@@ -18,11 +18,17 @@ const OS_PROJECT = process.env.OS_PROJECT_NAME || "Dung_Prj";
  * Mỗi call tự lấy token mới, không dùng token cứng.
  */
 export async function runCLI(command: string): Promise<string> {
-  const fullCmd = `bash -c 'source ${OPENRC} ${OS_USER} ${OS_PROJECT} > /dev/null 2>&1 && ${command}'`;
-  const { stdout, stderr } = await execAsync(fullCmd, { timeout: 60000 });
-  // stderr có thể có warning nhưng vẫn có stdout → bỏ qua
-  if (!stdout && stderr) throw new Error(stderr.trim());
-  return stdout.trim();
+  // bash -l (login shell) để load đầy đủ PATH giống interactive terminal
+  // Nếu không, Node.js subprocess không tìm thấy openstack binary
+  const fullCmd = `bash -lc 'source ${OPENRC} ${OS_USER} ${OS_PROJECT} && ${command} 2>&1'`;
+  try {
+    const { stdout, stderr } = await execAsync(fullCmd, { timeout: 60000 });
+    if (!stdout && stderr) throw new Error(stderr.trim());
+    return stdout.trim();
+  } catch (err: any) {
+    const detail = err.stderr?.trim() || err.stdout?.trim() || err.message;
+    throw new Error(detail);
+  }
 }
 
 // ─── Shell escape ──────────────────────────────────────────────────────────
