@@ -29,45 +29,51 @@ export async function runOpenStackCommand(
 }
 
 /**
- * Generate a bash user-data script for cloud-init.
+ * 1. Hàm generatePostCreateScript(body) bổ sung cấu hình user-data.
  */
-export function generateStartupScript(
+export function generatePostCreateScript(
+  instance_name: string,
   password: string,
-  environments: string[],
-  hostname?: string
+  environments: string[]
 ): string {
   let script = `#!/bin/bash
+# 1. Đặt hostname và cập nhật /etc/hosts
+hostnamectl set-hostname ${instance_name}
+echo "127.0.0.1 ${instance_name}" >> /etc/hosts
+
+# 2. Đổi password cho root và ubuntu, bật SSH password login
+echo "root:${password}" | chpasswd
 echo "ubuntu:${password}" | chpasswd
 sed -i 's/^#\\?PasswordAuthentication.*/PasswordAuthentication yes/' /etc/ssh/sshd_config
+sed -i 's/^#\\?PermitRootLogin.*/PermitRootLogin yes/' /etc/ssh/sshd_config
 find /etc/ssh/sshd_config.d -type f -name "*.conf" -exec sed -i 's/^#\\?PasswordAuthentication.*/PasswordAuthentication yes/' {} \\;
 systemctl restart ssh
-apt update -y
+
+# 3. Update & Upgrade mọi packages
+export DEBIAN_FRONTEND=noninteractive
+apt-get update -y
+apt-get upgrade -y
 `;
 
-  if (hostname) {
-    // Only alphanumeric and hyphens so it's relatively safe, but using simple escape anyway
-    script += `hostnamectl set-hostname ${hostname}\n`;
-  }
-
+  // 4. Cài cắm môi trường theo mảng JSON
   if (environments.includes("docker")) {
-    script += "apt install -y docker.io\n";
+    script += "apt-get install -y docker.io\n";
   }
-
   if (environments.includes("nodejs")) {
     script += "curl -fsSL https://deb.nodesource.com/setup_20.x | bash -\n";
-    script += "apt install -y nodejs\n";
+    script += "apt-get install -y nodejs\n";
   }
-
-  if (environments.includes("python")) {
-    script += "apt install -y python3 python3-pip\n";
+  if (environments.includes("python3") || environments.includes("python")) {
+    script += "apt-get install -y python3 python3-pip\n";
   }
-
+  if (environments.includes("git")) {
+    script += "apt-get install -y git\n";
+  }
   if (environments.includes("mysql")) {
-    script += "apt install -y mysql-server\n";
+    script += "apt-get install -y mysql-server\n";
   }
-
   if (environments.includes("nginx")) {
-    script += "apt install -y nginx\n";
+    script += "apt-get install -y nginx\n";
   }
 
   return script;
@@ -108,6 +114,7 @@ export interface CreateVMResponse {
   vm_name: string;
   vm_id?: string;
   status: string;
+  ip?: string;
   error?: string;
 }
 
@@ -201,6 +208,7 @@ export async function createOpenStackVM(
       vm_name: data.instance_name,
       vm_id: result.id || result.ID,
       status: result.status || "BUILD",
+      ip: result.addresses ? JSON.stringify(result.addresses) : "",
     };
   } catch (error) {
     const message =

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
-  generateStartupScript,
+  generatePostCreateScript,
   createOpenStackVM,
 } from "@/lib/openstack";
 
@@ -34,7 +34,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Validate instance name
+    // Validate instance name (which assumes role of hostname)
     const nameRegex = /^[a-zA-Z0-9][a-zA-Z0-9._-]*$/;
     
     if (!nameRegex.test(instance_name)) {
@@ -47,8 +47,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Generate startup script with instance_name as hostname
-    const startupScript = generateStartupScript(password, environments || [], instance_name);
+    // Generate startup script using instance_name
+    const startupScript = generatePostCreateScript(instance_name, password, environments || []);
 
     // Create the VM via OpenStack CLI
     const result = await createOpenStackVM(
