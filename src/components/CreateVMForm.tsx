@@ -74,8 +74,11 @@ export default function CreateVMForm() {
           instance_name: instanceName,
           password,
           flavor,
-          image: DEFAULT_OS,
+          os: "Ubuntu 24.04 Noble",
+          network: "public",
           environments: selectedEnvs,
+          username: "dung",
+          project: "Dung_Prj"
         }),
       });
 
