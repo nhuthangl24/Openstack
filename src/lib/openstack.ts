@@ -96,7 +96,6 @@ export async function cleanupTempFile(filepath: string): Promise<void> {
 
 export interface CreateVMData {
   instance_name: string;
-  hostname: string;
   password: string;
   flavor: string;
   os: string;
