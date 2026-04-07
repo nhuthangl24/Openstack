@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Terminal, X, Plug, PlugZap, ShieldCheck, Copy } from "lucide-react";
+import { Terminal, X, Plug, PlugZap, ShieldCheck } from "lucide-react";
 import { FitAddon } from "@xterm/addon-fit";
 import { WebLinksAddon } from "@xterm/addon-web-links";
 import { Terminal as XTerm } from "@xterm/xterm";
@@ -10,34 +10,8 @@ import "@xterm/xterm/css/xterm.css";
 interface WebSSHModalProps {
   vmName: string;
   host: string;
+  initialCommand?: string;
   onClose: () => void;
-}
-
-async function copyToClipboard(text: string): Promise<boolean> {
-  if (typeof navigator !== "undefined" && navigator.clipboard?.writeText) {
-    await navigator.clipboard.writeText(text);
-    return true;
-  }
-
-  if (typeof document === "undefined") return false;
-
-  const textarea = document.createElement("textarea");
-  textarea.value = text;
-  textarea.setAttribute("readonly", "");
-  textarea.style.position = "fixed";
-  textarea.style.opacity = "0";
-  textarea.style.pointerEvents = "none";
-  document.body.appendChild(textarea);
-  textarea.select();
-
-  let copied = false;
-  try {
-    copied = document.execCommand("copy");
-  } finally {
-    document.body.removeChild(textarea);
-  }
-
-  return copied;
 }
 
 function getSessionKey(vmName: string) {
@@ -54,19 +28,20 @@ function getDefaultWsUrl() {
 export default function WebSSHModal({
   vmName,
   host,
+  initialCommand,
   onClose,
 }: WebSSHModalProps) {
   const terminalRef = useRef<HTMLDivElement | null>(null);
   const xtermRef = useRef<XTerm | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
   const fitRef = useRef<FitAddon | null>(null);
+  const commandSentRef = useRef(false);
 
   const [username, setUsername] = useState("ubuntu");
   const [password, setPassword] = useState("");
   const [remember, setRemember] = useState(true);
   const [connected, setConnected] = useState(false);
   const [error, setError] = useState("");
-  const [copyMsg, setCopyMsg] = useState("");
 
   const wsUrl = useMemo(() => {
     if (typeof window === "undefined") return "";
@@ -149,13 +124,13 @@ export default function WebSSHModal({
 
     const term = new XTerm({
       fontFamily:
-        "var(--font-mono), ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace",
-      fontSize: 13,
+        "Arial, Helvetica, sans-serif",
+      fontSize: 12,
       theme: {
-        background: "#0a0b0d",
-        foreground: "#d2d6db",
-        cursor: "#7dd3fc",
-        selectionBackground: "#1f2937",
+        background: "#0b0f14",
+        foreground: "#d6dbe1",
+        cursor: "#ffffff",
+        selectionBackground: "#1c242f",
       },
       cursorBlink: true,
       scrollback: 2000,
@@ -176,6 +151,7 @@ export default function WebSSHModal({
 
     const ws = new WebSocket(wsUrl);
     wsRef.current = ws;
+    commandSentRef.current = false;
 
     ws.onopen = () => {
       setConnected(true);
@@ -189,6 +165,15 @@ export default function WebSSHModal({
         }),
       );
       term.focus();
+
+      if (initialCommand && !commandSentRef.current) {
+        commandSentRef.current = true;
+        setTimeout(() => {
+          if (ws.readyState === WebSocket.OPEN) {
+            ws.send(`${initialCommand}\n`);
+          }
+        }, 500);
+      }
     };
 
     ws.onmessage = (ev) => {
@@ -220,12 +205,6 @@ export default function WebSSHModal({
     setConnected(false);
   };
 
-  const handleCopy = async (text: string) => {
-    const ok = await copyToClipboard(text);
-    setCopyMsg(ok ? "Copied" : "Copy failed");
-    setTimeout(() => setCopyMsg(""), 1200);
-  };
-
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center p-4"
@@ -238,13 +217,13 @@ export default function WebSSHModal({
       }}
     >
       <div className="relative w-full max-w-5xl">
-        <div className="absolute -inset-[1px] rounded-2xl bg-gradient-to-br from-cyan-500/30 via-sky-500/10 to-emerald-500/20 blur-sm" />
+        <div className="absolute -inset-[1px] rounded-2xl bg-gradient-to-br from-white/5 via-white/0 to-white/5 blur-sm" />
 
-        <div className="relative overflow-hidden rounded-2xl border border-white/10 bg-[#0b0d10] shadow-2xl">
+        <div className="relative overflow-hidden rounded-2xl border border-white/10 bg-[#101216] shadow-2xl">
           <div className="flex items-center justify-between px-5 py-4 border-b border-white/10">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center">
-                <Terminal className="w-5 h-5 text-cyan-300" />
+              <div className="w-10 h-10 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center">
+                <Terminal className="w-5 h-5 text-white" />
               </div>
               <div>
                 <h3 className="text-sm font-semibold text-white">Web SSH</h3>
@@ -264,15 +243,15 @@ export default function WebSSHModal({
             </button>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-[320px_1fr]">
-            <div className="p-5 border-b lg:border-b-0 lg:border-r border-white/10">
+          <div className="grid grid-cols-1 lg:grid-cols-[300px_1fr]">
+            <div className="p-5 border-b lg:border-b-0 lg:border-r border-white/10 bg-black/20">
               <div className="space-y-4">
                 <div>
                   <label className="text-xs text-gray-400">Username</label>
                   <input
                     value={username}
                     onChange={(e) => setUsername(e.target.value)}
-                    className="mt-1 w-full rounded-lg border border-white/10 bg-black/40 px-3 py-2 text-sm text-white"
+                    className="mt-1 w-full rounded-lg border border-white/10 bg-black/40 px-3 py-2 text-sm text-white focus:border-white/30 focus:outline-none"
                     placeholder="ubuntu"
                   />
                 </div>
@@ -282,7 +261,7 @@ export default function WebSSHModal({
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     type="password"
-                    className="mt-1 w-full rounded-lg border border-white/10 bg-black/40 px-3 py-2 text-sm text-white"
+                    className="mt-1 w-full rounded-lg border border-white/10 bg-black/40 px-3 py-2 text-sm text-white focus:border-white/30 focus:outline-none"
                     placeholder="••••••••"
                   />
                 </div>
@@ -292,7 +271,7 @@ export default function WebSSHModal({
                     type="checkbox"
                     checked={remember}
                     onChange={(e) => setRemember(e.target.checked)}
-                    className="accent-cyan-400"
+                    className="accent-white"
                   />
                   Lưu tạm trong session của trình duyệt
                 </label>
@@ -301,7 +280,7 @@ export default function WebSSHModal({
                   {!connected ? (
                     <button
                       onClick={handleConnect}
-                      className="flex-1 inline-flex items-center justify-center gap-2 rounded-lg bg-cyan-400/90 hover:bg-cyan-300 text-black text-sm font-semibold px-3 py-2"
+                      className="flex-1 inline-flex items-center justify-center gap-2 rounded-lg bg-white text-black text-sm font-semibold px-3 py-2 hover:bg-gray-100"
                     >
                       <PlugZap className="w-4 h-4" /> Connect
                     </button>
@@ -332,54 +311,23 @@ export default function WebSSHModal({
                   </div>
                 )}
 
-                <div className="rounded-lg border border-white/10 bg-white/5 px-3 py-2">
+                <div className="rounded-lg border border-white/10 bg-black/40 px-3 py-2">
                   <div className="flex items-center gap-2 text-xs text-gray-400">
                     <ShieldCheck className="w-3.5 h-3.5 text-emerald-300" />
-                    Lưu mật khẩu chỉ trong session, không gửi lên server
-                    Next.js.
-                  </div>
-                </div>
-
-                <div className="pt-2">
-                  <p className="text-xs text-gray-500 mb-2">
-                    Quick deploy snippets
-                  </p>
-                  <div className="space-y-2">
-                    {[
-                      "sudo apt-get update -y",
-                      "git clone <repo> && cd <repo>",
-                      "npm install && npm run build",
-                      "pm2 start npm --name app -- start",
-                    ].map((cmd) => (
-                      <div
-                        key={cmd}
-                        className="flex items-center justify-between gap-2 rounded-lg bg-black/40 border border-white/10 px-2.5 py-1.5"
-                      >
-                        <code className="text-[11px] text-cyan-200 font-mono truncate">
-                          {cmd}
-                        </code>
-                        <button
-                          onClick={() => handleCopy(cmd)}
-                          className="p-1 rounded text-gray-400 hover:text-white hover:bg-white/10"
-                          title="Copy"
-                        >
-                          <Copy className="w-3 h-3" />
-                        </button>
-                      </div>
-                    ))}
-                    {copyMsg && (
-                      <div className="text-[11px] text-gray-500">{copyMsg}</div>
-                    )}
+                    Lưu mật khẩu chỉ trong session, không gửi lên server Next.js.
                   </div>
                 </div>
               </div>
             </div>
 
             <div className="p-4">
-              <div className="rounded-xl border border-white/10 bg-black/50 overflow-hidden">
+              <div className="rounded-xl border border-white/10 bg-[#0b0f14] overflow-hidden">
                 <div className="flex items-center justify-between px-3 py-2 border-b border-white/10 text-xs text-gray-500">
                   <span>Terminal</span>
-                  <span>{connected ? "Connected" : "Disconnected"}</span>
+                  <span className="inline-flex items-center gap-1.5">
+                    <span className={`w-1.5 h-1.5 rounded-full ${connected ? "bg-green-500" : "bg-red-500"}`} />
+                    {connected ? "Connected" : "Disconnected"}
+                  </span>
                 </div>
                 <div ref={terminalRef} className="h-[420px]" />
               </div>

@@ -31,6 +31,8 @@
 
 /* ── Vercel-style dark theme ── */
 :root {
+  --font-sans:           Arial, Helvetica, sans-serif;
+  --font-mono:           Arial, Helvetica, sans-serif;
   --background:           oklch(0.02 0 0);
   --foreground:           oklch(0.97 0 0);
   --card:                 oklch(0.07 0 0);

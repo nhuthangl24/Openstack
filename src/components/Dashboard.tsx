@@ -3,7 +3,6 @@
 import { useState, useEffect, useCallback } from "react";
 import {
   Plus,
-  RefreshCw,
   Terminal,
   Trash2,
   Copy,
@@ -14,10 +13,12 @@ import {
   TriangleAlert,
   CloudOff,
   MoreHorizontal,
+  Search,
 } from "lucide-react";
 import CreateServerModal from "@/components/CreateServerModal";
 import VMSuccessModal from "@/components/VMSuccessModal";
 import WebSSHModal from "@/components/WebSSHModal";
+import GitHubDeployModal from "@/components/GitHubDeployModal";
 import { toast } from "sonner";
 
 interface VM {
@@ -277,8 +278,11 @@ export default function Dashboard() {
   const [showCreate, setShowCreate] = useState(false);
   const [vmResult, setVmResult] = useState<VMResult | null>(null);
   const [deletingName, setDeletingName] = useState("");
-  const [sshVm, setSshVm] = useState<VM | null>(null);
-  const [deployTarget, setDeployTarget] = useState("");
+  const [sshSession, setSshSession] = useState<{
+    vm: VM;
+    command?: string;
+  } | null>(null);
+  const [showGitHub, setShowGitHub] = useState(false);
 
   const fetchVMs = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
@@ -320,6 +324,13 @@ export default function Dashboard() {
     }
   };
 
+  const handleDeployFromGitHub = (vmId: string, cloneUrl: string) => {
+    const vm = vms.find((item) => item.id === vmId);
+    if (!vm) return;
+    setShowGitHub(false);
+    setSshSession({ vm, command: `git clone ${cloneUrl}` });
+  };
+
   // Filtered VMs
   const filteredVMs = vms.filter((vm) => {
     if (filter === "active") return vm.status === "ACTIVE";
@@ -352,16 +363,16 @@ export default function Dashboard() {
       </div>
 
       {/* ── Navbar ─────────────────────────────────────────────────────────── */}
-      <header className="sticky top-0 z-40 border-b border-white/8 bg-black/85 backdrop-blur-xl">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between">
+      <header className="sticky top-0 z-40 border-b border-white/8 bg-black/80 backdrop-blur-2xl">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-4">
           {/* Logo */}
-          <div className="flex items-center gap-2.5">
-            <div className="w-7 h-7 bg-white rounded-md flex items-center justify-center flex-shrink-0">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 bg-white rounded-lg flex items-center justify-center flex-shrink-0 shadow-sm">
               <svg viewBox="0 0 24 24" className="w-4 h-4 fill-black">
                 <path d="M12 2L22 19.7H2L12 2Z" />
               </svg>
             </div>
-            <span className="text-sm font-semibold text-white">
+            <span className="text-sm font-semibold text-white tracking-wide">
               CloudDeploy
             </span>
             <span className="hidden sm:inline text-gray-700 text-sm">/</span>
@@ -371,12 +382,12 @@ export default function Dashboard() {
           </div>
 
           {/* Nav */}
-          <nav className="hidden md:flex items-center gap-1.5 text-xs text-gray-400">
+          <nav className="hidden lg:flex items-center gap-1.5 text-xs text-gray-400 bg-white/5 border border-white/10 rounded-full px-1 py-1">
             <a
               href="#servers"
-              className="px-3 py-1.5 rounded-full hover:text-white hover:bg-white/10 transition"
+              className="px-3 py-1.5 rounded-full bg-white text-black"
             >
-              Servers
+              Dashboard
             </a>
             <a
               href="#deploy"
@@ -384,39 +395,43 @@ export default function Dashboard() {
             >
               Deploy
             </a>
-            <a
-              href="#deploy"
-              className="px-3 py-1.5 rounded-full hover:text-white hover:bg-white/10 transition"
-            >
-              Terminal
-            </a>
           </nav>
 
           {/* Right */}
-          <div className="flex items-center gap-3">
-            <div className="hidden sm:flex items-center gap-1.5 text-xs text-gray-500 bg-white/5 border border-white/8 rounded-full px-3 py-1.5">
+          <div className="flex items-center gap-2">
+            <div className="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-full border border-white/10 bg-white/5">
+              <Search className="w-3.5 h-3.5 text-gray-500" />
+              <input
+                placeholder="Search VMs"
+                className="w-44 bg-transparent text-xs text-gray-200 placeholder:text-gray-600 focus:outline-none"
+              />
+            </div>
+
+            <div className="hidden sm:flex items-center gap-2 text-xs text-gray-400 bg-white/5 border border-white/10 rounded-full px-3 py-1.5">
               <span
                 className={`w-1.5 h-1.5 rounded-full ${error ? "bg-red-500" : "bg-green-500"}`}
               />
               {error ? "Disconnected" : "Connected"}
             </div>
+
             <button
-              onClick={() => fetchVMs(true)}
-              disabled={refreshing}
-              className="p-2 rounded-lg text-gray-500 hover:text-white hover:bg-white/6 transition-all"
-              title="Refresh"
+              onClick={() => setShowGitHub(true)}
+              className="hidden sm:inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-emerald-400/30 text-xs text-emerald-200 hover:text-white hover:border-emerald-300/60 transition"
+              title="Connect GitHub"
             >
-              <RefreshCw
-                className={`w-4 h-4 ${refreshing ? "animate-spin" : ""}`}
-              />
+              <span className="w-2 h-2 rounded-full bg-emerald-400" />
+              Connect GitHub
             </button>
             <button
               onClick={() => setShowCreate(true)}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white text-black text-sm font-semibold hover:bg-gray-100 transition-all"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white text-black text-sm font-semibold hover:bg-gray-100 transition-all shadow-sm"
             >
               <Plus className="w-4 h-4" />
               <span>New Server</span>
             </button>
+            <div className="hidden sm:flex items-center justify-center w-8 h-8 rounded-full bg-white/10 border border-white/10 text-xs text-gray-300">
+              AD
+            </div>
           </div>
         </div>
       </header>
@@ -471,6 +486,23 @@ export default function Dashboard() {
             </button>
           </div>
         )}
+
+        <section id="deploy" className="mb-6">
+          <div className="rounded-xl border border-white/10 bg-black/40 px-4 py-3 flex items-center justify-between gap-4">
+            <div>
+              <p className="text-sm font-medium text-white">Deploy from GitHub</p>
+              <p className="text-xs text-gray-500">
+                Chon repo public va clone ve VM ubuntu.
+              </p>
+            </div>
+            <button
+              onClick={() => setShowGitHub(true)}
+              className="px-3 py-1.5 rounded-full bg-white text-black text-xs font-semibold hover:bg-gray-100 transition-all"
+            >
+              Connect GitHub
+            </button>
+          </div>
+        </section>
 
         {/* Main card */}
         <div className="rounded-xl border border-white/8 bg-[#0a0a0a] overflow-hidden">
@@ -539,7 +571,7 @@ export default function Dashboard() {
                 vm={vm}
                 onDelete={handleDelete}
                 deleting={deletingName === vm.name}
-                onTerminal={(target) => setSshVm(target)}
+                onTerminal={(target) => setSshSession({ vm: target })}
               />
             ))}
 
@@ -551,6 +583,32 @@ export default function Dashboard() {
           )}
         </div>
 
+        {/* Deploy section */}
+        <section id="deploy" className="mt-8">
+          <div className="rounded-2xl border border-white/10 bg-[#0b0d10] p-5">
+            <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+              <div>
+                <h2 className="text-base font-semibold text-white">Deploy from GitHub</h2>
+                <p className="text-xs text-gray-500">
+                  Ket noi GitHub de chon repo, sau do clone ve VM ban chon.
+                </p>
+              </div>
+              <div className="flex flex-col sm:flex-row gap-3">
+                <button
+                  className="px-4 py-2 rounded-lg bg-white/10 hover:bg-white/15 text-white text-sm font-semibold"
+                >
+                  Connect GitHub
+                </button>
+                <button
+                  className="px-4 py-2 rounded-lg border border-white/10 text-gray-300 text-sm font-semibold hover:text-white hover:border-white/20"
+                >
+                  Select Repo
+                </button>
+              </div>
+            </div>
+          </div>
+        </section>
+
         {/* Footer note */}
         {!loading && vms.length > 0 && (
           <p className="text-xs text-gray-700 text-center mt-4">
@@ -558,56 +616,6 @@ export default function Dashboard() {
           </p>
         )}
 
-        {/* Deploy section */}
-        <section id="deploy" className="mt-10 scroll-mt-24">
-          <div className="rounded-2xl border border-white/10 bg-gradient-to-br from-[#0b0d10] via-[#0b0d10] to-[#0a1210] p-6">
-            <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-              <div>
-                <h2 className="text-lg font-semibold text-white">
-                  Deploy in Browser
-                </h2>
-                <p className="text-sm text-gray-500">
-                  Chọn VM và mở terminal để deploy nhanh.
-                </p>
-              </div>
-              <div className="flex flex-col sm:flex-row gap-3">
-                <select
-                  value={deployTarget}
-                  onChange={(e) => setDeployTarget(e.target.value)}
-                  className="min-w-[220px] rounded-lg border border-white/10 bg-black/40 px-3 py-2 text-sm text-white"
-                >
-                  <option value="">Select a VM</option>
-                  {vms.map((vm) => (
-                    <option key={vm.id} value={vm.id}>
-                      {vm.name} {vm.ip ? `(${vm.ip})` : "(no IP)"}
-                    </option>
-                  ))}
-                </select>
-                <button
-                  onClick={() => {
-                    const target = vms.find((v) => v.id === deployTarget);
-                    if (target) setSshVm(target);
-                  }}
-                  disabled={!deployTarget}
-                  className="px-4 py-2 rounded-lg bg-cyan-400/90 hover:bg-cyan-300 text-black text-sm font-semibold disabled:opacity-40 disabled:cursor-not-allowed"
-                >
-                  Open Web SSH
-                </button>
-              </div>
-            </div>
-            <div className="mt-5 grid grid-cols-1 md:grid-cols-3 gap-3 text-xs text-gray-400">
-              <div className="rounded-lg border border-white/10 bg-black/40 px-3 py-2">
-                1. Connect SSH ngay tren web
-              </div>
-              <div className="rounded-lg border border-white/10 bg-black/40 px-3 py-2">
-                2. Git clone + build + run
-              </div>
-              <div className="rounded-lg border border-white/10 bg-black/40 px-3 py-2">
-                3. Dung PM2 de giu app chay nen
-              </div>
-            </div>
-          </div>
-        </section>
       </main>
 
       {/* ── Modals ─────────────────────────────────────────────────────────── */}
@@ -632,11 +640,20 @@ export default function Dashboard() {
         />
       )}
 
-      {sshVm && (
+      {showGitHub && (
+        <GitHubDeployModal
+          vms={vms}
+          onDeploy={handleDeployFromGitHub}
+          onClose={() => setShowGitHub(false)}
+        />
+      )}
+
+      {sshSession && (
         <WebSSHModal
-          vmName={sshVm.name}
-          host={sshVm.ip}
-          onClose={() => setSshVm(null)}
+          vmName={sshSession.vm.name}
+          host={sshSession.vm.ip}
+          initialCommand={sshSession.command}
+          onClose={() => setSshSession(null)}
         />
       )}
     </div>
