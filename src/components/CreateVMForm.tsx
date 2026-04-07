@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -39,6 +39,14 @@ export default function CreateVMForm() {
   
   // State for success screen
   const [successData, setSuccessData] = useState<any>(null);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  // Prevent SSR/CSR mismatch
+  if (!mounted) return null;
 
   const validate = (): boolean => {
     const newErrors: Record<string, string> = {};
