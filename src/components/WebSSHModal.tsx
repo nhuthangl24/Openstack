@@ -124,13 +124,14 @@ export default function WebSSHModal({
 
     const term = new XTerm({
       fontFamily:
-        "Arial, Helvetica, sans-serif",
-      fontSize: 12,
+        "Consolas, Menlo, Monaco, 'Courier New', monospace",
+      fontSize: 15,
+      lineHeight: 1.25,
       theme: {
         background: "#0b0f14",
-        foreground: "#d6dbe1",
+        foreground: "#e6e9ee",
         cursor: "#ffffff",
-        selectionBackground: "#1c242f",
+        selectionBackground: "#222a34",
       },
       cursorBlink: true,
       scrollback: 2000,
@@ -245,8 +246,8 @@ export default function WebSSHModal({
             </button>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-[300px_1fr] min-w-0">
-            <div className="p-5 border-b lg:border-b-0 lg:border-r border-white/10 bg-black/20">
+          <div className="grid grid-cols-1 lg:grid-cols-[280px_1fr] min-w-0">
+            <div className="p-4 border-b lg:border-b-0 lg:border-r border-white/10 bg-black/20">
               <div className="space-y-4">
                 <div>
                   <label className="text-xs text-gray-400">Username</label>
@@ -331,7 +332,7 @@ export default function WebSSHModal({
                     {connected ? "Connected" : "Disconnected"}
                   </span>
                 </div>
-                <div ref={terminalRef} className="h-[420px] w-full" />
+                <div ref={terminalRef} className="h-[520px] w-full" />
               </div>
             </div>
           </div>

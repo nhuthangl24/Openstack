@@ -10,11 +10,14 @@ export async function GET(request: NextRequest) {
     headers: {
       Authorization: `Bearer ${token}`,
       Accept: "application/vnd.github+json",
+      "User-Agent": "CloudDeploy",
     },
   });
 
   if (!res.ok) {
-    return NextResponse.json({ error: "GitHub API error" }, { status: 500 });
+    const data = await res.json().catch(() => ({}));
+    const message = data.message || "GitHub API error";
+    return NextResponse.json({ error: message }, { status: res.status });
   }
 
   const repos = await res.json();

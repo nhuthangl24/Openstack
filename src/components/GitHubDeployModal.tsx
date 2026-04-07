@@ -42,6 +42,7 @@ export default function GitHubDeployModal({
   const [status, setStatus] = useState("");
   const [repos, setRepos] = useState<RepoOption[]>([]);
   const [selectedRepo, setSelectedRepo] = useState("");
+  const [repoInput, setRepoInput] = useState("");
   const [selectedVm, setSelectedVm] = useState("");
   const [error, setError] = useState("");
   const pollRef = useRef<number | null>(null);
@@ -50,6 +51,15 @@ export default function GitHubDeployModal({
     () => repos.find((r) => r.full_name === selectedRepo) || null,
     [repos, selectedRepo],
   );
+
+  const manualCloneUrl = useMemo(() => {
+    const raw = repoInput.trim();
+    if (!raw) return "";
+    if (raw.startsWith("git@") || raw.startsWith("http")) return raw;
+    if (raw.includes("github.com")) return raw;
+    if (raw.includes("/")) return `https://github.com/${raw}.git`;
+    return "";
+  }, [repoInput]);
 
   const stopPolling = () => {
     if (pollRef.current) {
@@ -63,14 +73,15 @@ export default function GitHubDeployModal({
     setError("");
     try {
       const res = await fetch("/api/github/repos");
-      if (!res.ok) throw new Error("Not connected");
       const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Not connected");
       setRepos(data.repos || []);
       if (data.repos?.length) {
         setSelectedRepo(data.repos[0].full_name);
       }
-    } catch {
+    } catch (err) {
       setRepos([]);
+      setError(err instanceof Error ? err.message : "Failed to load repos");
     } finally {
       setLoading(false);
     }
@@ -132,9 +143,10 @@ export default function GitHubDeployModal({
   }, []);
 
   const handleDeploy = () => {
-    if (!selectedRepoObj) return;
+    const cloneUrl = manualCloneUrl || selectedRepoObj?.clone_url;
+    if (!cloneUrl) return;
     if (!selectedVm) return;
-    onDeploy(selectedVm, selectedRepoObj.clone_url);
+    onDeploy(selectedVm, cloneUrl);
   };
 
   return (
@@ -185,6 +197,12 @@ export default function GitHubDeployModal({
                   </button>
                 </div>
 
+                {!device && !loading && !error && (
+                  <div className="mt-3 text-xs text-gray-500">
+                    No repos loaded yet. Connect GitHub or refresh after approval.
+                  </div>
+                )}
+
                 {device && (
                   <div className="mt-4 rounded-lg border border-white/10 bg-black/60 p-3 text-xs text-gray-400">
                     <div className="flex items-center justify-between">
@@ -214,6 +232,23 @@ export default function GitHubDeployModal({
                 )}
               </div>
             )}
+
+            <div className="rounded-xl border border-white/10 bg-black/40 p-4 space-y-3">
+              <div>
+                <label className="text-xs text-gray-400">Paste repo link (optional)</label>
+                <input
+                  value={repoInput}
+                  onChange={(e) => setRepoInput(e.target.value)}
+                  placeholder="https://github.com/user/repo"
+                  className="mt-1 w-full rounded-lg border border-white/10 bg-black/60 px-3 py-2 text-sm text-white"
+                />
+                {manualCloneUrl && (
+                  <div className="mt-2 text-xs text-gray-500">
+                    Clone: <span className="text-gray-300">{manualCloneUrl}</span>
+                  </div>
+                )}
+              </div>
+            </div>
 
             {repos.length > 0 && (
               <div className="rounded-xl border border-white/10 bg-black/40 p-4 space-y-4">
@@ -262,7 +297,7 @@ export default function GitHubDeployModal({
                   </div>
                 </div>
 
-                {selectedRepoObj && (
+                {selectedRepoObj && !manualCloneUrl && (
                   <div className="text-xs text-gray-500">
                     Repo: <span className="text-gray-300">{selectedRepoObj.clone_url}</span>
                   </div>
@@ -271,7 +306,7 @@ export default function GitHubDeployModal({
                 <div className="flex items-center justify-end gap-2">
                   <button
                     onClick={handleDeploy}
-                    disabled={!selectedRepoObj || !selectedVm}
+                    disabled={!selectedVm || (!manualCloneUrl && !selectedRepoObj)}
                     className="px-4 py-2 rounded-lg bg-white text-black text-sm font-semibold hover:bg-gray-100 disabled:opacity-50"
                   >
                     Open Web SSH & Clone

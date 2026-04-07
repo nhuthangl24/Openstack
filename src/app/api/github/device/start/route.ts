@@ -11,7 +11,7 @@ export async function POST() {
 
   const body = new URLSearchParams({
     client_id: clientId,
-    scope: "public_repo read:user",
+    scope: "repo read:user",
   });
 
   const res = await fetch("https://github.com/login/device/code", {
