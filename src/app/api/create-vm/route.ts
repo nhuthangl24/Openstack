@@ -1,19 +1,24 @@
 import { NextRequest, NextResponse } from "next/server";
-import { generateStartupScript } from "@/lib/generate-script";
-import { createOpenStackVM } from "@/lib/openstack";
+import {
+  generateStartupScript,
+  createOpenStackVM,
+} from "@/lib/openstack";
+
+export const dynamic = "force-dynamic";
 
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
 
-    const { instance_name, password, flavor, os, environments } = body;
+    const { instance_name, password, flavor, image, environments } = body;
 
     // Validate required fields
-    if (!instance_name || !password || !flavor) {
+    if (!instance_name || !password || !flavor || !image) {
       return NextResponse.json(
         {
           success: false,
-          error: "Missing required fields: instance_name, password, flavor",
+          error:
+            "Missing required fields: instance_name, password, flavor, image",
         },
         { status: 400 }
       );
@@ -49,28 +54,30 @@ export async function POST(request: NextRequest) {
       environments || []
     );
 
-    // Create the VM via OpenStack (stub)
+    // Create the VM via OpenStack CLI
     const result = await createOpenStackVM(
       {
         instance_name,
         password,
         flavor,
-        os: os || "Ubuntu 24.04",
+        image,
         environments: environments || [],
       },
       startupScript
     );
 
-    return NextResponse.json({
-      ...result,
-      message: `VM "${instance_name}" is being created with flavor ${flavor}`,
-      startup_script_preview: startupScript.substring(0, 200) + "...",
-    });
+    if (!result.success) {
+      return NextResponse.json(result, { status: 500 });
+    }
+
+    return NextResponse.json(result);
   } catch (error) {
-    console.error("Error creating VM:", error);
+    console.error("[API /api/create-vm] Error:", error);
     return NextResponse.json(
       {
         success: false,
+        vm_name: "",
+        status: "ERROR",
         error: "Internal server error while creating VM",
       },
       { status: 500 }

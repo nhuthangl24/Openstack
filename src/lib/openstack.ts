@@ -8,7 +8,7 @@ import { tmpdir } from "os";
 const execAsync = promisify(exec);
 
 const OPENRC_PATH = "/opt/stack/devstack/openrc";
-const OPENRC_SOURCE = `source ${OPENRC_PATH} admin admin`;
+const OPENRC_SOURCE = `source ${OPENRC_PATH} dung mtdung2004`;
 
 /**
  * Execute an OpenStack CLI command with sourced credentials.
