@@ -46,13 +46,13 @@ export default function CreateVMForm() {
 
   // Poll IP after VM created
   useEffect(() => {
-    if (!successData?.vmId || successData?.ip) return;
+    if (!successData?.instanceName || successData?.ip) return;
     let stopped = false;
     const poll = async () => {
       while (!stopped) {
         await new Promise(r => setTimeout(r, 5000));
         try {
-          const res = await fetch(`/api/vm-ip?id=${successData.vmId}`);
+          const res = await fetch(`/api/vm-ip?name=${encodeURIComponent(successData.instanceName)}`);
           const data = await res.json();
           if (data.ip) {
             setSuccessData((prev: any) => ({ ...prev, ip: data.ip }));
@@ -63,7 +63,7 @@ export default function CreateVMForm() {
     };
     poll();
     return () => { stopped = true; };
-  }, [successData?.vmId]);
+  }, [successData?.instanceName]);
 
   if (!mounted) return null;
 

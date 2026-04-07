@@ -181,19 +181,20 @@ bot.action("create_confirm", async (ctx) => {
         for (let i = 0; i < 24 && !ip; i++) {
           await new Promise(r => setTimeout(r, 5000));
           try {
-            const { runOpenStackCommand, escapeShellArg } = await import("./src/lib/openstack");
-            const out = await runOpenStackCommand(`openstack server show ${escapeShellArg(vmId)} -f json`, openstackEnv);
-            const vm = JSON.parse(out);
-            if (vm.addresses) {
-              if (typeof vm.addresses === "string") {
-                const m = vm.addresses.match(/(\d{1,3}(?:\.\d{1,3}){3})/);
-                if (m) ip = m[1];
-              } else if (typeof vm.addresses === "object") {
-                for (const nets of Object.values(vm.addresses) as any[]) {
-                  if (Array.isArray(nets) && nets[0]?.addr) { ip = nets[0].addr; break; }
-                }
-              }
-            }
+            const { stdout } = await import("child_process").then(({ exec }) =>
+              new Promise<{ stdout: string; stderr: string }>((res, rej) =>
+                exec(
+                  `bash -c 'openstack server show ${JSON.stringify(instance_name)} -c addresses -f value'`,
+                  {
+                    timeout: 15000,
+                    env: { ...process.env, OS_CLOUD: "", ...openstackEnv }
+                  },
+                  (err, stdout, stderr) => err ? rej(err) : res({ stdout, stderr })
+                )
+              )
+            );
+            const m = stdout.match(/(\d{1,3}(?:\.\d{1,3}){3})/);
+            if (m) ip = m[1];
           } catch {}
         }
       }
