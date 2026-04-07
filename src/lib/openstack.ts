@@ -106,6 +106,47 @@ export interface CreateVMResponse {
 }
 
 /**
+ * Safely escape a string for bash shell argument passing.
+ */
+export function escapeShellArg(arg: string): string {
+  return `'${arg.replace(/'/g, "'\\''")}'`;
+}
+
+/**
+ * Verify if an OpenStack resource exists by name or ID.
+ */
+export async function verifyOpenStackResource(
+  type: "network" | "image" | "flavor",
+  name: string,
+  envVars: Record<string, string>
+): Promise<boolean> {
+  const cmd = `openstack ${type} show ${escapeShellArg(name)} -f json`;
+  try {
+    await runOpenStackCommand(cmd, envVars);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export interface CreateVMData {
+  instance_name: string;
+  password: string;
+  flavor: string;
+  os: string;
+  network: string;
+  environments: string[];
+}
+
+export interface CreateVMResponse {
+  success: boolean;
+  vm_name: string;
+  vm_id?: string;
+  status: string;
+  error?: string;
+}
+
+/**
  * Create a VM on OpenStack using CLI.
  */
 export async function createOpenStackVM(
@@ -115,20 +156,6 @@ export async function createOpenStackVM(
   let scriptPath = "";
 
   try {
-    // Write user-data to temp file
-    scriptPath = await writeTempScript(script);
-
-    // Build the openstack server create command
-    const cmd = [
-      "openstack server create",
-      `--image '${data.os}'`,
-      `--flavor '${data.flavor}'`,
-      `--network '${data.network}'`,
-      `--user-data '${scriptPath}'`,
-      `'${data.instance_name}'`,
-      "-f json",
-    ].join(" ");
-
     // Ensure FULL OpenStack environment variables are injected into child_process.exec env
     const openstackEnv = {
       OS_AUTH_URL: process.env.OS_AUTH_URL || "http://127.0.0.1/identity",
@@ -140,6 +167,41 @@ export async function createOpenStackVM(
       OS_PROJECT_NAME: "Dung_Prj",
       OS_PASSWORD: "mtdung2004",
     };
+
+    // 1. Verify existence of required resources before creating
+    const [networkValid, imageValid, flavorValid] = await Promise.all([
+      verifyOpenStackResource("network", data.network, openstackEnv),
+      verifyOpenStackResource("image", data.os, openstackEnv),
+      verifyOpenStackResource("flavor", data.flavor, openstackEnv),
+    ]);
+
+    if (!networkValid || !imageValid || !flavorValid) {
+      const missing = [];
+      if (!networkValid) missing.push(`Network: ${data.network}`);
+      if (!imageValid) missing.push(`Image: ${data.os}`);
+      if (!flavorValid) missing.push(`Flavor: ${data.flavor}`);
+      
+      return {
+        success: false,
+        vm_name: data.instance_name,
+        status: "ERROR",
+        error: `Resources not found in OpenStack: ${missing.join(', ')}`,
+      };
+    }
+
+    // Write user-data to temp file
+    scriptPath = await writeTempScript(script);
+
+    // Build the openstack server create command with properly escaped shell arguments
+    const cmd = [
+      "openstack server create",
+      `--image ${escapeShellArg(data.os)}`,
+      `--flavor ${escapeShellArg(data.flavor)}`,
+      `--network ${escapeShellArg(data.network)}`,
+      `--user-data ${escapeShellArg(scriptPath)}`,
+      `${escapeShellArg(data.instance_name)}`,
+      "-f json",
+    ].join(" ");
 
     const output = await runOpenStackCommand(cmd, openstackEnv);
     const result = JSON.parse(output);
