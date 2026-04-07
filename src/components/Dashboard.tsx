@@ -7,6 +7,7 @@ import {
 } from "lucide-react";
 import CreateServerModal from "@/components/CreateServerModal";
 import VMSuccessModal from "@/components/VMSuccessModal";
+import WebSSHModal from "@/components/WebSSHModal";
 import { toast } from "sonner";
 
 interface VM {
@@ -92,7 +93,17 @@ function CopyBtn({ text, label }: { text: string; label?: string }) {
 }
 
 // ── VM Row ───────────────────────────────────────────────────────────────────
-function VMRow({ vm, onDelete, deleting }: { vm: VM; onDelete: (name: string) => void; deleting: boolean }) {
+function VMRow({
+  vm,
+  onDelete,
+  deleting,
+  onTerminal,
+}: {
+  vm: VM;
+  onDelete: (name: string) => void;
+  deleting: boolean;
+  onTerminal: (vm: VM) => void;
+}) {
   const [confirmDel, setConfirmDel] = useState(false);
   const sshCmd = `ssh ubuntu@${vm.ip || "<IP>"}`;
 
@@ -138,6 +149,15 @@ function VMRow({ vm, onDelete, deleting }: { vm: VM; onDelete: (name: string) =>
           <>
             {vm.ip && (
               <CopyBtn text={sshCmd} label="SSH command" />
+            )}
+            {vm.ip && (
+              <button
+                onClick={() => onTerminal(vm)}
+                className="p-1.5 rounded text-gray-600 hover:text-cyan-300 hover:bg-cyan-400/10 transition-all"
+                title="Open Web SSH"
+              >
+                <Terminal className="w-3.5 h-3.5" />
+              </button>
             )}
             <button
               onClick={() => setConfirmDel(true)}
@@ -213,6 +233,8 @@ export default function Dashboard() {
   const [showCreate, setShowCreate] = useState(false);
   const [vmResult, setVmResult]     = useState<VMResult | null>(null);
   const [deletingName, setDeletingName] = useState("");
+  const [sshVm, setSshVm]           = useState<VM | null>(null);
+  const [deployTarget, setDeployTarget] = useState("");
 
   const fetchVMs = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
@@ -277,10 +299,14 @@ export default function Dashboard() {
   ];
 
   return (
-    <div className="min-h-screen bg-black text-white flex flex-col">
+    <div className="min-h-screen bg-black text-white flex flex-col relative">
+      <div className="absolute inset-0 pointer-events-none">
+        <div className="absolute -top-40 right-0 w-[520px] h-[520px] rounded-full bg-cyan-500/10 blur-[120px]" />
+        <div className="absolute top-64 -left-32 w-[420px] h-[420px] rounded-full bg-emerald-500/10 blur-[120px]" />
+      </div>
 
       {/* ── Navbar ─────────────────────────────────────────────────────────── */}
-      <header className="sticky top-0 z-40 border-b border-white/8 bg-black/90 backdrop-blur-md">
+      <header className="sticky top-0 z-40 border-b border-white/8 bg-black/85 backdrop-blur-xl">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between">
           {/* Logo */}
           <div className="flex items-center gap-2.5">
@@ -291,8 +317,15 @@ export default function Dashboard() {
             </div>
             <span className="text-sm font-semibold text-white">CloudDeploy</span>
             <span className="hidden sm:inline text-gray-700 text-sm">/</span>
-            <span className="hidden sm:inline text-sm text-gray-400">Servers</span>
+            <span className="hidden sm:inline text-sm text-gray-400">Infrastructure</span>
           </div>
+
+          {/* Nav */}
+          <nav className="hidden md:flex items-center gap-1.5 text-xs text-gray-400">
+            <a href="#servers" className="px-3 py-1.5 rounded-full hover:text-white hover:bg-white/10 transition">Servers</a>
+            <a href="#deploy" className="px-3 py-1.5 rounded-full hover:text-white hover:bg-white/10 transition">Deploy</a>
+            <a href="#deploy" className="px-3 py-1.5 rounded-full hover:text-white hover:bg-white/10 transition">Terminal</a>
+          </nav>
 
           {/* Right */}
           <div className="flex items-center gap-3">
@@ -320,10 +353,10 @@ export default function Dashboard() {
       </header>
 
       {/* ── Main ─────────────────────────────────────────────────────────────── */}
-      <main className="flex-1 max-w-6xl mx-auto w-full px-4 sm:px-6 py-8">
+      <main className="flex-1 max-w-6xl mx-auto w-full px-4 sm:px-6 py-8 relative z-10">
 
         {/* Page title + stats */}
-        <div className="flex items-start justify-between mb-6">
+        <div id="servers" className="flex items-start justify-between mb-6 scroll-mt-24">
           <div>
             <h1 className="text-xl font-bold text-white">Servers</h1>
             <p className="text-sm text-gray-500 mt-0.5">
@@ -405,6 +438,7 @@ export default function Dashboard() {
               vm={vm}
               onDelete={handleDelete}
               deleting={deletingName === vm.name}
+              onTerminal={(target) => setSshVm(target)}
             />
           ))}
 
@@ -416,12 +450,54 @@ export default function Dashboard() {
           )}
         </div>
 
+
         {/* Footer note */}
         {!loading && vms.length > 0 && (
           <p className="text-xs text-gray-700 text-center mt-4">
             Auto-refreshes every 15 seconds · Hover a row for actions
           </p>
         )}
+
+        {/* Deploy section */}
+        <section id="deploy" className="mt-10 scroll-mt-24">
+          <div className="rounded-2xl border border-white/10 bg-gradient-to-br from-[#0b0d10] via-[#0b0d10] to-[#0a1210] p-6">
+            <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+              <div>
+                <h2 className="text-lg font-semibold text-white">Deploy in Browser</h2>
+                <p className="text-sm text-gray-500">Chọn VM và mở terminal để deploy nhanh.</p>
+              </div>
+              <div className="flex flex-col sm:flex-row gap-3">
+                <select
+                  value={deployTarget}
+                  onChange={(e) => setDeployTarget(e.target.value)}
+                  className="min-w-[220px] rounded-lg border border-white/10 bg-black/40 px-3 py-2 text-sm text-white"
+                >
+                  <option value="">Select a VM</option>
+                  {vms.map(vm => (
+                    <option key={vm.id} value={vm.id}>
+                      {vm.name} {vm.ip ? `(${vm.ip})` : "(no IP)"}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  onClick={() => {
+                    const target = vms.find(v => v.id === deployTarget);
+                    if (target) setSshVm(target);
+                  }}
+                  disabled={!deployTarget}
+                  className="px-4 py-2 rounded-lg bg-cyan-400/90 hover:bg-cyan-300 text-black text-sm font-semibold disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  Open Web SSH
+                </button>
+              </div>
+            </div>
+            <div className="mt-5 grid grid-cols-1 md:grid-cols-3 gap-3 text-xs text-gray-400">
+              <div className="rounded-lg border border-white/10 bg-black/40 px-3 py-2">1. Connect SSH ngay tren web</div>
+              <div className="rounded-lg border border-white/10 bg-black/40 px-3 py-2">2. Git clone + build + run</div>
+              <div className="rounded-lg border border-white/10 bg-black/40 px-3 py-2">3. Dung PM2 de giu app chay nen</div>
+            </div>
+          </div>
+        </section>
       </main>
 
       {/* ── Modals ─────────────────────────────────────────────────────────── */}
@@ -440,6 +516,14 @@ export default function Dashboard() {
         <VMSuccessModal
           info={vmResult}
           onClose={() => { setVmResult(null); fetchVMs(true); }}
+        />
+      )}
+
+      {sshVm && (
+        <WebSSHModal
+          vmName={sshVm.name}
+          host={sshVm.ip}
+          onClose={() => setSshVm(null)}
         />
       )}
     </div>
