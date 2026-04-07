@@ -1,6 +1,7 @@
 export interface Environment {
   id: string;
   label: string;
+  icon: string;
   description: string;
 }
 
@@ -8,29 +9,34 @@ export const environments: Environment[] = [
   {
     id: "docker",
     label: "Docker",
+    icon: "🐳",
     description: "Container runtime engine",
   },
   {
     id: "nodejs",
     label: "NodeJS",
+    icon: "🟢",
     description: "JavaScript runtime v20.x",
-  },
-  {
-    id: "pm2",
-    label: "PM2",
-    description: "Production Process Manager for Node.js",
   },
   {
     id: "python",
     label: "Python",
+    icon: "🐍",
     description: "Python 3 + pip",
   },
   {
-    id: "java",
-    label: "Java",
-    description: "Default JDK",
+    id: "mysql",
+    label: "MySQL",
+    icon: "🗄️",
+    description: "MySQL database server",
   },
   {
+    id: "nginx",
+    label: "Nginx",
+    icon: "⚡",
+    description: "High-performance web server",
+  },
+];
     id: "php",
     label: "PHP",
     description: "PHP + CLI + FPM",

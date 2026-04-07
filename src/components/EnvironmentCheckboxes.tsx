@@ -51,6 +51,9 @@ export default function EnvironmentCheckboxes({
                 onCheckedChange={() => toggleEnvironment(env.id)}
                 className="data-[state=checked]:bg-chart-1 data-[state=checked]:border-chart-1"
               />
+              <span className="text-lg" role="img" aria-label={env.label}>
+                {env.icon}
+              </span>
               <div className="flex-1 min-w-0">
                 <p
                   className={`text-sm font-medium ${
