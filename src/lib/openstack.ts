@@ -8,13 +8,20 @@ import { tmpdir } from "os";
 const execAsync = promisify(exec);
 
 const OPENRC_PATH = "/opt/stack/devstack/openrc";
-const OPENRC_SOURCE = `source ${OPENRC_PATH} dung mtdung2004`;
 
 /**
  * Execute an OpenStack CLI command with sourced credentials.
  */
-export async function runOpenStackCommand(command: string): Promise<string> {
-  const fullCommand = `bash -c '${OPENRC_SOURCE} && ${command}'`;
+export async function runOpenStackCommand(
+  command: string,
+  username?: string,
+  project?: string
+): Promise<string> {
+  const osUsername = username || "dung";
+  const osProject = project || "dung";
+  // The user instruction: source openrc <username> <project> (Note: normally openrc takes <project> <username>, using custom order as requested, but with OS_PASSWORD)
+  const openrcSource = `export OS_PASSWORD=mtdung2004 && source ${OPENRC_PATH} ${osUsername} ${osProject}`;
+  const fullCommand = `bash -c '${openrcSource} && ${command}'`;
 
   const { stdout, stderr } = await execAsync(fullCommand, {
     timeout: 30000,
@@ -92,8 +99,11 @@ export interface CreateVMData {
   instance_name: string;
   password: string;
   flavor: string;
-  image: string;
+  os: string;
+  network: string;
   environments: string[];
+  username?: string;
+  project?: string;
 }
 
 export interface CreateVMResponse {
@@ -120,15 +130,15 @@ export async function createOpenStackVM(
     // Build the openstack server create command
     const cmd = [
       "openstack server create",
-      `--image '${data.image}'`,
+      `--image '${data.os}'`,
       `--flavor '${data.flavor}'`,
-      "--network public",
+      `--network '${data.network}'`,
       `--user-data '${scriptPath}'`,
       `'${data.instance_name}'`,
       "-f json",
     ].join(" ");
 
-    const output = await runOpenStackCommand(cmd);
+    const output = await runOpenStackCommand(cmd, data.username, data.project);
     const result = JSON.parse(output);
 
     return {

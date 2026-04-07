@@ -10,15 +10,15 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
 
-    const { instance_name, password, flavor, image, environments } = body;
+    const { instance_name, password, flavor, os, network, environments, username, project } = body;
 
     // Validate required fields
-    if (!instance_name || !password || !flavor || !image) {
+    if (!instance_name || !password || !flavor || !os || !network) {
       return NextResponse.json(
         {
           success: false,
           error:
-            "Missing required fields: instance_name, password, flavor, image",
+            "Missing required fields: instance_name, password, flavor, os, network",
         },
         { status: 400 }
       );
@@ -60,13 +60,21 @@ export async function POST(request: NextRequest) {
         instance_name,
         password,
         flavor,
-        image,
+        os,
+        network,
         environments: environments || [],
+        username,
+        project,
       },
       startupScript
     );
 
     if (!result.success) {
+      // Return specific error status if it resembles 401 Authentication Required
+      const errMessage = result.error || "";
+      if (errMessage.includes("HTTP 401") || errMessage.includes("requires authentication")) {
+        return NextResponse.json(result, { status: 401 });
+      }
       return NextResponse.json(result, { status: 500 });
     }
 
