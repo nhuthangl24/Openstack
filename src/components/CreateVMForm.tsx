@@ -19,19 +19,25 @@ import {
   Loader2,
   Rocket,
   Sparkles,
+  CheckCircle2,
+  Copy,
+  Terminal,
+  Activity
 } from "lucide-react";
 
 const DEFAULT_OS = "Ubuntu 24.04 LTS";
 
 export default function CreateVMForm() {
   const [instanceName, setInstanceName] = useState("");
-  const [hostname, setHostname] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [flavor, setFlavor] = useState("");
   const [selectedEnvs, setSelectedEnvs] = useState<string[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  
+  // State for success screen
+  const [successData, setSuccessData] = useState<any>(null);
 
   const validate = (): boolean => {
     const newErrors: Record<string, string> = {};
@@ -43,15 +49,6 @@ export default function CreateVMForm() {
       if (!nameRegex.test(instanceName)) {
         newErrors.instanceName =
           "Tên chỉ chứa chữ, số, dấu chấm, gạch nối, gạch dưới";
-      }
-    }
-
-    if (!hostname.trim()) {
-      newErrors.hostname = "Hostname là bắt buộc";
-    } else {
-      const hostRegex = /^[a-zA-Z0-9-]*$/;
-      if (!hostRegex.test(hostname)) {
-        newErrors.hostname = "Hostname chỉ chứa chữ, số, gạch nối";
       }
     }
 
@@ -82,7 +79,6 @@ export default function CreateVMForm() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           instance_name: instanceName,
-          hostname,
           password,
           flavor,
           os: "e463cada-459d-4a95-9fac-faeeb90817f3",
@@ -100,13 +96,16 @@ export default function CreateVMForm() {
           description: `Flavor: ${flavor} | Status: ${data.status}`,
           duration: 5000,
         });
-        // Reset form
-        setInstanceName("");
-        setHostname("");
-        setPassword("");
-        setFlavor("");
-        setSelectedEnvs([]);
-        setErrors({});
+        
+        // Show success screen instead of resetting
+        setSuccessData({
+          instanceName,
+          password,
+          flavor,
+          ip: data.ip || "Đang cấp phát...",
+          vmId: data.vm_id,
+          environments: selectedEnvs
+        });
       } else {
         toast.error("Không thể tạo máy ảo", {
           description: data.error,
@@ -120,6 +119,90 @@ export default function CreateVMForm() {
       setIsSubmitting(false);
     }
   };
+
+  const copyToClipboard = (text: string) => {
+    navigator.clipboard.writeText(text);
+    toast.success("Đã copy vào bộ nhớ tạm");
+  };
+
+  if (successData) {
+    return (
+      <div className="max-w-3xl mx-auto animate-in fade-in zoom-in-95 duration-500">
+        <Card className="border-chart-2/40 bg-card/80 backdrop-blur-sm overflow-hidden relative">
+          <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-chart-2 via-chart-1 to-chart-3" />
+          <CardHeader className="text-center pb-2 pt-10">
+            <div className="w-16 h-16 rounded-full bg-chart-2/10 border border-chart-2/30 flex items-center justify-center mx-auto mb-4">
+              <CheckCircle2 className="w-8 h-8 text-chart-2" />
+            </div>
+            <h2 className="text-2xl font-bold text-foreground">Máy ảo đang được khởi tạo!</h2>
+            <p className="text-muted-foreground mt-2">Toàn bộ thông số kết nối của bạn được lưu phía dưới. Hãy copy mật khẩu lại vì nó sẽ không được hiển thị lần 2.</p>
+          </CardHeader>
+          <CardContent className="px-6 pb-10 pt-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="bg-input/30 rounded-xl p-4 border border-border/40">
+                <Label className="text-xs text-muted-foreground uppercase font-semibold tracking-wider">Tên máy / Hostname</Label>
+                <div className="flex items-center justify-between mt-1.5">
+                  <span className="font-mono text-sm">{successData.instanceName}</span>
+                  <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => copyToClipboard(successData.instanceName)}>
+                    <Copy className="w-3 h-3 text-muted-foreground" />
+                  </Button>
+                </div>
+              </div>
+              <div className="bg-input/30 rounded-xl p-4 border border-border/40 relative overflow-hidden group">
+                <div className="absolute inset-0 bg-chart-1/5 opacity-0 group-hover:opacity-100 transition-opacity" />
+                <Label className="text-xs text-muted-foreground uppercase font-semibold tracking-wider">Mật khẩu SSH (root & ubuntu)</Label>
+                <div className="flex items-center justify-between mt-1.5">
+                  <span className="font-mono text-sm font-semibold text-chart-1">{successData.password}</span>
+                  <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => copyToClipboard(successData.password)}>
+                    <Copy className="w-3 h-3 text-chart-1" />
+                  </Button>
+                </div>
+              </div>
+              <div className="bg-input/30 rounded-xl p-4 border border-border/40">
+                <Label className="text-xs text-muted-foreground uppercase font-semibold tracking-wider">IP Address</Label>
+                <div className="flex items-center justify-between mt-1.5">
+                  <span className="font-mono text-sm text-chart-2">{successData.ip}</span>
+                  <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => copyToClipboard(successData.ip)}>
+                    <Copy className="w-3 h-3 text-muted-foreground" />
+                  </Button>
+                </div>
+              </div>
+              <div className="bg-input/30 rounded-xl p-4 border border-border/40">
+                <Label className="text-xs text-muted-foreground uppercase font-semibold tracking-wider">Trạng thái</Label>
+                <div className="flex items-center gap-2 mt-1.5">
+                  <Activity className="w-4 h-4 text-chart-3 animate-pulse" />
+                  <span className="font-mono text-sm text-chart-3">BUILDING / CLOUD-INIT</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-6 bg-black/80 rounded-xl p-4 border border-border/20 text-green-400 font-mono text-sm relative">
+              <Label className="absolute -top-2.5 left-4 bg-background px-2 text-xs text-muted-foreground uppercase font-semibold tracking-wider font-sans">Lệnh kết nối nhanh</Label>
+              <div className="flex items-center justify-between pt-2">
+                <code>ssh ubuntu@{successData.ip === "Đang cấp phát..." ? "IP_CHƯA_CÓ" : (JSON.parse(successData.ip || "{}").public?.[0]?.addr || "LOCAL_IP")}</code>
+                <Button variant="ghost" size="icon" className="h-6 w-6 hover:bg-white/10" onClick={() => copyToClipboard(`ssh ubuntu@${successData.ip === "Đang cấp phát..." ? "IP_CHƯA_CÓ" : (JSON.parse(successData.ip || "{}").public?.[0]?.addr || "LOCAL_IP")}`)}>
+                  <Copy className="w-3 h-3 text-green-400" />
+                </Button>
+              </div>
+            </div>
+
+            <div className="mt-10 text-center">
+              <Button onClick={() => {
+                setInstanceName("");
+                setPassword("");
+                setFlavor("");
+                setSelectedEnvs([]);
+                setErrors({});
+                setSuccessData(null);
+              }} variant="outline" className="border-border/50 hover:bg-input/50">
+                Tạo thêm máy tính khác
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 lg:gap-8">
@@ -147,73 +230,38 @@ export default function CreateVMForm() {
 
           <CardContent className="px-6 pb-6">
             <form onSubmit={handleSubmit} className="space-y-6">
-              {/* Instance Name & Hostname split */}
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label
-                    htmlFor="instance-name"
-                    className="text-sm font-medium text-foreground/90 flex items-center gap-2"
-                  >
-                    <Server className="w-4 h-4 text-chart-1" />
-                    Tên máy (Display Name)
-                  </Label>
-                  <Input
-                    id="instance-name"
-                    placeholder="vd: web-server-01"
-                    value={instanceName}
-                    onChange={(e) => {
-                      setInstanceName(e.target.value);
-                      if (errors.instanceName)
-                        setErrors((prev) => ({
-                          ...prev,
-                          instanceName: "",
-                        }));
-                    }}
-                    className={`h-11 bg-input/50 border-border/60 placeholder:text-muted-foreground/40 focus:border-chart-1/50 focus:ring-chart-1/20 ${
-                      errors.instanceName
-                        ? "border-destructive/60 focus:border-destructive/60"
-                        : ""
-                    }`}
-                  />
-                  {errors.instanceName && (
-                    <p className="text-xs text-destructive mt-1 animate-in fade-in-0 slide-in-from-top-1">
-                      {errors.instanceName}
-                    </p>
-                  )}
-                </div>
-
-                <div className="space-y-2">
-                  <Label
-                    htmlFor="hostname"
-                    className="text-sm font-medium text-foreground/90 flex items-center gap-2"
-                  >
-                    <Server className="w-4 h-4 text-chart-3" />
-                    Hostname
-                  </Label>
-                  <Input
-                    id="hostname"
-                    placeholder="vd: web01.local"
-                    value={hostname}
-                    onChange={(e) => {
-                      setHostname(e.target.value);
-                      if (errors.hostname)
-                        setErrors((prev) => ({
-                          ...prev,
-                          hostname: "",
-                        }));
-                    }}
-                    className={`h-11 bg-input/50 border-border/60 placeholder:text-muted-foreground/40 focus:border-chart-1/50 focus:ring-chart-1/20 ${
-                      errors.hostname
-                        ? "border-destructive/60 focus:border-destructive/60"
-                        : ""
-                    }`}
-                  />
-                  {errors.hostname && (
-                    <p className="text-xs text-destructive mt-1 animate-in fade-in-0 slide-in-from-top-1">
-                      {errors.hostname}
-                    </p>
-                  )}
-                </div>
+              {/* Instance Name */}
+              <div className="space-y-2">
+                <Label
+                  htmlFor="instance-name"
+                  className="text-sm font-medium text-foreground/90 flex items-center gap-2"
+                >
+                  <Server className="w-4 h-4 text-chart-1" />
+                  Tên máy (Display Name & Hostname)
+                </Label>
+                <Input
+                  id="instance-name"
+                  placeholder="vd: web-server-01"
+                  value={instanceName}
+                  onChange={(e) => {
+                    setInstanceName(e.target.value);
+                    if (errors.instanceName)
+                      setErrors((prev) => ({
+                        ...prev,
+                        instanceName: "",
+                      }));
+                  }}
+                  className={`h-11 bg-input/50 border-border/60 placeholder:text-muted-foreground/40 focus:border-chart-1/50 focus:ring-chart-1/20 ${
+                    errors.instanceName
+                      ? "border-destructive/60 focus:border-destructive/60"
+                      : ""
+                  }`}
+                />
+                {errors.instanceName && (
+                  <p className="text-xs text-destructive mt-1 animate-in fade-in-0 slide-in-from-top-1">
+                    {errors.instanceName}
+                  </p>
+                )}
               </div>
 
 

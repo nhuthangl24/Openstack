@@ -145,6 +145,7 @@ export interface CreateVMResponse {
   status: string;
   ip?: string;
   error?: string;
+  error_message?: string;
 }
 
 /**

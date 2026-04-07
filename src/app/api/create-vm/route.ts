@@ -10,14 +10,14 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
 
-    const { instance_name, hostname, password, flavor, os, network, environments } = body;
+    const { instance_name, password, flavor, os, network, environments } = body;
 
     // Validate required fields
-    if (!instance_name || !hostname || !password || !flavor || !os || !network) {
+    if (!instance_name || !password || !flavor || !os || !network) {
       return NextResponse.json(
         {
           success: false,
-          error: "Missing required fields: instance_name, hostname, password, flavor, os, network",
+          error: "Missing required fields: instance_name, password, flavor, os, network",
         },
         { status: 400 }
       );
@@ -34,9 +34,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Validate instance name and hostname
+    // Validate instance name (which assumes role of hostname)
     const nameRegex = /^[a-zA-Z0-9][a-zA-Z0-9._-]*$/;
-    const hostRegex = /^[a-zA-Z0-9][a-zA-Z0-9._-]*$/;
     
     if (!nameRegex.test(instance_name)) {
       return NextResponse.json(
@@ -48,18 +47,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (!hostRegex.test(hostname)) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: "Hostname format is invalid",
-        },
-        { status: 400 }
-      );
-    }
-
-    // Generate startup script using hostname (not instance_name)
-    const startupScript = generatePostCreateScript(hostname, password, environments || []);
+    // Generate startup script using instance_name
+    const startupScript = generatePostCreateScript(instance_name, password, environments || []);
 
     // Create the VM via OpenStack CLI
     const result = await createOpenStackVM(
