@@ -12,6 +12,28 @@ const OPENRC = process.env.OPENRC_PATH || "/opt/stack/devstack/openrc";
 const OS_USER = process.env.OS_USERNAME || "dung";
 const OS_PROJECT = process.env.OS_PROJECT_NAME || "Dung_Prj";
 
+// ─── Network IP extractor ──────────────────────────────────────────────────
+// OpenStack trả networks dạng object: { "public": ["2001:db8::1", "192.168.1.1"] }
+// hoặc string: "public=192.168.1.1, ..."
+export function extractIPv4(networks: any): string {
+  if (!networks) return "";
+  if (typeof networks === "string") {
+    const m = networks.match(/(\d{1,3}(?:\.\d{1,3}){3})/);
+    return m ? m[1] : "";
+  }
+  if (typeof networks === "object") {
+    for (const addrs of Object.values(networks)) {
+      if (Array.isArray(addrs)) {
+        const ipv4 = (addrs as string[]).find((a) =>
+          /^\d{1,3}(\.\d{1,3}){3}$/.test(a)
+        );
+        if (ipv4) return ipv4;
+      }
+    }
+  }
+  return "";
+}
+
 // ─── Core CLI runner ───────────────────────────────────────────────────────
 /**
  * Chạy lệnh OpenStack sau khi source openrc.

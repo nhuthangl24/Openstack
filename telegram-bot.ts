@@ -5,6 +5,7 @@ import {
   createOpenStackVM,
   runCLI,
   escapeShellArg,
+  extractIPv4,
 } from "./src/lib/openstack";
 import { flavors, formatFlavor, Flavor } from "./src/lib/flavors";
 import { environments, Environment } from "./src/lib/environments";
@@ -16,9 +17,6 @@ if (!token) throw new Error("TELEGRAM_BOT_TOKEN not set in .env.local");
 
 const bot = new Telegraf(token);
 
-// ─── Fixed OS (Ubuntu 24.04) ───────────────────────────────────────────────
-const DEFAULT_OS_ID   = "e463cada-459d-4a95-9fac-faeeb90817f3";
-const DEFAULT_OS_NAME = "Ubuntu 24.04 Noble";
 const DEFAULT_NETWORK = "public";
 
 // ─── Session ───────────────────────────────────────────────────────────────
@@ -27,6 +25,7 @@ type State =
   | "CREATE_NAME"
   | "CREATE_PASSWORD"
   | "CREATE_FLAVOR"
+  | "CREATE_OS"
   | "CREATE_ENVS"
   | "CONFIRMING"
   | "CREATING"
@@ -38,8 +37,10 @@ interface Session {
     instance_name?: string;
     password?: string;
     flavor?: string;
+    os_name?: string;        // Image name to pass to lookupId
     environments?: string[];
-    delete_target?: string; // vm name to delete
+    delete_target?: string;
+    images_cache?: { id: string; name: string }[]; // temp cache for image selection
   };
 }
 
@@ -55,33 +56,47 @@ function resetSession(userId: number) {
 }
 
 // ─── Helpers ───────────────────────────────────────────────────────────────
-async function pollIP(
-  serverName: string,
-  maxAttempts = 30,
-  intervalMs = 5000
-): Promise<string> {
+async function pollIP(serverName: string, maxAttempts = 30, intervalMs = 5000): Promise<string> {
   for (let i = 0; i < maxAttempts; i++) {
     await new Promise((r) => setTimeout(r, intervalMs));
     try {
       const cmd = `openstack server show ${escapeShellArg(serverName)} -c addresses -f value`;
       const stdout = await runCLI(cmd);
-      const m = stdout.match(/(\d{1,3}(?:\.\d{1,3}){3})/);
-      if (m) return m[1];
-    } catch {
-      /* keep polling */
-    }
+      const ip = extractIPv4(stdout);
+      if (ip) return ip;
+    } catch { /* keep polling */ }
   }
   return "";
 }
 
-// Build env toggle keyboard
 function buildEnvKeyboard(selected: string[]) {
   const rows = environments.map((env: Environment) => {
-    const checked = selected.includes(env.id) ? "✅ " : "";
+    const checked = selected.includes(env.id) ? "✅ " : "☐ ";
     return [Markup.button.callback(`${checked}${env.label}`, `env_toggle_${env.id}`)];
   });
   rows.push([Markup.button.callback("➡️ Tiếp tục →", "env_done")]);
   return Markup.inlineKeyboard(rows);
+}
+
+// Format danh sách VM đẹp
+async function formatVMList(): Promise<string> {
+  const raw = await runCLI("openstack server list -f json");
+  const list: any[] = JSON.parse(raw);
+  if (list.length === 0) return "📭 Không có máy ảo nào.";
+
+  const lines = list.map((vm: any) => {
+    const name   = vm.Name   || vm.name   || "N/A";
+    const status = vm.Status || vm.status || "N/A";
+    const ip     = extractIPv4(vm.Networks ?? vm.networks);
+    const flavor = vm.Flavor || vm.flavor || "—";
+    const emoji  = status === "ACTIVE" ? "🟢" : status === "BUILD" ? "🟡" : status === "ERROR" ? "🔴" : "⚫";
+    return (
+      `${emoji} \`${name}\`\n` +
+      `   💻 ${flavor} | 🌐 \`${ip || "N/A"}\` | ${status}`
+    );
+  });
+
+  return `📋 *Danh sách máy ảo (${list.length}):*\n\n${lines.join("\n\n")}`;
 }
 
 // ─── /start ────────────────────────────────────────────────────────────────
@@ -89,7 +104,6 @@ bot.command("start", (ctx) => {
   resetSession(ctx.from.id);
   ctx.reply(
     "👋 *OpenStack VM Manager Bot*\n\n" +
-    "Tôi có thể giúp bạn:\n" +
     "🖥️ /create — Tạo máy ảo mới\n" +
     "📋 /list   — Danh sách máy ảo\n" +
     "🗑️ /delete — Xóa máy ảo\n" +
@@ -101,21 +115,21 @@ bot.command("start", (ctx) => {
 bot.command("help", (ctx) => {
   ctx.reply(
     "📖 *Hướng dẫn sử dụng*\n\n" +
-    "*/create* — Bắt đầu wizard tạo VM mới\n" +
-    "*/list*   — Xem tất cả VM đang chạy\n" +
+    "*/create* — Tạo VM mới (wizard từng bước)\n" +
+    "*/list*   — Xem tất cả VM + IP\n" +
     "*/delete* — Xóa một VM\n" +
     "*/cancel* — Hủy thao tác hiện tại\n\n" +
     "🔧 Các bước tạo VM:\n" +
-    "1️⃣ Nhập tên máy ảo\n" +
+    "1️⃣ Nhập tên\n" +
     "2️⃣ Nhập mật khẩu SSH\n" +
-    "3️⃣ Chọn cấu hình (Flavor)\n" +
-    "4️⃣ Chọn môi trường cài đặt\n" +
-    "5️⃣ Xác nhận & tạo",
+    "3️⃣ Chọn Flavor (CPU/RAM/Disk)\n" +
+    "4️⃣ Chọn OS Image\n" +
+    "5️⃣ Chọn môi trường cài sẵn\n" +
+    "6️⃣ Xác nhận & tạo",
     { parse_mode: "Markdown" }
   );
 });
 
-// ─── /cancel ───────────────────────────────────────────────────────────────
 bot.command("cancel", (ctx) => {
   resetSession(ctx.from.id);
   ctx.reply("❌ Đã hủy thao tác hiện tại.");
@@ -123,34 +137,12 @@ bot.command("cancel", (ctx) => {
 
 // ─── /list ─────────────────────────────────────────────────────────────────
 bot.command("list", async (ctx) => {
-  const msg = await ctx.reply("⏳ Đang lấy danh sách máy ảo...");
+  const msg = await ctx.reply("⏳ Đang tải danh sách máy ảo...");
   try {
-    const raw = await runCLI("openstack server list -f json");
-    const list: any[] = JSON.parse(raw);
-
-    if (list.length === 0) {
-      await ctx.telegram.editMessageText(
-        ctx.chat.id, msg.message_id, undefined,
-        "📭 Không có máy ảo nào."
-      );
-      return;
-    }
-
-    const lines = list.map((vm: any) => {
-      const name    = vm.Name   || vm.name   || "N/A";
-      const status  = vm.Status || vm.status || "N/A";
-      const nets    = vm.Networks || vm.networks || "";
-      const ipMatch = nets.match(/(\d{1,3}(?:\.\d{1,3}){3})/);
-      const ip      = ipMatch ? ipMatch[1] : "—";
-      const emoji   = status === "ACTIVE" ? "🟢" : status === "BUILD" ? "🟡" : "🔴";
-      return `${emoji} \`${name}\`\n   Status: ${status} | IP: \`${ip}\``;
+    const text = await formatVMList();
+    await ctx.telegram.editMessageText(ctx.chat.id, msg.message_id, undefined, text, {
+      parse_mode: "Markdown",
     });
-
-    await ctx.telegram.editMessageText(
-      ctx.chat.id, msg.message_id, undefined,
-      `📋 *Danh sách máy ảo (${list.length}):*\n\n${lines.join("\n\n")}`,
-      { parse_mode: "Markdown" }
-    );
   } catch (err: any) {
     await ctx.telegram.editMessageText(
       ctx.chat.id, msg.message_id, undefined,
@@ -163,23 +155,20 @@ bot.command("list", async (ctx) => {
 // ─── /delete ───────────────────────────────────────────────────────────────
 bot.command("delete", async (ctx) => {
   const session = getSession(ctx.from.id);
-  const msg = await ctx.reply("⏳ Đang lấy danh sách máy ảo...");
+  const msg = await ctx.reply("⏳ Đang lấy danh sách VM...");
   try {
     const raw = await runCLI("openstack server list -f json");
     const list: any[] = JSON.parse(raw);
 
     if (list.length === 0) {
-      await ctx.telegram.editMessageText(
-        ctx.chat.id, msg.message_id, undefined,
-        "📭 Không có máy ảo nào để xóa."
-      );
+      await ctx.telegram.editMessageText(ctx.chat.id, msg.message_id, undefined, "📭 Không có VM nào để xóa.");
       return;
     }
 
     const buttons = list.map((vm: any) => {
       const name   = vm.Name   || vm.name   || "unknown";
       const status = vm.Status || vm.status || "";
-      const emoji  = status === "ACTIVE" ? "🟢" : status === "BUILD" ? "🟡" : "🔴";
+      const emoji  = status === "ACTIVE" ? "🟢" : status === "BUILD" ? "🟡" : "⚫";
       return [Markup.button.callback(`${emoji} ${name}`, `delete_select_${name}`)];
     });
     buttons.push([Markup.button.callback("❌ Hủy", "delete_cancel")]);
@@ -199,15 +188,13 @@ bot.command("delete", async (ctx) => {
   }
 });
 
-// ─── delete_select_* ───────────────────────────────────────────────────────
 bot.action(/^delete_select_(.+)$/, async (ctx) => {
   const session = getSession(ctx.from!.id);
-  const vmName = ctx.match[1];
-  session.data.delete_target = vmName;
+  session.data.delete_target = ctx.match[1];
   await ctx.answerCbQuery();
   await ctx.editMessageText(
     `⚠️ *Xác nhận xóa máy ảo?*\n\n` +
-    `🖥️ Tên: \`${vmName}\`\n\n` +
+    `🖥️ Tên: \`${ctx.match[1]}\`\n\n` +
     `Thao tác này *không thể hoàn tác!*`,
     {
       parse_mode: "Markdown",
@@ -224,22 +211,21 @@ bot.action("delete_confirm", async (ctx) => {
   const vmName = session.data.delete_target;
   await ctx.answerCbQuery();
   if (!vmName) {
-    await ctx.editMessageText("❌ Không tìm thấy VM để xóa.");
+    await ctx.editMessageText("❌ Không tìm thấy VM.");
     resetSession(ctx.from!.id);
     return;
   }
   await ctx.editMessageText(`⏳ Đang xóa \`${vmName}\`...`, { parse_mode: "Markdown" });
   try {
     await runCLI(`openstack server delete ${escapeShellArg(vmName)} --wait`);
+    // Hiển thị danh sách cập nhật
+    const listText = await formatVMList();
     await ctx.editMessageText(
-      `✅ *Đã xóa máy ảo \`${vmName}\` thành công!*`,
+      `✅ *Đã xóa \`${vmName}\` thành công!*\n\n${listText}`,
       { parse_mode: "Markdown" }
     );
   } catch (err: any) {
-    await ctx.editMessageText(
-      `❌ Xóa thất bại:\n\`${err.message}\``,
-      { parse_mode: "Markdown" }
-    );
+    await ctx.editMessageText(`❌ Xóa thất bại:\n\`${err.message}\``, { parse_mode: "Markdown" });
   }
   resetSession(ctx.from!.id);
 });
@@ -257,9 +243,8 @@ bot.command("create", (ctx) => {
   session.data  = { environments: [] };
   ctx.reply(
     "🖥️ *Tạo máy ảo mới*\n\n" +
-    "📝 Nhập tên máy ảo\n" +
-    "_Chỉ dùng chữ, số, dấu chấm, gạch ngang, gạch dưới_\n" +
-    "_Ví dụ: web-server-01_",
+    "📝 *Bước 1/5:* Nhập tên máy ảo\n" +
+    "_VD: web-server-01 — chỉ dùng chữ, số, dấu chấm, gạch ngang, gạch dưới_",
     { parse_mode: "Markdown" }
   );
 });
@@ -268,17 +253,14 @@ bot.command("create", (ctx) => {
 bot.on("text", async (ctx) => {
   const session = getSession(ctx.from.id);
   const text = ctx.message.text.trim();
-
-  // Ignore commands
   if (text.startsWith("/")) return;
 
-  // ── Step 1: Name ──
+  // Step 1: Name
   if (session.state === "CREATE_NAME") {
     if (!/^[a-zA-Z0-9][a-zA-Z0-9._-]*$/.test(text)) {
       ctx.reply(
         "❌ Tên không hợp lệ!\n" +
-        "Chỉ dùng chữ, số, dấu chấm, gạch ngang, gạch dưới.\n" +
-        "_Ví dụ: web-server-01_",
+        "_Chỉ dùng chữ, số, dấu chấm, gạch ngang, gạch dưới. VD: web-01_",
         { parse_mode: "Markdown" }
       );
       return;
@@ -286,14 +268,14 @@ bot.on("text", async (ctx) => {
     session.data.instance_name = text;
     session.state = "CREATE_PASSWORD";
     ctx.reply(
-      "🔑 Nhập mật khẩu SSH\n" +
-      "_Tối thiểu 8 ký tự. Dùng để đăng nhập `ubuntu@<IP>` và `root@<IP>`_",
+      "🔑 *Bước 2/5:* Nhập mật khẩu SSH\n" +
+      "_Tối thiểu 8 ký tự. Dùng để đăng nhập ubuntu/root_",
       { parse_mode: "Markdown" }
     );
     return;
   }
 
-  // ── Step 2: Password ──
+  // Step 2: Password
   if (session.state === "CREATE_PASSWORD") {
     if (text.length < 8) {
       ctx.reply("❌ Mật khẩu quá ngắn, cần ít nhất 8 ký tự:");
@@ -301,62 +283,108 @@ bot.on("text", async (ctx) => {
     }
     session.data.password = text;
     session.state = "CREATE_FLAVOR";
-
     const flavorButtons = flavors.map((f: Flavor) => [
       Markup.button.callback(formatFlavor(f), `flavor_${f.name}`),
     ]);
-    ctx.reply("💻 Chọn cấu hình máy (Flavor):", Markup.inlineKeyboard(flavorButtons));
+    ctx.reply(
+      "💻 *Bước 3/5:* Chọn cấu hình máy (Flavor):",
+      { parse_mode: "Markdown", ...Markup.inlineKeyboard(flavorButtons) }
+    );
     return;
   }
 });
 
-// ─── Flavor selection ──────────────────────────────────────────────────────
+// ─── Step 3: Flavor → Step 4: OS ───────────────────────────────────────────
 bot.action(/^flavor_(.+)$/, async (ctx) => {
   const session = getSession(ctx.from!.id);
   if (session.state !== "CREATE_FLAVOR") {
-    await ctx.answerCbQuery("⚠️ Phiên đã hết hạn, dùng /create lại.");
+    await ctx.answerCbQuery("⚠️ Phiên hết hạn, dùng /create lại.");
     return;
   }
   session.data.flavor = ctx.match[1];
-  session.state = "CREATE_ENVS";
+  session.state = "CREATE_OS";
   await ctx.answerCbQuery();
 
+  // Fetch images dynamically
+  await ctx.editMessageText("⏳ Đang tải danh sách OS...");
+  try {
+    const raw = await runCLI("openstack image list --status active -f json");
+    const images: any[] = JSON.parse(raw);
+    const cache = images.map((img: any) => ({
+      id:   img.ID   || img.id,
+      name: img.Name || img.name || "Unknown",
+    }));
+    session.data.images_cache = cache;
+
+    if (cache.length === 0) {
+      await ctx.editMessageText("❌ Không tìm thấy image nào trong OpenStack.");
+      resetSession(ctx.from!.id);
+      return;
+    }
+
+    const buttons = cache.map((img, idx) => [
+      Markup.button.callback(img.name, `os_${idx}`),
+    ]);
+    await ctx.editMessageText(
+      "🐧 *Bước 4/5:* Chọn hệ điều hành (OS Image):",
+      { parse_mode: "Markdown", ...Markup.inlineKeyboard(buttons) }
+    );
+  } catch (err: any) {
+    await ctx.editMessageText(`❌ Lỗi tải OS: \`${err.message}\``, { parse_mode: "Markdown" });
+    resetSession(ctx.from!.id);
+  }
+});
+
+// ─── Step 4: OS → Step 5: Environments ────────────────────────────────────
+bot.action(/^os_(\d+)$/, async (ctx) => {
+  const session = getSession(ctx.from!.id);
+  if (session.state !== "CREATE_OS") {
+    await ctx.answerCbQuery("⚠️ Phiên hết hạn.");
+    return;
+  }
+  const idx = parseInt(ctx.match[1], 10);
+  const images = session.data.images_cache ?? [];
+  const chosen = images[idx];
+  if (!chosen) {
+    await ctx.answerCbQuery("❌ Image không hợp lệ.");
+    return;
+  }
+  session.data.os_name = chosen.name;
+  session.state = "CREATE_ENVS";
+  await ctx.answerCbQuery();
   await ctx.editMessageText(
-    "🔧 *Chọn môi trường cài đặt:*\n_Bấm để bật/tắt, sau đó bấm Tiếp tục_",
+    "🔧 *Bước 5/5:* Chọn môi trường cài sẵn\n_Bấm để bật/tắt, sau đó bấm Tiếp tục_",
     { parse_mode: "Markdown", ...buildEnvKeyboard(session.data.environments ?? []) }
   );
 });
 
-// ─── Env toggles ───────────────────────────────────────────────────────────
+// ─── Step 5: Env toggles ───────────────────────────────────────────────────
 bot.action(/^env_toggle_(.+)$/, async (ctx) => {
   const session = getSession(ctx.from!.id);
   if (session.state !== "CREATE_ENVS") {
-    await ctx.answerCbQuery("⚠️ Phiên đã hết hạn.");
+    await ctx.answerCbQuery("⚠️ Phiên hết hạn.");
     return;
   }
   const envId = ctx.match[1];
   const sel = session.data.environments ?? [];
   const idx = sel.indexOf(envId);
-  if (idx === -1) sel.push(envId);
-  else sel.splice(idx, 1);
+  if (idx === -1) sel.push(envId); else sel.splice(idx, 1);
   session.data.environments = sel;
-  await ctx.answerCbQuery(idx === -1 ? `✅ Đã thêm ${envId}` : `❌ Đã bỏ ${envId}`);
-  await ctx.editMessageReplyMarkup(
-    buildEnvKeyboard(sel).reply_markup as any
-  );
+  await ctx.answerCbQuery(idx === -1 ? `✅ ${envId}` : `❌ Bỏ ${envId}`);
+  await ctx.editMessageReplyMarkup(buildEnvKeyboard(sel).reply_markup as any);
 });
 
-// ─── Env done → confirm ────────────────────────────────────────────────────
+// ─── Env done → Confirm ────────────────────────────────────────────────────
 bot.action("env_done", async (ctx) => {
   const session = getSession(ctx.from!.id);
   if (session.state !== "CREATE_ENVS") {
-    await ctx.answerCbQuery("⚠️ Phiên đã hết hạn.");
+    await ctx.answerCbQuery("⚠️ Phiên hết hạn.");
     return;
   }
   session.state = "CONFIRMING";
   await ctx.answerCbQuery();
 
-  const { instance_name, password, flavor, environments: envs = [] } = session.data;
+  const { instance_name, password, flavor, os_name, environments: envs = [] } = session.data;
   const envList = envs.length > 0 ? envs.join(", ") : "_Không có_";
 
   await ctx.editMessageText(
@@ -364,7 +392,7 @@ bot.action("env_done", async (ctx) => {
     `📝 Tên: \`${instance_name}\`\n` +
     `🔑 Mật khẩu: \`${password}\`\n` +
     `💻 Flavor: \`${flavor}\`\n` +
-    `🐧 OS: ${DEFAULT_OS_NAME}\n` +
+    `🐧 OS: \`${os_name}\`\n` +
     `🌐 Network: ${DEFAULT_NETWORK}\n` +
     `🔧 Môi trường: ${envList}\n\n` +
     `Xác nhận tạo?`,
@@ -382,14 +410,14 @@ bot.action("env_done", async (ctx) => {
 bot.action("confirm_create", async (ctx) => {
   const session = getSession(ctx.from!.id);
   if (session.state !== "CONFIRMING") {
-    await ctx.answerCbQuery("⚠️ Phiên đã hết hạn.");
+    await ctx.answerCbQuery("⚠️ Phiên hết hạn.");
     return;
   }
   session.state = "CREATING";
   await ctx.answerCbQuery();
   await ctx.editMessageText("⏳ Đang tạo máy ảo, vui lòng chờ...");
 
-  const { instance_name, password, flavor, environments: envs = [] } = session.data;
+  const { instance_name, password, flavor, os_name, environments: envs = [] } = session.data;
 
   const script = generatePostCreateScript(instance_name!, password!, envs);
   const result = await createOpenStackVM(
@@ -397,7 +425,7 @@ bot.action("confirm_create", async (ctx) => {
       instance_name: instance_name!,
       password: password!,
       flavor: flavor!,
-      os: DEFAULT_OS_ID,
+      os: os_name!,          // Tên image → lookupId sẽ resolve sang ID
       network: DEFAULT_NETWORK,
       environments: envs,
     },
@@ -413,32 +441,35 @@ bot.action("confirm_create", async (ctx) => {
     return;
   }
 
-  await ctx.editMessageText(
-    `✅ Máy ảo đã khởi tạo thành công!\n⏳ Đang chờ IP (có thể mất 1–2 phút)...`
-  );
+  await ctx.editMessageText("✅ VM đã khởi tạo! ⏳ Đang chờ IP (tối đa 2 phút)...");
 
   const ip = await pollIP(instance_name!);
-
   const envList = envs.length > 0 ? envs.join(", ") : "Không có";
+
+  // Lấy danh sách VM cập nhật
+  let listText = "";
+  try {
+    listText = "\n\n" + (await formatVMList());
+  } catch { /* ignore nếu lỗi */ }
 
   await ctx.editMessageText(
     `🎉 *TẠO MÁY ẢO THÀNH CÔNG!*\n\n` +
     `📝 Tên: \`${result.vm_name}\`\n` +
     `🆔 ID: \`${result.vm_id}\`\n` +
-    `🐧 OS: ${DEFAULT_OS_NAME}\n` +
+    `🐧 OS: \`${os_name}\`\n` +
     `💻 Flavor: \`${flavor}\`\n` +
     `🔧 Môi trường: ${envList}\n` +
-    `🌐 IP: \`${ip || "Chưa lấy được — kiểm tra /list"}\`\n\n` +
+    `🌐 IP: \`${ip || "Chưa lấy được — thử /list sau 1 phút"}\`\n\n` +
     `🔑 Mật khẩu: \`${password}\`\n` +
-    `📟 SSH: \`ssh ubuntu@${ip || "<IP>"}\`\n\n` +
-    `_Cloud-init đang cài đặt, thử SSH sau ~60 giây._`,
+    `📟 SSH: \`ssh ubuntu@${ip || "<IP>"}\`\n` +
+    `_Cloud-init đang cài đặt, thử SSH sau ~60 giây._` +
+    listText,
     { parse_mode: "Markdown" }
   );
 
   resetSession(ctx.from!.id);
 });
 
-// ─── Cancel create ─────────────────────────────────────────────────────────
 bot.action("cancel_create", async (ctx) => {
   resetSession(ctx.from!.id);
   await ctx.answerCbQuery();
@@ -451,7 +482,7 @@ bot.on("message", (ctx) => {
   if (session.state === "IDLE") {
     ctx.reply(
       "💡 Dùng các lệnh:\n" +
-      "/create — Tạo VM mới\n" +
+      "/create — Tạo VM\n" +
       "/list   — Danh sách VM\n" +
       "/delete — Xóa VM\n" +
       "/help   — Trợ giúp"
@@ -462,7 +493,6 @@ bot.on("message", (ctx) => {
 // ─── Launch ────────────────────────────────────────────────────────────────
 bot.launch().then(() => {
   console.log("🤖 Telegram bot OpenStack VM Manager đang chạy...");
-  console.log("📋 Lệnh: /start, /create, /list, /delete, /help, /cancel");
 });
 process.once("SIGINT",  () => bot.stop("SIGINT"));
 process.once("SIGTERM", () => bot.stop("SIGTERM"));

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { runCLI } from "@/lib/openstack";
+import { runCLI, extractIPv4 } from "@/lib/openstack";
 
 export const dynamic = "force-dynamic";
 
@@ -10,12 +10,13 @@ export async function GET() {
     const list = JSON.parse(raw);
 
     const instances = list.map((vm: any) => ({
-      id: vm.ID || vm.id,
-      name: vm.Name || vm.name,
-      status: vm.Status || vm.status,
+      id:      vm.ID      || vm.id,
+      name:    vm.Name    || vm.name,
+      status:  vm.Status  || vm.status,
       networks: vm.Networks || vm.networks || "",
-      image: vm.Image || vm.image || "",
-      flavor: vm.Flavor || vm.flavor || "",
+      ip:      extractIPv4(vm.Networks ?? vm.networks),
+      image:   vm.Image   || vm.image   || "",
+      flavor:  vm.Flavor  || vm.flavor  || "",
     }));
 
     return NextResponse.json({ success: true, instances });
