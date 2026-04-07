@@ -9,6 +9,7 @@ import { Separator } from "@/components/ui/separator";
 import FlavorSelect from "@/components/FlavorSelect";
 import EnvironmentCheckboxes from "@/components/EnvironmentCheckboxes";
 import PreviewCard from "@/components/PreviewCard";
+import VMSuccessModal from "@/components/VMSuccessModal";
 import { toast } from "sonner";
 import {
   Server,
@@ -23,6 +24,16 @@ import {
 
 const DEFAULT_OS = "Ubuntu 24.04 LTS";
 
+interface VMResult {
+  vm_name: string;
+  vm_id: string;
+  status: string;
+  flavor: string;
+  os: string;
+  password: string;
+  environments: string[];
+}
+
 export default function CreateVMForm() {
   const [instanceName, setInstanceName] = useState("");
   const [hostname, setHostname] = useState("");
@@ -32,6 +43,7 @@ export default function CreateVMForm() {
   const [selectedEnvs, setSelectedEnvs] = useState<string[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [vmResult, setVmResult] = useState<VMResult | null>(null);
 
   const validate = (): boolean => {
     const newErrors: Record<string, string> = {};
@@ -96,9 +108,15 @@ export default function CreateVMForm() {
       const data = await response.json();
 
       if (data.success) {
-        toast.success(`Máy ảo "${instanceName}" đang được tạo!`, {
-          description: `Flavor: ${flavor} | Status: ${data.status}`,
-          duration: 5000,
+        // Mở modal với thông tin VM
+        setVmResult({
+          vm_name: data.vm_name || instanceName,
+          vm_id:   data.vm_id  || "",
+          status:  data.status || "BUILD",
+          flavor,
+          os: "Ubuntu 24.04 Noble",
+          password,
+          environments: selectedEnvs,
         });
         // Reset form
         setInstanceName("");
@@ -109,7 +127,7 @@ export default function CreateVMForm() {
         setErrors({});
       } else {
         toast.error("Không thể tạo máy ảo", {
-          description: data.error,
+          description: data.error_message || data.error,
         });
       }
     } catch {
@@ -122,6 +140,13 @@ export default function CreateVMForm() {
   };
 
   return (
+    <>
+    {vmResult && (
+      <VMSuccessModal
+        info={vmResult}
+        onClose={() => setVmResult(null)}
+      />
+    )}
     <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 lg:gap-8">
       {/* Form Column */}
       <div className="lg:col-span-3">
@@ -391,5 +416,6 @@ export default function CreateVMForm() {
         </div>
       </div>
     </div>
+    </>
   );
 }
