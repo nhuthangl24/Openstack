@@ -25,6 +25,7 @@ const DEFAULT_OS = "Ubuntu 24.04 LTS";
 
 export default function CreateVMForm() {
   const [instanceName, setInstanceName] = useState("");
+  const [hostname, setHostname] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [flavor, setFlavor] = useState("");
@@ -42,6 +43,15 @@ export default function CreateVMForm() {
       if (!nameRegex.test(instanceName)) {
         newErrors.instanceName =
           "Tên chỉ chứa chữ, số, dấu chấm, gạch nối, gạch dưới";
+      }
+    }
+
+    if (!hostname.trim()) {
+      newErrors.hostname = "Hostname là bắt buộc";
+    } else {
+      const hostRegex = /^[a-zA-Z0-9-]*$/;
+      if (!hostRegex.test(hostname)) {
+        newErrors.hostname = "Hostname chỉ chứa chữ, số, gạch nối";
       }
     }
 
@@ -72,6 +82,7 @@ export default function CreateVMForm() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           instance_name: instanceName,
+          hostname,
           password,
           flavor,
           os: "e463cada-459d-4a95-9fac-faeeb90817f3",
@@ -91,6 +102,7 @@ export default function CreateVMForm() {
         });
         // Reset form
         setInstanceName("");
+        setHostname("");
         setPassword("");
         setFlavor("");
         setSelectedEnvs([]);
@@ -135,39 +147,75 @@ export default function CreateVMForm() {
 
           <CardContent className="px-6 pb-6">
             <form onSubmit={handleSubmit} className="space-y-6">
-              {/* Instance Name */}
-              <div className="space-y-2">
-                <Label
-                  htmlFor="instance-name"
-                  className="text-sm font-medium text-foreground/90 flex items-center gap-2"
-                >
-                  <Server className="w-4 h-4 text-chart-1" />
-                  Tên máy
-                </Label>
-                <Input
-                  id="instance-name"
-                  placeholder="vd: web-server-01"
-                  value={instanceName}
-                  onChange={(e) => {
-                    setInstanceName(e.target.value);
-                    if (errors.instanceName)
-                      setErrors((prev) => ({
-                        ...prev,
-                        instanceName: "",
-                      }));
-                  }}
-                  className={`h-11 bg-input/50 border-border/60 placeholder:text-muted-foreground/40 focus:border-chart-1/50 focus:ring-chart-1/20 ${
-                    errors.instanceName
-                      ? "border-destructive/60 focus:border-destructive/60"
-                      : ""
-                  }`}
-                />
-                {errors.instanceName && (
-                  <p className="text-xs text-destructive mt-1 animate-in fade-in-0 slide-in-from-top-1">
-                    {errors.instanceName}
-                  </p>
-                )}
+              {/* Instance Name & Hostname split */}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label
+                    htmlFor="instance-name"
+                    className="text-sm font-medium text-foreground/90 flex items-center gap-2"
+                  >
+                    <Server className="w-4 h-4 text-chart-1" />
+                    Tên máy (Display Name)
+                  </Label>
+                  <Input
+                    id="instance-name"
+                    placeholder="vd: web-server-01"
+                    value={instanceName}
+                    onChange={(e) => {
+                      setInstanceName(e.target.value);
+                      if (errors.instanceName)
+                        setErrors((prev) => ({
+                          ...prev,
+                          instanceName: "",
+                        }));
+                    }}
+                    className={`h-11 bg-input/50 border-border/60 placeholder:text-muted-foreground/40 focus:border-chart-1/50 focus:ring-chart-1/20 ${
+                      errors.instanceName
+                        ? "border-destructive/60 focus:border-destructive/60"
+                        : ""
+                    }`}
+                  />
+                  {errors.instanceName && (
+                    <p className="text-xs text-destructive mt-1 animate-in fade-in-0 slide-in-from-top-1">
+                      {errors.instanceName}
+                    </p>
+                  )}
+                </div>
+
+                <div className="space-y-2">
+                  <Label
+                    htmlFor="hostname"
+                    className="text-sm font-medium text-foreground/90 flex items-center gap-2"
+                  >
+                    <Server className="w-4 h-4 text-chart-3" />
+                    Hostname
+                  </Label>
+                  <Input
+                    id="hostname"
+                    placeholder="vd: web01.local"
+                    value={hostname}
+                    onChange={(e) => {
+                      setHostname(e.target.value);
+                      if (errors.hostname)
+                        setErrors((prev) => ({
+                          ...prev,
+                          hostname: "",
+                        }));
+                    }}
+                    className={`h-11 bg-input/50 border-border/60 placeholder:text-muted-foreground/40 focus:border-chart-1/50 focus:ring-chart-1/20 ${
+                      errors.hostname
+                        ? "border-destructive/60 focus:border-destructive/60"
+                        : ""
+                    }`}
+                  />
+                  {errors.hostname && (
+                    <p className="text-xs text-destructive mt-1 animate-in fade-in-0 slide-in-from-top-1">
+                      {errors.hostname}
+                    </p>
+                  )}
+                </div>
               </div>
+
 
               {/* SSH Password */}
               <div className="space-y-2">

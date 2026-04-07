@@ -10,14 +10,14 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
 
-    const { instance_name, password, flavor, os, network, environments } = body;
+    const { instance_name, hostname, password, flavor, os, network, environments } = body;
 
     // Validate required fields
-    if (!instance_name || !password || !flavor || !os || !network) {
+    if (!instance_name || !hostname || !password || !flavor || !os || !network) {
       return NextResponse.json(
         {
           success: false,
-          error: "Missing required fields: instance_name, password, flavor, os, network",
+          error: "Missing required fields: instance_name, hostname, password, flavor, os, network",
         },
         { status: 400 }
       );
@@ -34,8 +34,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Validate instance name format
+    // Validate instance name and hostname format
     const nameRegex = /^[a-zA-Z0-9][a-zA-Z0-9._-]*$/;
+    const hostRegex = /^[a-zA-Z0-9-]*$/;
+    
     if (!nameRegex.test(instance_name)) {
       return NextResponse.json(
         {
@@ -46,18 +48,28 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Generate startup script
-    const startupScript = generateStartupScript(password, environments || []);
+    if (!hostRegex.test(hostname)) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Hostname only allows letters, numbers, and hyphens",
+        },
+        { status: 400 }
+      );
+    }
+
+    // Generate startup script with hostname
+    const startupScript = generateStartupScript(password, environments || [], hostname);
 
     // Create the VM via OpenStack CLI
     const result = await createOpenStackVM(
       {
         instance_name,
-        password,
         flavor,
         os,
         network,
         environments: environments || [],
+        password // We might not need this here since it's in the script, but I'll keep the interface same for now
       },
       startupScript
     );

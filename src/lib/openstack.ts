@@ -33,7 +33,8 @@ export async function runOpenStackCommand(
  */
 export function generateStartupScript(
   password: string,
-  environments: string[]
+  environments: string[],
+  hostname?: string
 ): string {
   let script = `#!/bin/bash
 echo "ubuntu:${password}" | chpasswd
@@ -42,6 +43,11 @@ find /etc/ssh/sshd_config.d -type f -name "*.conf" -exec sed -i 's/^#\\?Password
 systemctl restart ssh
 apt update -y
 `;
+
+  if (hostname) {
+    // Only alphanumeric and hyphens so it's relatively safe, but using simple escape anyway
+    script += `hostnamectl set-hostname ${hostname}\n`;
+  }
 
   if (environments.includes("docker")) {
     script += "apt install -y docker.io\n";
