@@ -74,7 +74,7 @@ export default function CreateVMForm() {
           instance_name: instanceName,
           password,
           flavor,
-          os: DEFAULT_OS,
+          image: DEFAULT_OS,
           environments: selectedEnvs,
         }),
       });
