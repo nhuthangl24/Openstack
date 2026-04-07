@@ -2,8 +2,18 @@
 
 import { useState, useEffect, useCallback } from "react";
 import {
-  Plus, RefreshCw, Terminal, Trash2, Copy, Check,
-  Server, AlertCircle, Loader2, TriangleAlert, CloudOff, MoreHorizontal
+  Plus,
+  RefreshCw,
+  Terminal,
+  Trash2,
+  Copy,
+  Check,
+  Server,
+  AlertCircle,
+  Loader2,
+  TriangleAlert,
+  CloudOff,
+  MoreHorizontal,
 } from "lucide-react";
 import CreateServerModal from "@/components/CreateServerModal";
 import VMSuccessModal from "@/components/VMSuccessModal";
@@ -20,29 +30,49 @@ interface VM {
 }
 
 interface VMResult {
-  vm_name: string; vm_id: string; status: string;
-  flavor: string; os: string; password: string; environments: string[];
+  vm_name: string;
+  vm_id: string;
+  status: string;
+  flavor: string;
+  os: string;
+  password: string;
+  environments: string[];
 }
 
 // ── Status helpers ──────────────────────────────────────────────────────────
 function StatusDot({ status }: { status: string }) {
   const color =
-    status === "ACTIVE"  ? "bg-green-500" :
-    status === "BUILD"   ? "bg-yellow-400 status-pulse" :
-    status === "ERROR"   ? "bg-red-500" :
-    status === "SHUTOFF" ? "bg-gray-500" : "bg-gray-600";
-  return <span className={`inline-block w-2 h-2 rounded-full flex-shrink-0 ${color}`} />;
+    status === "ACTIVE"
+      ? "bg-green-500"
+      : status === "BUILD"
+        ? "bg-yellow-400 status-pulse"
+        : status === "ERROR"
+          ? "bg-red-500"
+          : status === "SHUTOFF"
+            ? "bg-gray-500"
+            : "bg-gray-600";
+  return (
+    <span
+      className={`inline-block w-2 h-2 rounded-full flex-shrink-0 ${color}`}
+    />
+  );
 }
 
 function StatusBadge({ status }: { status: string }) {
   const cls =
-    status === "ACTIVE"  ? "text-green-400 bg-green-400/10 border-green-400/20" :
-    status === "BUILD"   ? "text-yellow-400 bg-yellow-400/10 border-yellow-400/20" :
-    status === "ERROR"   ? "text-red-400 bg-red-400/10 border-red-400/20" :
-    status === "SHUTOFF" ? "text-gray-400 bg-gray-400/10 border-gray-400/20" :
-                           "text-gray-500 bg-gray-500/10 border-gray-500/20";
+    status === "ACTIVE"
+      ? "text-green-400 bg-green-400/10 border-green-400/20"
+      : status === "BUILD"
+        ? "text-yellow-400 bg-yellow-400/10 border-yellow-400/20"
+        : status === "ERROR"
+          ? "text-red-400 bg-red-400/10 border-red-400/20"
+          : status === "SHUTOFF"
+            ? "text-gray-400 bg-gray-400/10 border-gray-400/20"
+            : "text-gray-500 bg-gray-500/10 border-gray-500/20";
   return (
-    <span className={`inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium border ${cls}`}>
+    <span
+      className={`inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium border ${cls}`}
+    >
       {status || "UNKNOWN"}
     </span>
   );
@@ -85,9 +115,16 @@ function CopyBtn({ text, label }: { text: string; label?: string }) {
     setTimeout(() => setCopied(false), 1500);
   };
   return (
-    <button onClick={handleCopy} title={`Copy ${label || text}`}
-      className="p-1.5 rounded text-gray-600 hover:text-gray-300 hover:bg-white/6 transition-all">
-      {copied ? <Check className="w-3.5 h-3.5 text-green-400" /> : <Copy className="w-3.5 h-3.5" />}
+    <button
+      onClick={handleCopy}
+      title={`Copy ${label || text}`}
+      className="p-1.5 rounded text-gray-600 hover:text-gray-300 hover:bg-white/6 transition-all"
+    >
+      {copied ? (
+        <Check className="w-3.5 h-3.5 text-green-400" />
+      ) : (
+        <Copy className="w-3.5 h-3.5" />
+      )}
     </button>
   );
 }
@@ -108,8 +145,9 @@ function VMRow({
   const sshCmd = `ssh ubuntu@${vm.ip || "<IP>"}`;
 
   return (
-    <div className={`vm-row flex items-center gap-4 px-6 py-4 border-b border-white/6 group ${confirmDel ? "bg-red-950/20" : ""}`}>
-
+    <div
+      className={`vm-row flex items-center gap-4 px-6 py-4 border-b border-white/6 group ${confirmDel ? "bg-red-950/20" : ""}`}
+    >
       {/* Status + Name */}
       <div className="flex items-center gap-3 min-w-0 flex-1">
         <StatusDot status={vm.status} />
@@ -140,16 +178,16 @@ function VMRow({
 
       {/* OS */}
       <div className="hidden lg:block min-w-[140px]">
-        <span className="text-xs text-gray-500 truncate">{vm.image || "—"}</span>
+        <span className="text-xs text-gray-500 truncate">
+          {vm.image || "—"}
+        </span>
       </div>
 
       {/* Actions */}
       <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity ml-auto flex-shrink-0">
         {!confirmDel ? (
           <>
-            {vm.ip && (
-              <CopyBtn text={sshCmd} label="SSH command" />
-            )}
+            {vm.ip && <CopyBtn text={sshCmd} label="SSH command" />}
             {vm.ip && (
               <button
                 onClick={() => onTerminal(vm)}
@@ -171,7 +209,10 @@ function VMRow({
           <div className="flex items-center gap-2">
             <span className="text-xs text-red-400">Delete?</span>
             <button
-              onClick={() => { onDelete(vm.name); setConfirmDel(false); }}
+              onClick={() => {
+                onDelete(vm.name);
+                setConfirmDel(false);
+              }}
               disabled={deleting}
               className="px-2.5 py-1 rounded text-xs font-medium bg-red-600 hover:bg-red-700 text-white transition-all disabled:opacity-50"
             >
@@ -209,9 +250,12 @@ function EmptyState({ onNew }: { onNew: () => void }) {
       <div className="w-14 h-14 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center mb-4">
         <CloudOff className="w-6 h-6 text-gray-500" />
       </div>
-      <h3 className="text-base font-semibold text-white mb-1">No servers yet</h3>
+      <h3 className="text-base font-semibold text-white mb-1">
+        No servers yet
+      </h3>
       <p className="text-sm text-gray-500 mb-6 max-w-xs">
-        Deploy your first virtual server to get started. Choose your hardware, OS and software stack.
+        Deploy your first virtual server to get started. Choose your hardware,
+        OS and software stack.
       </p>
       <button
         onClick={onNew}
@@ -225,15 +269,15 @@ function EmptyState({ onNew }: { onNew: () => void }) {
 
 // ── Main Dashboard ────────────────────────────────────────────────────────────
 export default function Dashboard() {
-  const [vms, setVMs]               = useState<VM[]>([]);
-  const [loading, setLoading]       = useState(true);
-  const [error, setError]           = useState("");
+  const [vms, setVMs] = useState<VM[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
   const [refreshing, setRefreshing] = useState(false);
-  const [filter, setFilter]         = useState("all");
+  const [filter, setFilter] = useState("all");
   const [showCreate, setShowCreate] = useState(false);
-  const [vmResult, setVmResult]     = useState<VMResult | null>(null);
+  const [vmResult, setVmResult] = useState<VMResult | null>(null);
   const [deletingName, setDeletingName] = useState("");
-  const [sshVm, setSshVm]           = useState<VM | null>(null);
+  const [sshVm, setSshVm] = useState<VM | null>(null);
   const [deployTarget, setDeployTarget] = useState("");
 
   const fetchVMs = useCallback(async (silent = false) => {
@@ -277,25 +321,27 @@ export default function Dashboard() {
   };
 
   // Filtered VMs
-  const filteredVMs = vms.filter(vm => {
-    if (filter === "active")   return vm.status === "ACTIVE";
+  const filteredVMs = vms.filter((vm) => {
+    if (filter === "active") return vm.status === "ACTIVE";
     if (filter === "building") return vm.status === "BUILD";
-    if (filter === "error")    return vm.status === "ERROR" || vm.status === "SHUTOFF";
+    if (filter === "error")
+      return vm.status === "ERROR" || vm.status === "SHUTOFF";
     return true;
   });
 
   const counts = {
-    all:      vms.length,
-    active:   vms.filter(v => v.status === "ACTIVE").length,
-    building: vms.filter(v => v.status === "BUILD").length,
-    error:    vms.filter(v => v.status === "ERROR" || v.status === "SHUTOFF").length,
+    all: vms.length,
+    active: vms.filter((v) => v.status === "ACTIVE").length,
+    building: vms.filter((v) => v.status === "BUILD").length,
+    error: vms.filter((v) => v.status === "ERROR" || v.status === "SHUTOFF")
+      .length,
   };
 
   const FILTERS = [
-    { key: "all",      label: "All",      count: counts.all },
-    { key: "active",   label: "Active",   count: counts.active },
+    { key: "all", label: "All", count: counts.all },
+    { key: "active", label: "Active", count: counts.active },
     { key: "building", label: "Building", count: counts.building },
-    { key: "error",    label: "Error",    count: counts.error },
+    { key: "error", label: "Error", count: counts.error },
   ];
 
   return (
@@ -315,22 +361,43 @@ export default function Dashboard() {
                 <path d="M12 2L22 19.7H2L12 2Z" />
               </svg>
             </div>
-            <span className="text-sm font-semibold text-white">CloudDeploy</span>
+            <span className="text-sm font-semibold text-white">
+              CloudDeploy
+            </span>
             <span className="hidden sm:inline text-gray-700 text-sm">/</span>
-            <span className="hidden sm:inline text-sm text-gray-400">Infrastructure</span>
+            <span className="hidden sm:inline text-sm text-gray-400">
+              Infrastructure
+            </span>
           </div>
 
           {/* Nav */}
           <nav className="hidden md:flex items-center gap-1.5 text-xs text-gray-400">
-            <a href="#servers" className="px-3 py-1.5 rounded-full hover:text-white hover:bg-white/10 transition">Servers</a>
-            <a href="#deploy" className="px-3 py-1.5 rounded-full hover:text-white hover:bg-white/10 transition">Deploy</a>
-            <a href="#deploy" className="px-3 py-1.5 rounded-full hover:text-white hover:bg-white/10 transition">Terminal</a>
+            <a
+              href="#servers"
+              className="px-3 py-1.5 rounded-full hover:text-white hover:bg-white/10 transition"
+            >
+              Servers
+            </a>
+            <a
+              href="#deploy"
+              className="px-3 py-1.5 rounded-full hover:text-white hover:bg-white/10 transition"
+            >
+              Deploy
+            </a>
+            <a
+              href="#deploy"
+              className="px-3 py-1.5 rounded-full hover:text-white hover:bg-white/10 transition"
+            >
+              Terminal
+            </a>
           </nav>
 
           {/* Right */}
           <div className="flex items-center gap-3">
             <div className="hidden sm:flex items-center gap-1.5 text-xs text-gray-500 bg-white/5 border border-white/8 rounded-full px-3 py-1.5">
-              <span className={`w-1.5 h-1.5 rounded-full ${error ? "bg-red-500" : "bg-green-500"}`} />
+              <span
+                className={`w-1.5 h-1.5 rounded-full ${error ? "bg-red-500" : "bg-green-500"}`}
+              />
               {error ? "Disconnected" : "Connected"}
             </div>
             <button
@@ -339,7 +406,9 @@ export default function Dashboard() {
               className="p-2 rounded-lg text-gray-500 hover:text-white hover:bg-white/6 transition-all"
               title="Refresh"
             >
-              <RefreshCw className={`w-4 h-4 ${refreshing ? "animate-spin" : ""}`} />
+              <RefreshCw
+                className={`w-4 h-4 ${refreshing ? "animate-spin" : ""}`}
+              />
             </button>
             <button
               onClick={() => setShowCreate(true)}
@@ -354,20 +423,37 @@ export default function Dashboard() {
 
       {/* ── Main ─────────────────────────────────────────────────────────────── */}
       <main className="flex-1 max-w-6xl mx-auto w-full px-4 sm:px-6 py-8 relative z-10">
-
         {/* Page title + stats */}
-        <div id="servers" className="flex items-start justify-between mb-6 scroll-mt-24">
+        <div
+          id="servers"
+          className="flex items-start justify-between mb-6 scroll-mt-24"
+        >
           <div>
             <h1 className="text-xl font-bold text-white">Servers</h1>
             <p className="text-sm text-gray-500 mt-0.5">
-              {loading ? "Loading..." : `${vms.length} server${vms.length !== 1 ? "s" : ""}`}
+              {loading
+                ? "Loading..."
+                : `${vms.length} server${vms.length !== 1 ? "s" : ""}`}
             </p>
           </div>
           {!loading && vms.length > 0 && (
             <div className="flex items-center gap-4 text-xs text-gray-500">
-              <span className="flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full bg-green-500" />{counts.active} active</span>
-              {counts.building > 0 && <span className="flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full bg-yellow-400" />{counts.building} building</span>}
-              {counts.error > 0 && <span className="flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full bg-red-500" />{counts.error} error</span>}
+              <span className="flex items-center gap-1.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-green-500" />
+                {counts.active} active
+              </span>
+              {counts.building > 0 && (
+                <span className="flex items-center gap-1.5">
+                  <span className="w-1.5 h-1.5 rounded-full bg-yellow-400" />
+                  {counts.building} building
+                </span>
+              )}
+              {counts.error > 0 && (
+                <span className="flex items-center gap-1.5">
+                  <span className="w-1.5 h-1.5 rounded-full bg-red-500" />
+                  {counts.error} error
+                </span>
+              )}
             </div>
           )}
         </div>
@@ -377,24 +463,30 @@ export default function Dashboard() {
           <div className="flex items-center gap-3 px-4 py-3 mb-5 rounded-lg bg-red-950/40 border border-red-800/40">
             <AlertCircle className="w-4 h-4 text-red-400 flex-shrink-0" />
             <p className="text-sm text-red-300">{error}</p>
-            <button onClick={() => fetchVMs()} className="ml-auto text-xs text-red-400 hover:text-red-300 underline">Retry</button>
+            <button
+              onClick={() => fetchVMs()}
+              className="ml-auto text-xs text-red-400 hover:text-red-300 underline"
+            >
+              Retry
+            </button>
           </div>
         )}
 
         {/* Main card */}
         <div className="rounded-xl border border-white/8 bg-[#0a0a0a] overflow-hidden">
-
           {/* Filter tabs + table header */}
-          {(!loading && vms.length > 0) && (
+          {!loading && vms.length > 0 && (
             <div className="flex items-center justify-between border-b border-white/8">
               {/* Tabs */}
               <div className="flex">
-                {FILTERS.map(f => (
+                {FILTERS.map((f) => (
                   <button
                     key={f.key}
                     onClick={() => setFilter(f.key)}
                     className={`relative px-4 py-3 text-xs font-medium transition-colors ${
-                      filter === f.key ? "text-white" : "text-gray-500 hover:text-gray-300"
+                      filter === f.key
+                        ? "text-white"
+                        : "text-gray-500 hover:text-gray-300"
                     }`}
                   >
                     {filter === f.key && (
@@ -402,9 +494,15 @@ export default function Dashboard() {
                     )}
                     {f.label}
                     {f.count > 0 && (
-                      <span className={`ml-1.5 px-1.5 py-0.5 rounded text-[10px] ${
-                        filter === f.key ? "bg-white/15 text-white" : "bg-white/8 text-gray-500"
-                      }`}>{f.count}</span>
+                      <span
+                        className={`ml-1.5 px-1.5 py-0.5 rounded text-[10px] ${
+                          filter === f.key
+                            ? "bg-white/15 text-white"
+                            : "bg-white/8 text-gray-500"
+                        }`}
+                      >
+                        {f.count}
+                      </span>
                     )}
                   </button>
                 ))}
@@ -422,7 +520,9 @@ export default function Dashboard() {
           {/* Loading skeletons */}
           {loading && (
             <div>
-              {[1, 2, 3].map(i => <SkeletonRow key={i} />)}
+              {[1, 2, 3].map((i) => (
+                <SkeletonRow key={i} />
+              ))}
             </div>
           )}
 
@@ -432,15 +532,16 @@ export default function Dashboard() {
           )}
 
           {/* VM list */}
-          {!loading && filteredVMs.map(vm => (
-            <VMRow
-              key={vm.id}
-              vm={vm}
-              onDelete={handleDelete}
-              deleting={deletingName === vm.name}
-              onTerminal={(target) => setSshVm(target)}
-            />
-          ))}
+          {!loading &&
+            filteredVMs.map((vm) => (
+              <VMRow
+                key={vm.id}
+                vm={vm}
+                onDelete={handleDelete}
+                deleting={deletingName === vm.name}
+                onTerminal={(target) => setSshVm(target)}
+              />
+            ))}
 
           {/* Filter empty */}
           {!loading && vms.length > 0 && filteredVMs.length === 0 && (
@@ -449,7 +550,6 @@ export default function Dashboard() {
             </div>
           )}
         </div>
-
 
         {/* Footer note */}
         {!loading && vms.length > 0 && (
@@ -463,8 +563,12 @@ export default function Dashboard() {
           <div className="rounded-2xl border border-white/10 bg-gradient-to-br from-[#0b0d10] via-[#0b0d10] to-[#0a1210] p-6">
             <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
               <div>
-                <h2 className="text-lg font-semibold text-white">Deploy in Browser</h2>
-                <p className="text-sm text-gray-500">Chọn VM và mở terminal để deploy nhanh.</p>
+                <h2 className="text-lg font-semibold text-white">
+                  Deploy in Browser
+                </h2>
+                <p className="text-sm text-gray-500">
+                  Chọn VM và mở terminal để deploy nhanh.
+                </p>
               </div>
               <div className="flex flex-col sm:flex-row gap-3">
                 <select
@@ -473,7 +577,7 @@ export default function Dashboard() {
                   className="min-w-[220px] rounded-lg border border-white/10 bg-black/40 px-3 py-2 text-sm text-white"
                 >
                   <option value="">Select a VM</option>
-                  {vms.map(vm => (
+                  {vms.map((vm) => (
                     <option key={vm.id} value={vm.id}>
                       {vm.name} {vm.ip ? `(${vm.ip})` : "(no IP)"}
                     </option>
@@ -481,7 +585,7 @@ export default function Dashboard() {
                 </select>
                 <button
                   onClick={() => {
-                    const target = vms.find(v => v.id === deployTarget);
+                    const target = vms.find((v) => v.id === deployTarget);
                     if (target) setSshVm(target);
                   }}
                   disabled={!deployTarget}
@@ -492,9 +596,15 @@ export default function Dashboard() {
               </div>
             </div>
             <div className="mt-5 grid grid-cols-1 md:grid-cols-3 gap-3 text-xs text-gray-400">
-              <div className="rounded-lg border border-white/10 bg-black/40 px-3 py-2">1. Connect SSH ngay tren web</div>
-              <div className="rounded-lg border border-white/10 bg-black/40 px-3 py-2">2. Git clone + build + run</div>
-              <div className="rounded-lg border border-white/10 bg-black/40 px-3 py-2">3. Dung PM2 de giu app chay nen</div>
+              <div className="rounded-lg border border-white/10 bg-black/40 px-3 py-2">
+                1. Connect SSH ngay tren web
+              </div>
+              <div className="rounded-lg border border-white/10 bg-black/40 px-3 py-2">
+                2. Git clone + build + run
+              </div>
+              <div className="rounded-lg border border-white/10 bg-black/40 px-3 py-2">
+                3. Dung PM2 de giu app chay nen
+              </div>
             </div>
           </div>
         </section>
@@ -504,7 +614,7 @@ export default function Dashboard() {
       {showCreate && (
         <CreateServerModal
           onClose={() => setShowCreate(false)}
-          onSuccess={data => {
+          onSuccess={(data) => {
             setShowCreate(false);
             setVmResult(data);
             fetchVMs(true);
@@ -515,7 +625,10 @@ export default function Dashboard() {
       {vmResult && (
         <VMSuccessModal
           info={vmResult}
-          onClose={() => { setVmResult(null); fetchVMs(true); }}
+          onClose={() => {
+            setVmResult(null);
+            fetchVMs(true);
+          }}
         />
       )}
 

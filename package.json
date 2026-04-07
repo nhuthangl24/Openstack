@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "concurrently -n next,ssh \"next dev\" \"tsx ssh-server.ts\"",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",

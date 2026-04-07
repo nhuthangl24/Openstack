@@ -51,7 +51,11 @@ function getDefaultWsUrl() {
   return `${isSecure ? "wss" : "ws"}://${host}:3001`;
 }
 
-export default function WebSSHModal({ vmName, host, onClose }: WebSSHModalProps) {
+export default function WebSSHModal({
+  vmName,
+  host,
+  onClose,
+}: WebSSHModalProps) {
   const terminalRef = useRef<HTMLDivElement | null>(null);
   const xtermRef = useRef<XTerm | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
@@ -139,12 +143,13 @@ export default function WebSSHModal({ vmName, host, onClose }: WebSSHModalProps)
     if (remember && typeof window !== "undefined") {
       sessionStorage.setItem(
         getSessionKey(vmName),
-        JSON.stringify({ username, password })
+        JSON.stringify({ username, password }),
       );
     }
 
     const term = new XTerm({
-      fontFamily: "var(--font-mono), ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace",
+      fontFamily:
+        "var(--font-mono), ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace",
       fontSize: 13,
       theme: {
         background: "#0a0b0d",
@@ -181,7 +186,7 @@ export default function WebSSHModal({ vmName, host, onClose }: WebSSHModalProps)
           password,
           cols: term.cols,
           rows: term.rows,
-        })
+        }),
       );
       term.focus();
     };
@@ -224,8 +229,13 @@ export default function WebSSHModal({ vmName, host, onClose }: WebSSHModalProps)
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center p-4"
-      style={{ backgroundColor: "rgba(3,4,6,0.85)", backdropFilter: "blur(8px)" }}
-      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+      style={{
+        backgroundColor: "rgba(3,4,6,0.85)",
+        backdropFilter: "blur(8px)",
+      }}
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
     >
       <div className="relative w-full max-w-5xl">
         <div className="absolute -inset-[1px] rounded-2xl bg-gradient-to-br from-cyan-500/30 via-sky-500/10 to-emerald-500/20 blur-sm" />
@@ -238,11 +248,16 @@ export default function WebSSHModal({ vmName, host, onClose }: WebSSHModalProps)
               </div>
               <div>
                 <h3 className="text-sm font-semibold text-white">Web SSH</h3>
-                <p className="text-xs text-gray-500">{vmName} · {host || "Chưa có IP"}</p>
+                <p className="text-xs text-gray-500">
+                  {vmName} · {host || "Chưa có IP"}
+                </p>
               </div>
             </div>
             <button
-              onClick={() => { handleDisconnect(); onClose(); }}
+              onClick={() => {
+                handleDisconnect();
+                onClose();
+              }}
               className="p-2 rounded-lg text-gray-500 hover:text-white hover:bg-white/10 transition"
             >
               <X className="w-5 h-5" />
@@ -320,12 +335,15 @@ export default function WebSSHModal({ vmName, host, onClose }: WebSSHModalProps)
                 <div className="rounded-lg border border-white/10 bg-white/5 px-3 py-2">
                   <div className="flex items-center gap-2 text-xs text-gray-400">
                     <ShieldCheck className="w-3.5 h-3.5 text-emerald-300" />
-                    Lưu mật khẩu chỉ trong session, không gửi lên server Next.js.
+                    Lưu mật khẩu chỉ trong session, không gửi lên server
+                    Next.js.
                   </div>
                 </div>
 
                 <div className="pt-2">
-                  <p className="text-xs text-gray-500 mb-2">Quick deploy snippets</p>
+                  <p className="text-xs text-gray-500 mb-2">
+                    Quick deploy snippets
+                  </p>
                   <div className="space-y-2">
                     {[
                       "sudo apt-get update -y",
@@ -333,8 +351,13 @@ export default function WebSSHModal({ vmName, host, onClose }: WebSSHModalProps)
                       "npm install && npm run build",
                       "pm2 start npm --name app -- start",
                     ].map((cmd) => (
-                      <div key={cmd} className="flex items-center justify-between gap-2 rounded-lg bg-black/40 border border-white/10 px-2.5 py-1.5">
-                        <code className="text-[11px] text-cyan-200 font-mono truncate">{cmd}</code>
+                      <div
+                        key={cmd}
+                        className="flex items-center justify-between gap-2 rounded-lg bg-black/40 border border-white/10 px-2.5 py-1.5"
+                      >
+                        <code className="text-[11px] text-cyan-200 font-mono truncate">
+                          {cmd}
+                        </code>
                         <button
                           onClick={() => handleCopy(cmd)}
                           className="p-1 rounded text-gray-400 hover:text-white hover:bg-white/10"
@@ -344,7 +367,9 @@ export default function WebSSHModal({ vmName, host, onClose }: WebSSHModalProps)
                         </button>
                       </div>
                     ))}
-                    {copyMsg && <div className="text-[11px] text-gray-500">{copyMsg}</div>}
+                    {copyMsg && (
+                      <div className="text-[11px] text-gray-500">{copyMsg}</div>
+                    )}
                   </div>
                 </div>
               </div>

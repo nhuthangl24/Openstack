@@ -84,14 +84,18 @@ function CopyButton({ text }: { text: string }) {
 
 export default function VMSuccessModal({ info, onClose }: VMSuccessModalProps) {
   const [ip, setIp] = useState<string>("");
-  const [ipStatus, setIpStatus] = useState<"polling" | "found" | "timeout">("polling");
+  const [ipStatus, setIpStatus] = useState<"polling" | "found" | "timeout">(
+    "polling",
+  );
   const [attempts, setAttempts] = useState(0);
   const MAX_ATTEMPTS = 30; // 30 × 5s = 2.5 phút
 
   const pollIP = useCallback(async () => {
     if (ipStatus === "found" || ipStatus === "timeout") return;
     try {
-      const res = await fetch(`/api/vm-ip?name=${encodeURIComponent(info.vm_name)}`);
+      const res = await fetch(
+        `/api/vm-ip?name=${encodeURIComponent(info.vm_name)}`,
+      );
       const data = await res.json();
       if (data.ip) {
         setIp(data.ip);
@@ -129,13 +133,19 @@ export default function VMSuccessModal({ info, onClose }: VMSuccessModalProps) {
   }, [onClose]);
 
   const sshCmd = `ssh ubuntu@${ip || "<IP>"}`;
-  const envList = info.environments.length > 0 ? info.environments.join(", ") : "Không có";
+  const envList =
+    info.environments.length > 0 ? info.environments.join(", ") : "Không có";
 
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-in fade-in-0 duration-300"
-      style={{ backgroundColor: "rgba(0,0,0,0.7)", backdropFilter: "blur(8px)" }}
-      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+      style={{
+        backgroundColor: "rgba(0,0,0,0.7)",
+        backdropFilter: "blur(8px)",
+      }}
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
     >
       <div className="relative w-full max-w-lg animate-in zoom-in-95 slide-in-from-bottom-4 duration-300">
         {/* Glow effect */}
@@ -152,8 +162,12 @@ export default function VMSuccessModal({ info, onClose }: VMSuccessModalProps) {
                 <CheckCircle2 className="w-6 h-6 text-green-400" />
               </div>
               <div>
-                <h2 className="text-lg font-bold text-white">Tạo máy ảo thành công!</h2>
-                <p className="text-xs text-gray-400">Cloud-init đang cài đặt trong nền</p>
+                <h2 className="text-lg font-bold text-white">
+                  Tạo máy ảo thành công!
+                </h2>
+                <p className="text-xs text-gray-400">
+                  Cloud-init đang cài đặt trong nền
+                </p>
               </div>
             </div>
             <button
@@ -176,14 +190,20 @@ export default function VMSuccessModal({ info, onClose }: VMSuccessModalProps) {
                 {ip && <CopyButton text={ip} />}
               </div>
               {ipStatus === "found" ? (
-                <p className="text-2xl font-mono font-bold text-cyan-400">{ip}</p>
+                <p className="text-2xl font-mono font-bold text-cyan-400">
+                  {ip}
+                </p>
               ) : ipStatus === "timeout" ? (
-                <p className="text-sm text-gray-500 italic">Chưa lấy được IP — thử lại sau</p>
+                <p className="text-sm text-gray-500 italic">
+                  Chưa lấy được IP — thử lại sau
+                </p>
               ) : (
                 <div className="flex items-center gap-2">
                   <Loader2 className="w-4 h-4 text-cyan-400 animate-spin" />
                   <span className="text-sm text-gray-400">Đang chờ IP...</span>
-                  <span className="text-xs text-gray-600">({attempts}/{MAX_ATTEMPTS})</span>
+                  <span className="text-xs text-gray-600">
+                    ({attempts}/{MAX_ATTEMPTS})
+                  </span>
                 </div>
               )}
             </div>
@@ -209,7 +229,9 @@ export default function VMSuccessModal({ info, onClose }: VMSuccessModalProps) {
                 </div>
                 <CopyButton text={info.password} />
               </div>
-              <code className="text-sm font-mono text-yellow-300">{info.password}</code>
+              <code className="text-sm font-mono text-yellow-300">
+                {info.password}
+              </code>
             </div>
 
             {/* Details grid */}
@@ -220,7 +242,9 @@ export default function VMSuccessModal({ info, onClose }: VMSuccessModalProps) {
                   <span>VM Name</span>
                 </div>
                 <div className="flex items-center justify-between">
-                  <p className="text-sm font-mono text-white truncate">{info.vm_name}</p>
+                  <p className="text-sm font-mono text-white truncate">
+                    {info.vm_name}
+                  </p>
                   <CopyButton text={info.vm_name} />
                 </div>
               </div>
@@ -247,7 +271,9 @@ export default function VMSuccessModal({ info, onClose }: VMSuccessModalProps) {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-xs text-gray-500 mb-0.5">Instance ID</p>
-                  <code className="text-xs font-mono text-gray-400">{info.vm_id}</code>
+                  <code className="text-xs font-mono text-gray-400">
+                    {info.vm_id}
+                  </code>
                 </div>
                 <CopyButton text={info.vm_id || ""} />
               </div>
@@ -277,7 +303,8 @@ export default function VMSuccessModal({ info, onClose }: VMSuccessModalProps) {
             <div className="flex items-start gap-2 pt-1">
               <ExternalLink className="w-3.5 h-3.5 text-amber-400 mt-0.5 flex-shrink-0" />
               <p className="text-xs text-gray-500 leading-relaxed">
-                Cloud-init đang chạy trong nền. Thử SSH sau ~60 giây khi cloud-init hoàn tất.
+                Cloud-init đang chạy trong nền. Thử SSH sau ~60 giây khi
+                cloud-init hoàn tất.
                 {ipStatus === "polling" && " IP sẽ tự động cập nhật."}
               </p>
             </div>
