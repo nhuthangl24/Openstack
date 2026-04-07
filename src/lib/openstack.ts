@@ -16,7 +16,8 @@ export async function runOpenStackCommand(
   command: string,
   envVars: Record<string, string> = {}
 ): Promise<string> {
-  const openrcSource = `export OS_USERNAME="\${OS_USERNAME}" && export OS_PROJECT_NAME="\${OS_PROJECT_NAME}" && export OS_PASSWORD="\${OS_PASSWORD}" && source ${OPENRC_PATH}`;
+  // Source openrc using proper variables resolving in subshell
+  const openrcSource = `source ${OPENRC_PATH} $OS_USERNAME $OS_PROJECT_NAME`;
   const fullCommand = `bash -c '${openrcSource} && ${command}'`;
 
   const { stdout, stderr } = await execAsync(fullCommand, {
@@ -132,8 +133,13 @@ export async function createOpenStackVM(
       "-f json",
     ].join(" ");
 
-    // Using exact environment for authentication
+    // Ensure FULL OpenStack environment variables are injected into child_process.exec env
     const openstackEnv = {
+      OS_AUTH_URL: process.env.OS_AUTH_URL || "http://127.0.0.1/identity",
+      OS_REGION_NAME: process.env.OS_REGION_NAME || "RegionOne",
+      OS_USER_DOMAIN_ID: process.env.OS_USER_DOMAIN_ID || "default",
+      OS_PROJECT_DOMAIN_ID: process.env.OS_PROJECT_DOMAIN_ID || "default",
+      OS_AUTH_TYPE: process.env.OS_AUTH_TYPE || "password",
       OS_USERNAME: "dung",
       OS_PROJECT_NAME: "Dung_Prj",
       OS_PASSWORD: "mtdung2004",
