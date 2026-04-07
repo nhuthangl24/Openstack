@@ -10,15 +10,14 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
 
-    const { instance_name, password, flavor, os, network, environments, username, project } = body;
+    const { instance_name, password, flavor, os, network, environments } = body;
 
     // Validate required fields
     if (!instance_name || !password || !flavor || !os || !network) {
       return NextResponse.json(
         {
           success: false,
-          error:
-            "Missing required fields: instance_name, password, flavor, os, network",
+          error: "Missing required fields: instance_name, password, flavor, os, network",
         },
         { status: 400 }
       );
@@ -41,18 +40,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         {
           success: false,
-          error:
-            "Instance name must start with alphanumeric and contain only letters, numbers, dots, hyphens, and underscores",
+          error: "Instance name must start with alphanumeric and contain only letters, numbers, dots, hyphens, and underscores",
         },
         { status: 400 }
       );
     }
 
     // Generate startup script
-    const startupScript = generateStartupScript(
-      password,
-      environments || []
-    );
+    const startupScript = generateStartupScript(password, environments || []);
 
     // Create the VM via OpenStack CLI
     const result = await createOpenStackVM(
@@ -63,17 +58,17 @@ export async function POST(request: NextRequest) {
         os,
         network,
         environments: environments || [],
-        username,
-        project,
       },
       startupScript
     );
 
     if (!result.success) {
-      // Return specific error status if it resembles 401 Authentication Required
       const errMessage = result.error || "";
       if (errMessage.includes("HTTP 401") || errMessage.includes("requires authentication")) {
-        return NextResponse.json(result, { status: 401 });
+        return NextResponse.json(
+          { success: false, error: "OpenStack authentication failed (HTTP 401)" },
+          { status: 401 }
+        );
       }
       return NextResponse.json(result, { status: 500 });
     }

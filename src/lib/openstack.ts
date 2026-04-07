@@ -14,18 +14,14 @@ const OPENRC_PATH = "/opt/stack/devstack/openrc";
  */
 export async function runOpenStackCommand(
   command: string,
-  username?: string,
-  project?: string
+  envVars: Record<string, string> = {}
 ): Promise<string> {
-  const osUsername = username || "dung";
-  const osProject = project || "dung";
-  // The user instruction: source openrc <username> <project> (Note: normally openrc takes <project> <username>, using custom order as requested, but with OS_PASSWORD)
-  const openrcSource = `export OS_PASSWORD=mtdung2004 && source ${OPENRC_PATH} ${osUsername} ${osProject}`;
+  const openrcSource = `export OS_USERNAME="\${OS_USERNAME}" && export OS_PROJECT_NAME="\${OS_PROJECT_NAME}" && export OS_PASSWORD="\${OS_PASSWORD}" && source ${OPENRC_PATH}`;
   const fullCommand = `bash -c '${openrcSource} && ${command}'`;
 
   const { stdout, stderr } = await execAsync(fullCommand, {
     timeout: 30000,
-    env: { ...process.env, OS_CLOUD: "" },
+    env: { ...process.env, OS_CLOUD: "", ...envVars },
   });
 
   if (stderr && !stdout) {
@@ -102,8 +98,6 @@ export interface CreateVMData {
   os: string;
   network: string;
   environments: string[];
-  username?: string;
-  project?: string;
 }
 
 export interface CreateVMResponse {
@@ -138,7 +132,14 @@ export async function createOpenStackVM(
       "-f json",
     ].join(" ");
 
-    const output = await runOpenStackCommand(cmd, data.username, data.project);
+    // Using exact environment for authentication
+    const openstackEnv = {
+      OS_USERNAME: "dung",
+      OS_PROJECT_NAME: "Dung_Prj",
+      OS_PASSWORD: "mtdung2004",
+    };
+
+    const output = await runOpenStackCommand(cmd, openstackEnv);
     const result = JSON.parse(output);
 
     return {
