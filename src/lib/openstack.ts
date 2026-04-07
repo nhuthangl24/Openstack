@@ -56,24 +56,53 @@ apt-get upgrade -y
 `;
 
   // 4. Cài cắm môi trường theo mảng JSON
-  if (environments.includes("docker")) {
-    script += "apt-get install -y docker.io\n";
-  }
-  if (environments.includes("nodejs")) {
-    script += "curl -fsSL https://deb.nodesource.com/setup_20.x | bash -\n";
-    script += "apt-get install -y nodejs\n";
-  }
-  if (environments.includes("python3") || environments.includes("python")) {
-    script += "apt-get install -y python3 python3-pip\n";
-  }
-  if (environments.includes("git")) {
-    script += "apt-get install -y git\n";
-  }
-  if (environments.includes("mysql")) {
-    script += "apt-get install -y mysql-server\n";
-  }
-  if (environments.includes("nginx")) {
-    script += "apt-get install -y nginx\n";
+  if (environments.length > 0) {
+    if (environments.includes("docker")) {
+      script += "apt-get install -y docker.io\n";
+    }
+    if (environments.includes("nodejs")) {
+      script += "curl -fsSL https://deb.nodesource.com/setup_20.x | bash -\n";
+      script += "apt-get install -y nodejs\n";
+      if (environments.includes("pm2")) {
+        script += "npm install -g pm2\n";
+      }
+    }
+    if (environments.includes("python3") || environments.includes("python")) {
+      script += "apt-get install -y python3 python3-pip\n";
+    }
+    if (environments.includes("java") || environments.includes("jdk")) {
+      script += "apt-get install -y default-jdk\n";
+    }
+    if (environments.includes("php")) {
+      script += "apt-get install -y php php-cli php-fpm\n";
+      if (environments.includes("composer")) {
+        script += "apt-get install -y composer\n";
+      }
+    }
+    if (environments.includes("golang") || environments.includes("go")) {
+      script += "apt-get install -y golang\n";
+    }
+    if (environments.includes("git")) {
+      script += "apt-get install -y git\n";
+    }
+    if (environments.includes("mysql")) {
+      script += "apt-get install -y mysql-server\n";
+    }
+    if (environments.includes("postgresql") || environments.includes("postgres")) {
+      script += "apt-get install -y postgresql postgresql-contrib\n";
+    }
+    if (environments.includes("mongodb") || environments.includes("mongo")) {
+      script += "apt-get install -y mongodb\n";
+    }
+    if (environments.includes("redis")) {
+      script += "apt-get install -y redis-server\n";
+    }
+    if (environments.includes("nginx")) {
+      script += "apt-get install -y nginx\n";
+    }
+    if (environments.includes("apache2") || environments.includes("apache")) {
+      script += "apt-get install -y apache2\n";
+    }
   }
 
   return script;
