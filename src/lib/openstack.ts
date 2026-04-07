@@ -174,6 +174,46 @@ export async function verifyOpenStackResource(
 
 
 /**
+ * Poll for VM status until ACTIVE and return the first IP found.
+ */
+export async function pollVMIP(
+  vmId: string,
+  envVars: Record<string, string>,
+  maxAttempts = 24,
+  intervalMs = 5000
+): Promise<string> {
+  for (let i = 0; i < maxAttempts; i++) {
+    try {
+      await new Promise((r) => setTimeout(r, intervalMs));
+      const out = await runOpenStackCommand(
+        `openstack server show ${escapeShellArg(vmId)} -f json`,
+        envVars
+      );
+      const vm = JSON.parse(out);
+      if (vm.status === "ACTIVE") {
+        // Parse addresses - could be object like { public: [{addr: '...'}] }
+        const addresses = vm.addresses;
+        if (addresses && typeof addresses === "object") {
+          for (const net of Object.values(addresses) as any[]) {
+            if (Array.isArray(net) && net.length > 0 && net[0].addr) {
+              return net[0].addr;
+            }
+          }
+        }
+        // addresses may already be a string in some OpenStack versions
+        if (typeof addresses === "string" && addresses.length > 0) {
+          const match = addresses.match(/(\d+\.\d+\.\d+\.\d+)/);
+          if (match) return match[1];
+        }
+      }
+    } catch {
+      // Keep polling
+    }
+  }
+  return "";
+}
+
+/**
  * Create a VM on OpenStack using CLI.
  */
 export async function createOpenStackVM(
@@ -232,13 +272,17 @@ export async function createOpenStackVM(
 
     const output = await runOpenStackCommand(cmd, openstackEnv);
     const result = JSON.parse(output);
+    const vmId = result.id || result.ID;
+
+    // Poll for ACTIVE status and grab IP (up to 2 min)
+    const ip = await pollVMIP(vmId, openstackEnv);
 
     return {
       success: true,
       vm_name: data.instance_name,
-      vm_id: result.id || result.ID,
-      status: result.status || "BUILD",
-      ip: result.addresses ? JSON.stringify(result.addresses) : "",
+      vm_id: vmId,
+      status: ip ? "ACTIVE" : "BUILD",
+      ip,
     };
   } catch (error) {
     const message =

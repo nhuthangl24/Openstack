@@ -29,6 +29,7 @@ const DEFAULT_OS = "Ubuntu 24.04 LTS";
 
 export default function CreateVMForm() {
   const [instanceName, setInstanceName] = useState("");
+  const [sshUser, setSshUser] = useState("ubuntu");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [flavor, setFlavor] = useState("");
@@ -100,9 +101,10 @@ export default function CreateVMForm() {
         // Show success screen instead of resetting
         setSuccessData({
           instanceName,
+          sshUser: sshUser.trim() || "ubuntu",
           password,
           flavor,
-          ip: data.ip || "Đang cấp phát...",
+          ip: data.ip || "",
           vmId: data.vm_id,
           environments: selectedEnvs
         });
@@ -121,8 +123,22 @@ export default function CreateVMForm() {
   };
 
   const copyToClipboard = (text: string) => {
-    navigator.clipboard.writeText(text);
-    toast.success("Đã copy vào bộ nhớ tạm");
+    if (!text) return;
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(() => toast.success("Đã copy vào bộ nhớ tạm"));
+    } else {
+      // Fallback dành cho HTTP (không phải HTTPS)
+      const el = document.createElement("textarea");
+      el.value = text;
+      el.style.position = "fixed";
+      el.style.opacity = "0";
+      document.body.appendChild(el);
+      el.focus();
+      el.select();
+      document.execCommand("copy");
+      document.body.removeChild(el);
+      toast.success("Đã copy vào bộ nhớ tạm");
+    }
   };
 
   if (successData) {
@@ -161,17 +177,23 @@ export default function CreateVMForm() {
               <div className="bg-input/30 rounded-xl p-4 border border-border/40">
                 <Label className="text-xs text-muted-foreground uppercase font-semibold tracking-wider">IP Address</Label>
                 <div className="flex items-center justify-between mt-1.5">
-                  <span className="font-mono text-sm text-chart-2">{successData.ip}</span>
-                  <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => copyToClipboard(successData.ip)}>
-                    <Copy className="w-3 h-3 text-muted-foreground" />
-                  </Button>
+                  <span className="font-mono text-sm text-chart-2">
+                    {successData.ip || "Đang lấy IP..."}
+                  </span>
+                  {successData.ip && (
+                    <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => copyToClipboard(successData.ip)}>
+                      <Copy className="w-3 h-3 text-muted-foreground" />
+                    </Button>
+                  )}
                 </div>
               </div>
               <div className="bg-input/30 rounded-xl p-4 border border-border/40">
                 <Label className="text-xs text-muted-foreground uppercase font-semibold tracking-wider">Trạng thái</Label>
                 <div className="flex items-center gap-2 mt-1.5">
                   <Activity className="w-4 h-4 text-chart-3 animate-pulse" />
-                  <span className="font-mono text-sm text-chart-3">BUILDING / CLOUD-INIT</span>
+                  <span className="font-mono text-sm text-chart-3">
+                    {successData.ip ? "ACTIVE" : "BUILDING / CLOUD-INIT"}
+                  </span>
                 </div>
               </div>
             </div>
@@ -179,8 +201,8 @@ export default function CreateVMForm() {
             <div className="mt-6 bg-black/80 rounded-xl p-4 border border-border/20 text-green-400 font-mono text-sm relative">
               <Label className="absolute -top-2.5 left-4 bg-background px-2 text-xs text-muted-foreground uppercase font-semibold tracking-wider font-sans">Lệnh kết nối nhanh</Label>
               <div className="flex items-center justify-between pt-2">
-                <code>ssh ubuntu@{successData.ip === "Đang cấp phát..." ? "IP_CHƯA_CÓ" : (JSON.parse(successData.ip || "{}").public?.[0]?.addr || "LOCAL_IP")}</code>
-                <Button variant="ghost" size="icon" className="h-6 w-6 hover:bg-white/10" onClick={() => copyToClipboard(`ssh ubuntu@${successData.ip === "Đang cấp phát..." ? "IP_CHƯA_CÓ" : (JSON.parse(successData.ip || "{}").public?.[0]?.addr || "LOCAL_IP")}`)}>
+                <code>ssh {successData.sshUser}@{successData.ip || "<IP_CHUA_CO>"}</code>
+                <Button variant="ghost" size="icon" className="h-6 w-6 hover:bg-white/10" onClick={() => copyToClipboard(`ssh ${successData.sshUser}@${successData.ip}`)}>
                   <Copy className="w-3 h-3 text-green-400" />
                 </Button>
               </div>
@@ -264,77 +286,95 @@ export default function CreateVMForm() {
                 )}
               </div>
 
-
-              {/* SSH Password */}
-              <div className="space-y-2">
-                <Label
-                  htmlFor="ssh-password"
-                  className="text-sm font-medium text-foreground/90 flex items-center gap-2"
-                >
-                  <KeyRound className="w-4 h-4 text-chart-4" />
-                  Mật khẩu SSH
-                </Label>
-                <div className="relative">
-                  <Input
-                    id="ssh-password"
-                    type={showPassword ? "text" : "password"}
-                    placeholder="Tối thiểu 8 ký tự"
-                    value={password}
-                    onChange={(e) => {
-                      setPassword(e.target.value);
-                      if (errors.password)
-                        setErrors((prev) => ({ ...prev, password: "" }));
-                    }}
-                    className={`h-11 bg-input/50 border-border/60 placeholder:text-muted-foreground/40 pr-11 focus:border-chart-1/50 focus:ring-chart-1/20 ${
-                      errors.password
-                        ? "border-destructive/60 focus:border-destructive/60"
-                        : ""
-                    }`}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
-                    aria-label={
-                      showPassword ? "Ẩn mật khẩu" : "Hiện mật khẩu"
-                    }
+              {/* SSH Username + Password row */}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label
+                    htmlFor="ssh-user"
+                    className="text-sm font-medium text-foreground/90 flex items-center gap-2"
                   >
-                    {showPassword ? (
-                      <EyeOff className="w-4 h-4" />
-                    ) : (
-                      <Eye className="w-4 h-4" />
-                    )}
-                  </button>
+                    <Server className="w-4 h-4 text-chart-3" />
+                    Tên user SSH
+                  </Label>
+                  <Input
+                    id="ssh-user"
+                    placeholder="ubuntu"
+                    value={sshUser}
+                    onChange={(e) => setSshUser(e.target.value)}
+                    className="h-11 bg-input/50 border-border/60 placeholder:text-muted-foreground/40 focus:border-chart-1/50 focus:ring-chart-1/20"
+                  />
+                  <p className="text-[11px] text-muted-foreground">Mặc định: ubuntu</p>
                 </div>
-                {errors.password && (
-                  <p className="text-xs text-destructive mt-1 animate-in fade-in-0 slide-in-from-top-1">
-                    {errors.password}
-                  </p>
-                )}
-                {password.length > 0 && password.length < 8 && !errors.password && (
-                  <div className="flex items-center gap-2 mt-1">
-                    <div className="flex-1 h-1 rounded-full bg-secondary overflow-hidden">
-                      <div
-                        className="h-full rounded-full bg-destructive/70 transition-all duration-300"
-                        style={{
-                          width: `${Math.min(
-                            (password.length / 8) * 100,
-                            100
-                          )}%`,
-                        }}
-                      />
+                <div className="space-y-2">
+                  <Label
+                    htmlFor="ssh-password"
+                    className="text-sm font-medium text-foreground/90 flex items-center gap-2"
+                  >
+                    <KeyRound className="w-4 h-4 text-chart-4" />
+                    Mật khẩu SSH
+                  </Label>
+                  <div className="relative">
+                    <Input
+                      id="ssh-password"
+                      type={showPassword ? "text" : "password"}
+                      placeholder="Tối thiểu 8 ký tự"
+                      value={password}
+                      onChange={(e) => {
+                        setPassword(e.target.value);
+                        if (errors.password)
+                          setErrors((prev) => ({ ...prev, password: "" }));
+                      }}
+                      className={`h-11 bg-input/50 border-border/60 placeholder:text-muted-foreground/40 pr-11 focus:border-chart-1/50 focus:ring-chart-1/20 ${
+                        errors.password
+                          ? "border-destructive/60 focus:border-destructive/60"
+                          : ""
+                      }`}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                      aria-label={
+                        showPassword ? "Ẩn mật khẩu" : "Hiện mật khẩu"
+                      }
+                    >
+                      {showPassword ? (
+                        <EyeOff className="w-4 h-4" />
+                      ) : (
+                        <Eye className="w-4 h-4" />
+                      )}
+                    </button>
+                  </div>
+                  {errors.password && (
+                    <p className="text-xs text-destructive mt-1 animate-in fade-in-0 slide-in-from-top-1">
+                      {errors.password}
+                    </p>
+                  )}
+                  {password.length > 0 && password.length < 8 && !errors.password && (
+                    <div className="flex items-center gap-2 mt-1">
+                      <div className="flex-1 h-1 rounded-full bg-secondary overflow-hidden">
+                        <div
+                          className="h-full rounded-full bg-destructive/70 transition-all duration-300"
+                          style={{
+                            width: `${Math.min(
+                              (password.length / 8) * 100,
+                              100
+                            )}%`,
+                          }}
+                        />
+                      </div>
+                      <span className="text-[10px] text-muted-foreground">
+                        {password.length}/8
+                      </span>
                     </div>
-                    <span className="text-[10px] text-muted-foreground">
-                      {password.length}/8
-                    </span>
-                  </div>
-                )}
-                {password.length >= 8 && (
-                  <div className="flex items-center gap-2 mt-1">
-                    <div className="flex-1 h-1 rounded-full bg-chart-2" />
-                    <span className="text-[10px] text-chart-2">Đủ mạnh</span>
-                  </div>
-                )}
+                  )}
+                  {password.length >= 8 && (
+                    <div className="flex items-center gap-2 mt-1">
+                      <div className="flex-1 h-1 rounded-full bg-chart-2" />
+                      <span className="text-[10px] text-chart-2">Đủ mạnh</span>
+                    </div>
+                  )}
+                </div>
               </div>
 
               <Separator className="bg-border/30" />
