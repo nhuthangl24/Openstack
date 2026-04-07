@@ -144,6 +144,7 @@ export default function WebSSHModal({
       terminalRef.current.innerHTML = "";
       term.open(terminalRef.current);
       fitAddon.fit();
+      setTimeout(() => fitAddon.fit(), 80);
     }
 
     xtermRef.current = term;
@@ -165,6 +166,7 @@ export default function WebSSHModal({
         }),
       );
       term.focus();
+      setTimeout(() => fitAddon.fit(), 80);
 
       if (initialCommand && !commandSentRef.current) {
         commandSentRef.current = true;
@@ -216,7 +218,7 @@ export default function WebSSHModal({
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <div className="relative w-full max-w-5xl">
+      <div className="relative w-[96vw] max-w-5xl">
         <div className="absolute -inset-[1px] rounded-2xl bg-gradient-to-br from-white/5 via-white/0 to-white/5 blur-sm" />
 
         <div className="relative overflow-hidden rounded-2xl border border-white/10 bg-[#101216] shadow-2xl">
@@ -243,7 +245,7 @@ export default function WebSSHModal({
             </button>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-[300px_1fr]">
+          <div className="grid grid-cols-1 lg:grid-cols-[300px_1fr] min-w-0">
             <div className="p-5 border-b lg:border-b-0 lg:border-r border-white/10 bg-black/20">
               <div className="space-y-4">
                 <div>
@@ -320,7 +322,7 @@ export default function WebSSHModal({
               </div>
             </div>
 
-            <div className="p-4">
+            <div className="p-4 min-w-0">
               <div className="rounded-xl border border-white/10 bg-[#0b0f14] overflow-hidden">
                 <div className="flex items-center justify-between px-3 py-2 border-b border-white/10 text-xs text-gray-500">
                   <span>Terminal</span>
@@ -329,7 +331,7 @@ export default function WebSSHModal({
                     {connected ? "Connected" : "Disconnected"}
                   </span>
                 </div>
-                <div ref={terminalRef} className="h-[420px]" />
+                <div ref={terminalRef} className="h-[420px] w-full" />
               </div>
             </div>
           </div>
