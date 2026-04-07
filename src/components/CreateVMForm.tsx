@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";grep OS_IDENTITY_API_VERSION /opt/stack/devstack/openrc
+import { useState } from "react";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
