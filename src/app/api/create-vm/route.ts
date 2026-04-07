@@ -65,6 +65,7 @@ export async function POST(request: NextRequest) {
     const result = await createOpenStackVM(
       {
         instance_name,
+        hostname,
         flavor,
         os,
         network,

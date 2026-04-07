@@ -96,6 +96,7 @@ export async function cleanupTempFile(filepath: string): Promise<void> {
 
 export interface CreateVMData {
   instance_name: string;
+  hostname: string;
   password: string;
   flavor: string;
   os: string;
@@ -135,22 +136,6 @@ export async function verifyOpenStackResource(
   }
 }
 
-export interface CreateVMData {
-  instance_name: string;
-  password: string;
-  flavor: string;
-  os: string;
-  network: string;
-  environments: string[];
-}
-
-export interface CreateVMResponse {
-  success: boolean;
-  vm_name: string;
-  vm_id?: string;
-  status: string;
-  error?: string;
-}
 
 /**
  * Create a VM on OpenStack using CLI.
@@ -205,6 +190,7 @@ export async function createOpenStackVM(
       `--flavor ${escapeShellArg(data.flavor)}`,
       `--network ${escapeShellArg(data.network)}`,
       `--user-data ${escapeShellArg(scriptPath)}`,
+      ...(data.hostname ? [`--hostname ${escapeShellArg(data.hostname)}`] : []),
       `${escapeShellArg(data.instance_name)}`,
       "-f json",
     ].join(" ");
