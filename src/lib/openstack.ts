@@ -190,7 +190,6 @@ export async function createOpenStackVM(
       `--flavor ${escapeShellArg(data.flavor)}`,
       `--network ${escapeShellArg(data.network)}`,
       `--user-data ${escapeShellArg(scriptPath)}`,
-      ...(data.hostname ? [`--hostname ${escapeShellArg(data.hostname)}`] : []),
       `${escapeShellArg(data.instance_name)}`,
       "-f json",
     ].join(" ");
