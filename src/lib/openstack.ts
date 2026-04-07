@@ -7,18 +7,14 @@ import { tmpdir } from "os";
 
 const execAsync = promisify(exec);
 
-const OPENRC_PATH = "/opt/stack/devstack/openrc";
-
 /**
- * Execute an OpenStack CLI command with sourced credentials.
+ * Execute an OpenStack CLI command with credentials supplied via environment.
  */
 export async function runOpenStackCommand(
   command: string,
   envVars: Record<string, string> = {}
 ): Promise<string> {
-  // Source openrc using proper variables resolving in subshell
-  const openrcSource = `source ${OPENRC_PATH} $OS_USERNAME $OS_PROJECT_NAME`;
-  const fullCommand = `bash -c '${openrcSource} && ${command}'`;
+  const fullCommand = `bash -c '${command}'`;
 
   const { stdout, stderr } = await execAsync(fullCommand, {
     timeout: 30000,
