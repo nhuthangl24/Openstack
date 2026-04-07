@@ -274,15 +274,12 @@ export async function createOpenStackVM(
     const result = JSON.parse(output);
     const vmId = result.id || result.ID;
 
-    // Poll for ACTIVE status and grab IP (up to 2 min)
-    const ip = await pollVMIP(vmId, openstackEnv);
-
     return {
       success: true,
       vm_name: data.instance_name,
       vm_id: vmId,
-      status: ip ? "ACTIVE" : "BUILD",
-      ip,
+      status: result.status || "BUILD",
+      ip: "",
     };
   } catch (error) {
     const message =

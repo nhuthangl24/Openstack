@@ -162,13 +162,51 @@ bot.action("create_confirm", async (ctx) => {
     }, script);
 
     if (result.success) {
+      await ctx.editMessageText("✅ VM đã tạo xong! Đang chờ lấy IP...");
+
+      // Poll IP
+      let ip = "";
+      const vmId = result.vm_id || "";
+      if (vmId) {
+        const openstackEnv = {
+          OS_AUTH_URL: process.env.OS_AUTH_URL || "http://127.0.0.1/identity",
+          OS_REGION_NAME: process.env.OS_REGION_NAME || "RegionOne",
+          OS_USER_DOMAIN_ID: process.env.OS_USER_DOMAIN_ID || "default",
+          OS_PROJECT_DOMAIN_ID: process.env.OS_PROJECT_DOMAIN_ID || "default",
+          OS_AUTH_TYPE: process.env.OS_AUTH_TYPE || "password",
+          OS_USERNAME: "dung",
+          OS_PROJECT_NAME: "Dung_Prj",
+          OS_PASSWORD: "mtdung2004",
+        };
+        for (let i = 0; i < 24 && !ip; i++) {
+          await new Promise(r => setTimeout(r, 5000));
+          try {
+            const { runOpenStackCommand, escapeShellArg } = await import("./src/lib/openstack");
+            const out = await runOpenStackCommand(`openstack server show ${escapeShellArg(vmId)} -f json`, openstackEnv);
+            const vm = JSON.parse(out);
+            if (vm.addresses) {
+              if (typeof vm.addresses === "string") {
+                const m = vm.addresses.match(/(\d{1,3}(?:\.\d{1,3}){3})/);
+                if (m) ip = m[1];
+              } else if (typeof vm.addresses === "object") {
+                for (const nets of Object.values(vm.addresses) as any[]) {
+                  if (Array.isArray(nets) && nets[0]?.addr) { ip = nets[0].addr; break; }
+                }
+              }
+            }
+          } catch {}
+        }
+      }
+
       await ctx.editMessageText(
         `🎉 **TẠO MÁY ẢO THÀNH CÔNG!** 🎉\n\n` +
         `📝 Tên máy: \`${result.vm_name}\`\n` +
         `🆔 ID: \`${result.vm_id}\`\n` +
-        `☁️ Status: \`${result.status}\`\n` +
-        `🌐 IP info: \`${result.ip || "Đang cấp phát..."}\`\n\n` + 
-        `_Cloud-init đang chạy background để set mật khẩu, vui lòng thử SSH bằng ssh ubuntu@ip sau vài giây!_`,
+        `☁️ Status: \`ACTIVE\`\n` +
+        `🌐 IP: \`${ip || "Không lấy được IP, vui lòng check trên Dashboard"}\`\n\n` + 
+        `🔑 Mật khẩu SSH: \`${password}\`\n` +
+        `📟 Lệnh SSH: \`ssh ubuntu@${ip || "<IP>"}\`\n\n` +
+        `_Cloud-init đang chạy background để set mật khẩu, SSH sau ~30 giây!_`,
         { parse_mode: "Markdown" }
       );
     } else {
