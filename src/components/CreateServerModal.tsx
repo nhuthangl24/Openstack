@@ -243,14 +243,14 @@ export default function CreateServerModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/55 p-4 backdrop-blur-md"
+      className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/55 p-4 backdrop-blur-md sm:p-6"
       onClick={(event) => {
         if (event.target === event.currentTarget) {
           onClose();
         }
       }}
     >
-      <div className="surface-panel relative flex max-h-[92vh] w-full max-w-6xl flex-col overflow-hidden rounded-[2rem]">
+      <div className="surface-panel relative mx-auto flex max-h-[calc(100dvh-2rem)] w-full max-w-6xl flex-col overflow-hidden rounded-[2rem] sm:max-h-[calc(100dvh-3rem)]">
         <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-primary/40 to-transparent" />
 
         <div className="flex flex-col gap-4 border-b border-border/70 px-5 py-5 sm:flex-row sm:items-start sm:justify-between sm:px-6">
@@ -282,8 +282,9 @@ export default function CreateServerModal({
           </button>
         </div>
 
-        <div className="grid min-h-0 flex-1 gap-0 xl:grid-cols-[minmax(0,1fr)_22rem]">
-          <div className="min-h-0 overflow-y-auto px-5 py-5 sm:px-6">
+        <div className="flex-1 overflow-y-auto overscroll-contain xl:overflow-hidden">
+          <div className="grid min-h-full gap-0 xl:min-h-0 xl:grid-cols-[minmax(0,1fr)_22rem]">
+            <div className="px-5 py-5 pb-8 sm:px-6 xl:min-h-0 xl:overflow-y-auto xl:overscroll-contain">
             {errors.submit && (
               <div className="mb-5 rounded-[1.4rem] border border-rose-500/25 bg-rose-500/10 px-4 py-3 text-sm text-rose-200 dark:text-rose-300">
                 {errors.submit}
@@ -553,7 +554,7 @@ export default function CreateServerModal({
                 description="Các package này sẽ được cài qua cloud-init sau khi VM khởi động."
               />
 
-              <div className="grid gap-3 lg:grid-cols-2">
+              <div className="grid gap-3 lg:auto-rows-fr lg:grid-cols-2">
                 {environments.map((env) => (
                   <EnvironmentCard
                     key={env.id}
@@ -566,8 +567,8 @@ export default function CreateServerModal({
             </section>
           </div>
 
-          <aside className="border-t border-border/70 bg-background/45 px-5 py-5 xl:border-l xl:border-t-0 xl:px-6">
-            <div className="space-y-4 xl:sticky xl:top-5">
+            <aside className="border-t border-border/70 bg-background/45 px-5 py-5 pb-6 xl:min-h-0 xl:overflow-y-auto xl:overscroll-contain xl:border-l xl:border-t-0 xl:px-6">
+              <div className="space-y-4 xl:pr-1">
               <div className="rounded-[1.6rem] border border-border/70 bg-card/85 p-5">
                 <p className="text-xs font-semibold uppercase tracking-[0.24em] text-muted-foreground">
                   Review
@@ -614,7 +615,7 @@ export default function CreateServerModal({
                 </div>
               </div>
 
-              <div className="flex flex-col gap-3">
+              <div className="flex flex-col gap-3 pb-1">
                 <button
                   type="button"
                   onClick={handleDeploy}
@@ -686,7 +687,7 @@ function EnvironmentCard({
     <button
       type="button"
       onClick={onToggle}
-      className={`env-chip rounded-[1.4rem] border p-4 text-left ${
+      className={`env-chip h-full rounded-[1.4rem] border p-4 text-left ${
         selected
           ? "border-primary/40 bg-primary/10"
           : "border-border/70 bg-background/65 hover:border-primary/25"
