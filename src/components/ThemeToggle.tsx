@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { LaptopMinimal, MoonStar, SunMedium } from "lucide-react";
 import { useTheme } from "next-themes";
 import { cn } from "@/lib/utils";
@@ -23,15 +24,21 @@ const THEMES = [
 ];
 
 export default function ThemeToggle() {
-  const { theme, setTheme, resolvedTheme } = useTheme();
-  const activeTheme = theme ?? "system";
+  const { theme, setTheme } = useTheme();
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  const activeTheme = mounted ? theme ?? "system" : "system";
 
   return (
-    <div className="inline-flex items-center gap-1 rounded-full border border-border/70 bg-card/85 p-1 shadow-[0_18px_50px_-35px_rgba(15,23,42,0.55)] backdrop-blur">
+    <div className="inline-grid w-full grid-cols-3 gap-1 rounded-[1.25rem] border border-border/70 bg-background/78 p-1.5 shadow-[0_20px_48px_-34px_rgba(15,23,42,0.55)] backdrop-blur sm:w-auto">
       {THEMES.map(({ value, label, icon: Icon }) => {
         const isActive = activeTheme === value;
-        const isResolved =
-          value !== "system" && resolvedTheme === value && theme === "system";
+        const buttonTitle =
+          value === "system" && mounted ? "System" : label;
 
         return (
           <button
@@ -39,21 +46,16 @@ export default function ThemeToggle() {
             type="button"
             onClick={() => setTheme(value)}
             className={cn(
-              "inline-flex items-center gap-2 rounded-full px-3 py-2 text-xs font-semibold transition-all",
+              "inline-flex min-w-0 items-center justify-center gap-2 rounded-[1rem] px-3.5 py-2.5 text-[12px] font-semibold transition-all",
               isActive
-                ? "bg-foreground text-background shadow-[0_12px_30px_-20px_rgba(2,6,23,0.9)]"
-                : "text-muted-foreground hover:bg-muted hover:text-foreground",
+                ? "bg-foreground text-background shadow-[0_16px_34px_-24px_rgba(2,6,23,0.9)]"
+                : "text-muted-foreground hover:bg-muted/70 hover:text-foreground",
             )}
             aria-pressed={isActive}
-            title={value === "system" && resolvedTheme ? `System (${resolvedTheme})` : label}
+            title={buttonTitle}
           >
             <Icon className="h-3.5 w-3.5" />
-            <span>{label}</span>
-            {isResolved && (
-              <span className="rounded-full bg-background/15 px-1.5 py-0.5 text-[10px] uppercase tracking-[0.18em]">
-                Live
-              </span>
-            )}
+            <span className="truncate">{label}</span>
           </button>
         );
       })}

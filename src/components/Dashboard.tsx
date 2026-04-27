@@ -5,6 +5,7 @@ import {
   useDeferredValue,
   useEffect,
   useState,
+  type KeyboardEvent,
   type MouseEvent,
 } from "react";
 import {
@@ -91,6 +92,20 @@ function readStoredViewMode() {
 
   const value = window.localStorage.getItem(VIEW_MODE_KEY);
   return value === "list" ? "list" : "grid";
+}
+
+function handleSelectableSurfaceKeyDown(
+  event: KeyboardEvent<HTMLElement>,
+  onSelect: () => void,
+) {
+  if (event.target !== event.currentTarget) {
+    return;
+  }
+
+  if (event.key === "Enter" || event.key === " ") {
+    event.preventDefault();
+    onSelect();
+  }
 }
 
 function statusPriority(status: string) {
@@ -417,9 +432,11 @@ function ServerCard({
   const sshCommand = vm.ip ? `ssh ${SSH_USER}@${vm.ip}` : "";
 
   return (
-    <button
-      type="button"
+    <div
+      role="button"
+      tabIndex={0}
       onClick={onSelect}
+      onKeyDown={(event) => handleSelectableSurfaceKeyDown(event, onSelect)}
       className={`surface-panel group relative w-full overflow-hidden rounded-[1.7rem] p-5 text-left transition ${
         selected
           ? "border-primary/45 shadow-[0_35px_80px_-55px_rgba(37,99,235,0.55)]"
@@ -493,7 +510,7 @@ function ServerCard({
           }}
         />
       </div>
-    </button>
+    </div>
   );
 }
 
@@ -515,9 +532,11 @@ function ServerRow({
   onGitHub: (vmId: string) => void;
 }) {
   return (
-    <button
-      type="button"
+    <div
+      role="button"
+      tabIndex={0}
       onClick={onSelect}
+      onKeyDown={(event) => handleSelectableSurfaceKeyDown(event, onSelect)}
       className={`surface-panel flex w-full flex-col gap-4 rounded-[1.5rem] p-4 text-left transition md:flex-row md:items-center ${
         selected
           ? "border-primary/45 shadow-[0_30px_60px_-45px_rgba(37,99,235,0.5)]"
@@ -571,7 +590,7 @@ function ServerRow({
           />
         </div>
       </div>
-    </button>
+    </div>
   );
 }
 
@@ -654,10 +673,9 @@ export default function Dashboard() {
   const [filter, setFilter] = useState<FilterKey>("all");
   const [sortBy, setSortBy] = useState<SortKey>("status");
   const [query, setQuery] = useState("");
-  const [viewMode, setViewMode] = useState<ViewMode>(() => readStoredViewMode());
-  const [autoRefresh, setAutoRefresh] = useState<boolean>(() =>
-    readStoredBoolean(AUTO_REFRESH_KEY, true),
-  );
+  const [viewMode, setViewMode] = useState<ViewMode>("grid");
+  const [autoRefresh, setAutoRefresh] = useState(true);
+  const [preferencesHydrated, setPreferencesHydrated] = useState(false);
   const [showCreate, setShowCreate] = useState(false);
   const [createPresetKey, setCreatePresetKey] = useState<string | null>(null);
   const [vmResult, setVmResult] = useState<VMResult | null>(null);
@@ -711,7 +729,13 @@ export default function Dashboard() {
   }, [fetchFleet]);
 
   useEffect(() => {
-    if (!autoRefresh) {
+    setAutoRefresh(readStoredBoolean(AUTO_REFRESH_KEY, true));
+    setViewMode(readStoredViewMode());
+    setPreferencesHydrated(true);
+  }, []);
+
+  useEffect(() => {
+    if (!preferencesHydrated || !autoRefresh) {
       return;
     }
 
@@ -720,15 +744,23 @@ export default function Dashboard() {
     }, 15000);
 
     return () => window.clearInterval(interval);
-  }, [autoRefresh, fetchFleet]);
+  }, [autoRefresh, fetchFleet, preferencesHydrated]);
 
   useEffect(() => {
+    if (!preferencesHydrated) {
+      return;
+    }
+
     window.localStorage.setItem(AUTO_REFRESH_KEY, String(autoRefresh));
-  }, [autoRefresh]);
+  }, [autoRefresh, preferencesHydrated]);
 
   useEffect(() => {
+    if (!preferencesHydrated) {
+      return;
+    }
+
     window.localStorage.setItem(VIEW_MODE_KEY, viewMode);
-  }, [viewMode]);
+  }, [viewMode, preferencesHydrated]);
 
   let visibleVMs = vms.filter((vm) => {
     if (filter === "ready" && !(vm.status === "ACTIVE" && vm.ip)) {
@@ -869,14 +901,14 @@ export default function Dashboard() {
       </div>
 
       <div className="relative z-10 mx-auto max-w-7xl px-4 pb-10 pt-6 sm:px-6 lg:px-8">
-        <header className="surface-panel surface-noise rounded-[2rem] px-5 py-5 sm:px-6">
-          <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
-            <div className="flex items-start gap-4">
-              <div className="flex h-14 w-14 items-center justify-center rounded-[1.3rem] bg-foreground text-background shadow-[0_18px_45px_-28px_rgba(15,23,42,0.7)]">
+        <header className="surface-panel surface-noise overflow-hidden rounded-[2.2rem] px-5 py-6 sm:px-6 sm:py-7 xl:px-8">
+          <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(18rem,23rem)] xl:items-start">
+            <div className="flex min-w-0 items-start gap-4 sm:gap-5">
+              <div className="flex h-15 w-15 flex-shrink-0 items-center justify-center rounded-[1.45rem] bg-foreground text-background shadow-[0_18px_45px_-28px_rgba(15,23,42,0.7)]">
                 <Activity className="h-6 w-6" />
               </div>
-              <div>
-                <div className="inline-flex items-center gap-2 rounded-full border border-border/70 bg-background/70 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.24em] text-muted-foreground">
+              <div className="min-w-0">
+                <div className="inline-flex items-center gap-2 rounded-full border border-border/70 bg-background/72 px-3.5 py-1.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
                   <span
                     className={`h-2 w-2 rounded-full ${
                       error ? "bg-rose-400" : "bg-emerald-400"
@@ -884,10 +916,10 @@ export default function Dashboard() {
                   />
                   {error ? "OpenStack cần kiểm tra" : "OpenStack đang kết nối"}
                 </div>
-                <h1 className="mt-4 text-3xl font-semibold tracking-tight text-foreground sm:text-4xl">
+                <h1 className="mt-4 text-3xl font-semibold leading-none tracking-tight text-foreground sm:text-4xl xl:text-[3.2rem]">
                   OrbitStack Console
                 </h1>
-                <p className="mt-2 max-w-3xl text-sm leading-6 text-muted-foreground sm:text-base">
+                <p className="mt-3 max-w-3xl text-sm leading-7 text-muted-foreground sm:text-base">
                   UI mới tập trung vào tốc độ thao tác: theo dõi fleet, tạo VM bằng
                   preset, triển khai repo từ GitHub và mở Web SSH ngay trong một
                   chỗ.
@@ -895,13 +927,15 @@ export default function Dashboard() {
               </div>
             </div>
 
-            <div className="flex flex-col items-start gap-3 lg:items-end">
-              <ThemeToggle />
-              <div className="flex flex-wrap gap-3">
+            <div className="flex min-w-0 flex-col gap-3 xl:items-end">
+              <div className="w-full xl:flex xl:justify-end">
+                <ThemeToggle />
+              </div>
+              <div className="flex w-full flex-col gap-3 sm:flex-row xl:justify-end">
                 <button
                   type="button"
                   onClick={() => openGitHub()}
-                  className="inline-flex items-center gap-2 rounded-full border border-border/70 bg-background/75 px-4 py-3 text-sm font-semibold text-foreground transition hover:border-primary/35 hover:text-primary"
+                  className="inline-flex items-center justify-center gap-2 rounded-[1.15rem] border border-border/70 bg-background/75 px-5 py-3 text-sm font-semibold text-foreground transition hover:border-primary/35 hover:text-primary"
                 >
                   <GitBranch className="h-4 w-4" />
                   GitHub Deploy
@@ -912,7 +946,7 @@ export default function Dashboard() {
                     setCreatePresetKey(null);
                     setShowCreate(true);
                   }}
-                  className="inline-flex items-center gap-2 rounded-full bg-foreground px-5 py-3 text-sm font-semibold text-background transition hover:opacity-90"
+                  className="inline-flex items-center justify-center gap-2 rounded-[1.15rem] bg-foreground px-5 py-3 text-sm font-semibold text-background transition hover:opacity-90"
                 >
                   <Plus className="h-4 w-4" />
                   Tạo server mới
@@ -952,20 +986,20 @@ export default function Dashboard() {
         <section className="mt-6 grid gap-6 xl:grid-cols-[minmax(0,1fr)_22rem]">
           <div className="space-y-6">
             <div className="surface-panel rounded-[2rem] p-5 sm:p-6">
-              <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.24em] text-muted-foreground">
+              <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+                <div className="min-w-0 flex-1 pr-0 xl:pr-6">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
                     Fleet Control
                   </p>
-                  <h2 className="mt-2 text-2xl font-semibold tracking-tight text-foreground">
+                  <h2 className="mt-2 max-w-3xl text-2xl font-semibold leading-tight tracking-tight text-foreground xl:text-[2.15rem]">
                     Tìm nhanh và thao tác trực tiếp trên từng VM
                   </h2>
                 </div>
-                <div className="flex flex-wrap gap-2">
+                <div className="flex shrink-0 flex-wrap gap-2 xl:justify-end">
                   <button
                     type="button"
                     onClick={() => void tryCopy(buildInventoryText(visibleVMs), "Đã copy snapshot fleet.")}
-                    className="inline-flex items-center gap-2 rounded-full border border-border/70 bg-background/70 px-4 py-2.5 text-sm font-semibold text-foreground transition hover:border-primary/35 hover:text-primary"
+                    className="inline-flex items-center gap-2 rounded-[1rem] border border-border/70 bg-background/70 px-4 py-2.5 text-sm font-semibold text-foreground transition hover:border-primary/35 hover:text-primary"
                   >
                     <Copy className="h-4 w-4" />
                     Copy snapshot
@@ -973,7 +1007,7 @@ export default function Dashboard() {
                   <button
                     type="button"
                     onClick={() => void fetchFleet({ silent: true })}
-                    className="inline-flex items-center gap-2 rounded-full border border-border/70 bg-background/70 px-4 py-2.5 text-sm font-semibold text-foreground transition hover:border-primary/35 hover:text-primary"
+                    className="inline-flex items-center gap-2 rounded-[1rem] border border-border/70 bg-background/70 px-4 py-2.5 text-sm font-semibold text-foreground transition hover:border-primary/35 hover:text-primary"
                   >
                     <RefreshCw className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />
                     Làm mới
