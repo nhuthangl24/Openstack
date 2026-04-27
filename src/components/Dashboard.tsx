@@ -1,25 +1,46 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
 import {
+  useCallback,
+  useDeferredValue,
+  useEffect,
+  useState,
+  type MouseEvent,
+} from "react";
+import {
+  Activity,
+  ArrowUpRight,
+  Boxes,
+  Check,
+  CircleAlert,
+  CloudOff,
+  Copy,
+  Cpu,
+  Database,
+  GitBranch,
+  Grid2X2,
+  LayoutList,
+  Loader2,
+  Network,
   Plus,
+  RefreshCw,
+  Search,
+  Server,
+  ShieldCheck,
+  Sparkles,
   Terminal,
   Trash2,
-  Copy,
-  Check,
-  Server,
-  AlertCircle,
-  Loader2,
-  TriangleAlert,
-  CloudOff,
-  MoreHorizontal,
-  Search,
+  Workflow,
+  type LucideIcon,
 } from "lucide-react";
+import { toast } from "sonner";
 import CreateServerModal from "@/components/CreateServerModal";
+import GitHubDeployModal from "@/components/GitHubDeployModal";
+import ThemeToggle from "@/components/ThemeToggle";
 import VMSuccessModal from "@/components/VMSuccessModal";
 import WebSSHModal from "@/components/WebSSHModal";
-import GitHubDeployModal from "@/components/GitHubDeployModal";
-import { toast } from "sonner";
+import { copyToClipboard } from "@/lib/clipboard";
+import { serverPresets } from "@/lib/presets";
 
 interface VM {
   id: string;
@@ -40,592 +61,1212 @@ interface VMResult {
   environments: string[];
 }
 
-// ── Status helpers ──────────────────────────────────────────────────────────
-function StatusDot({ status }: { status: string }) {
-  const color =
-    status === "ACTIVE"
-      ? "bg-green-500"
-      : status === "BUILD"
-        ? "bg-yellow-400 status-pulse"
-        : status === "ERROR"
-          ? "bg-red-500"
-          : status === "SHUTOFF"
-            ? "bg-gray-500"
-            : "bg-gray-600";
+type FilterKey = "all" | "ready" | "building" | "attention";
+type SortKey = "status" | "name" | "ip";
+type ViewMode = "grid" | "list";
+
+const SSH_USER = "ubuntu";
+const AUTO_REFRESH_KEY = "orbitstack:auto-refresh";
+const VIEW_MODE_KEY = "orbitstack:view-mode";
+
+const presetIcons: Record<string, LucideIcon> = {
+  "docker-host": Boxes,
+  "node-api": Workflow,
+  "data-lab": Database,
+};
+
+function readStoredBoolean(key: string, fallback: boolean) {
+  if (typeof window === "undefined") {
+    return fallback;
+  }
+
+  const value = window.localStorage.getItem(key);
+  return value === null ? fallback : value === "true";
+}
+
+function readStoredViewMode() {
+  if (typeof window === "undefined") {
+    return "grid" as ViewMode;
+  }
+
+  const value = window.localStorage.getItem(VIEW_MODE_KEY);
+  return value === "list" ? "list" : "grid";
+}
+
+function statusPriority(status: string) {
+  switch (status) {
+    case "ACTIVE":
+      return 0;
+    case "BUILD":
+      return 1;
+    case "SHUTOFF":
+      return 2;
+    case "ERROR":
+      return 3;
+    default:
+      return 4;
+  }
+}
+
+function getStatusMeta(status: string) {
+  switch (status) {
+    case "ACTIVE":
+      return {
+        label: "Sẵn sàng",
+        tone:
+          "border-emerald-500/20 bg-emerald-500/10 text-emerald-300 dark:border-emerald-400/20 dark:bg-emerald-400/10 dark:text-emerald-300",
+        dot: "bg-emerald-400",
+        description: "VM đang chạy ổn định.",
+      };
+    case "BUILD":
+      return {
+        label: "Đang dựng",
+        tone:
+          "border-amber-500/20 bg-amber-500/10 text-amber-300 dark:border-amber-400/20 dark:bg-amber-400/10 dark:text-amber-300",
+        dot: "bg-amber-400 status-pulse",
+        description: "OpenStack vẫn đang provision máy.",
+      };
+    case "ERROR":
+      return {
+        label: "Lỗi",
+        tone:
+          "border-rose-500/20 bg-rose-500/10 text-rose-300 dark:border-rose-400/20 dark:bg-rose-400/10 dark:text-rose-300",
+        dot: "bg-rose-400",
+        description: "Cần kiểm tra lại thao tác hoặc quota.",
+      };
+    case "SHUTOFF":
+      return {
+        label: "Đã tắt",
+        tone:
+          "border-slate-500/20 bg-slate-500/10 text-slate-300 dark:border-slate-400/20 dark:bg-slate-400/10 dark:text-slate-300",
+        dot: "bg-slate-400",
+        description: "Máy đang dừng và chưa sẵn sàng SSH.",
+      };
+    default:
+      return {
+        label: status || "Không rõ",
+        tone:
+          "border-slate-500/20 bg-slate-500/10 text-slate-300 dark:border-slate-400/20 dark:bg-slate-400/10 dark:text-slate-300",
+        dot: "bg-slate-400",
+        description: "Trạng thái chưa được phân loại.",
+      };
+  }
+}
+
+function formatLastUpdated(value: Date | null) {
+  if (!value) {
+    return "Chưa đồng bộ";
+  }
+
+  const diff = Math.floor((Date.now() - value.getTime()) / 1000);
+
+  if (diff < 10) {
+    return "Vừa xong";
+  }
+
+  if (diff < 60) {
+    return `${diff}s trước`;
+  }
+
+  if (diff < 3600) {
+    return `${Math.floor(diff / 60)} phút trước`;
+  }
+
+  return value.toLocaleTimeString("vi-VN", {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+function buildInventoryText(vms: VM[]) {
+  if (!vms.length) {
+    return "Chưa có VM nào trong danh sách.";
+  }
+
+  return [
+    "OrbitStack Fleet Snapshot",
+    "",
+    ...vms.map(
+      (vm, index) =>
+        `${index + 1}. ${vm.name} | ${vm.status} | ${vm.ip || "No IP"} | ${vm.flavor || "Unknown flavor"} | ${vm.image || "Unknown image"}`,
+    ),
+  ].join("\n");
+}
+
+async function tryCopy(text: string, successMessage: string) {
+  const copied = await copyToClipboard(text);
+
+  if (copied) {
+    toast.success(successMessage);
+    return;
+  }
+
+  toast.error("Không thể sao chép vào clipboard.");
+}
+
+function MetricCard({
+  icon: Icon,
+  label,
+  value,
+  helper,
+}: {
+  icon: LucideIcon;
+  label: string;
+  value: string | number;
+  helper: string;
+}) {
   return (
-    <span
-      className={`inline-block w-2 h-2 rounded-full flex-shrink-0 ${color}`}
-    />
+    <div className="surface-panel surface-noise relative overflow-hidden rounded-[1.6rem] p-5">
+      <div className="absolute right-4 top-4 rounded-full border border-border/70 bg-background/70 p-2 text-muted-foreground">
+        <Icon className="h-4 w-4" />
+      </div>
+      <p className="text-xs font-semibold uppercase tracking-[0.24em] text-muted-foreground">
+        {label}
+      </p>
+      <p className="mt-6 text-3xl font-semibold tracking-tight text-foreground">
+        {value}
+      </p>
+      <p className="mt-2 text-sm text-muted-foreground">{helper}</p>
+    </div>
   );
 }
 
 function StatusBadge({ status }: { status: string }) {
-  const cls =
-    status === "ACTIVE"
-      ? "text-green-400 bg-green-400/10 border-green-400/20"
-      : status === "BUILD"
-        ? "text-yellow-400 bg-yellow-400/10 border-yellow-400/20"
-        : status === "ERROR"
-          ? "text-red-400 bg-red-400/10 border-red-400/20"
-          : status === "SHUTOFF"
-            ? "text-gray-400 bg-gray-400/10 border-gray-400/20"
-            : "text-gray-500 bg-gray-500/10 border-gray-500/20";
+  const meta = getStatusMeta(status);
+
   return (
     <span
-      className={`inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium border ${cls}`}
+      className={`inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-semibold ${meta.tone}`}
     >
-      {status || "UNKNOWN"}
+      <span className={`h-2 w-2 rounded-full ${meta.dot}`} />
+      {meta.label}
     </span>
   );
 }
 
-// ── CopyButton ───────────────────────────────────────────────────────────────
-async function copyToClipboard(text: string): Promise<boolean> {
-  if (typeof navigator !== "undefined" && navigator.clipboard?.writeText) {
-    await navigator.clipboard.writeText(text);
-    return true;
-  }
-
-  if (typeof document === "undefined") return false;
-
-  const textarea = document.createElement("textarea");
-  textarea.value = text;
-  textarea.setAttribute("readonly", "");
-  textarea.style.position = "fixed";
-  textarea.style.opacity = "0";
-  textarea.style.pointerEvents = "none";
-  document.body.appendChild(textarea);
-  textarea.select();
-
-  let copied = false;
-  try {
-    copied = document.execCommand("copy");
-  } finally {
-    document.body.removeChild(textarea);
-  }
-
-  return copied;
-}
-
-function CopyBtn({ text, label }: { text: string; label?: string }) {
+function CopyChip({
+  text,
+  label,
+}: {
+  text: string;
+  label: string;
+}) {
   const [copied, setCopied] = useState(false);
-  const handleCopy = async () => {
+
+  async function handleCopy(event: MouseEvent<HTMLButtonElement>) {
+    event.stopPropagation();
+
     const ok = await copyToClipboard(text);
-    if (!ok) return;
+
+    if (!ok) {
+      toast.error(`Không thể sao chép ${label.toLowerCase()}.`);
+      return;
+    }
+
     setCopied(true);
-    setTimeout(() => setCopied(false), 1500);
-  };
+    window.setTimeout(() => setCopied(false), 1400);
+  }
+
   return (
     <button
+      type="button"
       onClick={handleCopy}
-      title={`Copy ${label || text}`}
-      className="p-1.5 rounded text-gray-600 hover:text-gray-300 hover:bg-white/6 transition-all"
+      className="inline-flex items-center gap-2 rounded-full border border-border/70 bg-background/65 px-3 py-1.5 text-xs font-medium text-muted-foreground transition hover:border-primary/30 hover:text-foreground"
+      title={`Sao chép ${label}`}
     >
-      {copied ? (
-        <Check className="w-3.5 h-3.5 text-green-400" />
-      ) : (
-        <Copy className="w-3.5 h-3.5" />
-      )}
+      {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+      <span>{copied ? "Đã copy" : label}</span>
     </button>
   );
 }
 
-// ── VM Row ───────────────────────────────────────────────────────────────────
-function VMRow({
-  vm,
-  onDelete,
-  deleting,
-  onTerminal,
+function EmptyFleet({
+  onCreate,
+  onPreset,
 }: {
-  vm: VM;
-  onDelete: (name: string) => void;
-  deleting: boolean;
-  onTerminal: (vm: VM) => void;
+  onCreate: () => void;
+  onPreset: (presetKey: string) => void;
 }) {
-  const [confirmDel, setConfirmDel] = useState(false);
-  const sshCmd = `ssh ubuntu@${vm.ip || "<IP>"}`;
+  return (
+    <div className="surface-panel surface-noise rounded-[2rem] p-8 text-center">
+      <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-[1.4rem] border border-border/70 bg-background/75 text-muted-foreground">
+        <CloudOff className="h-7 w-7" />
+      </div>
+      <h3 className="mt-5 text-2xl font-semibold tracking-tight text-foreground">
+        Chưa có máy nào trong fleet
+      </h3>
+      <p className="mx-auto mt-3 max-w-xl text-sm leading-6 text-muted-foreground">
+        Mình đã thay dashboard sang layout mới, giờ bạn có thể tạo VM thủ công hoặc
+        dùng preset để lên nhanh một máy Docker, Node API hay Data Lab chỉ với vài
+        cú nhấp.
+      </p>
+      <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
+        <button
+          type="button"
+          onClick={onCreate}
+          className="inline-flex items-center gap-2 rounded-full bg-foreground px-5 py-3 text-sm font-semibold text-background transition hover:opacity-90"
+        >
+          <Plus className="h-4 w-4" />
+          Tạo VM mới
+        </button>
+        {serverPresets.map((preset) => (
+          <button
+            key={preset.key}
+            type="button"
+            onClick={() => onPreset(preset.key)}
+            className="inline-flex items-center gap-2 rounded-full border border-border/70 bg-background/70 px-4 py-3 text-sm font-medium text-foreground transition hover:border-primary/35 hover:text-primary"
+          >
+            <Sparkles className="h-4 w-4" />
+            {preset.label}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function FleetSkeleton() {
+  return (
+    <div className="grid gap-4 md:grid-cols-2">
+      {[1, 2, 3, 4].map((item) => (
+        <div
+          key={item}
+          className="surface-panel rounded-[1.8rem] p-5"
+        >
+          <div className="skeleton h-4 w-28" />
+          <div className="mt-5 space-y-3">
+            <div className="skeleton h-12 w-full" />
+            <div className="skeleton h-12 w-full" />
+            <div className="skeleton h-12 w-4/5" />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function PresetCard({
+  presetKey,
+  onClick,
+}: {
+  presetKey: string;
+  onClick: (presetKey: string) => void;
+}) {
+  const preset = serverPresets.find((item) => item.key === presetKey);
+
+  if (!preset) {
+    return null;
+  }
+
+  const Icon = presetIcons[preset.key] ?? Server;
 
   return (
-    <div
-      className={`vm-row flex items-center gap-4 px-6 py-4 border-b border-white/6 group ${confirmDel ? "bg-red-950/20" : ""}`}
+    <button
+      type="button"
+      onClick={() => onClick(preset.key)}
+      className="surface-panel group relative overflow-hidden rounded-[1.6rem] p-5 text-left transition hover:-translate-y-0.5 hover:border-primary/35"
     >
-      {/* Status + Name */}
-      <div className="flex items-center gap-3 min-w-0 flex-1">
-        <StatusDot status={vm.status} />
+      <div className="absolute right-4 top-4 rounded-full bg-primary/10 p-2 text-primary transition group-hover:scale-105">
+        <Icon className="h-4 w-4" />
+      </div>
+      <p className="text-xs font-semibold uppercase tracking-[0.24em] text-muted-foreground">
+        Quick Kit
+      </p>
+      <h3 className="mt-5 text-xl font-semibold tracking-tight text-foreground">
+        {preset.label}
+      </h3>
+      <p className="mt-2 text-sm leading-6 text-muted-foreground">
+        {preset.description}
+      </p>
+      <div className="mt-4 flex flex-wrap gap-2">
+        {preset.highlights.map((item) => (
+          <span
+            key={item}
+            className="rounded-full border border-border/70 bg-background/70 px-3 py-1 text-xs font-medium text-foreground"
+          >
+            {item}
+          </span>
+        ))}
+      </div>
+      <div className="mt-5 inline-flex items-center gap-2 text-sm font-semibold text-primary">
+        Mở preset
+        <ArrowUpRight className="h-4 w-4 transition group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
+      </div>
+    </button>
+  );
+}
+
+function ServerCard({
+  vm,
+  selected,
+  deleting,
+  onSelect,
+  onDelete,
+  onTerminal,
+  onGitHub,
+}: {
+  vm: VM;
+  selected: boolean;
+  deleting: boolean;
+  onSelect: () => void;
+  onDelete: (name: string) => void;
+  onTerminal: (vm: VM) => void;
+  onGitHub: (vmId: string) => void;
+}) {
+  const status = getStatusMeta(vm.status);
+  const sshCommand = vm.ip ? `ssh ${SSH_USER}@${vm.ip}` : "";
+
+  return (
+    <button
+      type="button"
+      onClick={onSelect}
+      className={`surface-panel group relative w-full overflow-hidden rounded-[1.7rem] p-5 text-left transition ${
+        selected
+          ? "border-primary/45 shadow-[0_35px_80px_-55px_rgba(37,99,235,0.55)]"
+          : "hover:-translate-y-0.5 hover:border-primary/25"
+      }`}
+    >
+      <div className="absolute right-4 top-4">
+        <StatusBadge status={vm.status} />
+      </div>
+      <div className="max-w-[70%]">
+        <p className="text-xs font-semibold uppercase tracking-[0.24em] text-muted-foreground">
+          {vm.flavor || "Flavor chưa rõ"}
+        </p>
+        <h3 className="mt-2 text-xl font-semibold tracking-tight text-foreground">
+          {vm.name}
+        </h3>
+        <p className="mt-2 text-sm text-muted-foreground">{status.description}</p>
+      </div>
+
+      <div className="mt-6 grid gap-3 sm:grid-cols-3">
+        <InfoMiniCard
+          icon={Network}
+          label="IP"
+          value={vm.ip || "Đang chờ cấp"}
+          accent={Boolean(vm.ip)}
+        />
+        <InfoMiniCard
+          icon={Server}
+          label="Image"
+          value={vm.image || "Chưa rõ"}
+        />
+        <InfoMiniCard
+          icon={Cpu}
+          label="SSH"
+          value={vm.ip ? "Có thể kết nối" : "Chưa sẵn sàng"}
+          accent={vm.status === "ACTIVE" && Boolean(vm.ip)}
+        />
+      </div>
+
+      <div className="mt-5 flex flex-wrap items-center gap-2">
+        {vm.ip && <CopyChip text={vm.ip} label="Copy IP" />}
+        {sshCommand && <CopyChip text={sshCommand} label="Copy SSH" />}
+      </div>
+
+      <div className="mt-5 flex flex-wrap gap-2">
+        <ActionButton
+          label="Web SSH"
+          icon={Terminal}
+          disabled={!vm.ip}
+          onClick={(event) => {
+            event.stopPropagation();
+            onTerminal(vm);
+          }}
+        />
+        <ActionButton
+          label="Deploy Repo"
+          icon={GitBranch}
+          onClick={(event) => {
+            event.stopPropagation();
+            onGitHub(vm.id);
+          }}
+        />
+        <ActionButton
+          label={deleting ? "Đang xoá..." : "Xoá VM"}
+          icon={deleting ? Loader2 : Trash2}
+          destructive
+          disabled={deleting}
+          onClick={(event) => {
+            event.stopPropagation();
+            onDelete(vm.name);
+          }}
+        />
+      </div>
+    </button>
+  );
+}
+
+function ServerRow({
+  vm,
+  selected,
+  deleting,
+  onSelect,
+  onDelete,
+  onTerminal,
+  onGitHub,
+}: {
+  vm: VM;
+  selected: boolean;
+  deleting: boolean;
+  onSelect: () => void;
+  onDelete: (name: string) => void;
+  onTerminal: (vm: VM) => void;
+  onGitHub: (vmId: string) => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onSelect}
+      className={`surface-panel flex w-full flex-col gap-4 rounded-[1.5rem] p-4 text-left transition md:flex-row md:items-center ${
+        selected
+          ? "border-primary/45 shadow-[0_30px_60px_-45px_rgba(37,99,235,0.5)]"
+          : "hover:border-primary/25"
+      }`}
+    >
+      <div className="flex min-w-0 flex-1 items-center gap-4">
+        <div className="flex h-11 w-11 items-center justify-center rounded-[1rem] border border-border/70 bg-background/70">
+          <Server className="h-5 w-5 text-primary" />
+        </div>
         <div className="min-w-0">
-          <p className="text-sm font-medium text-white truncate">{vm.name}</p>
-          <p className="text-xs text-gray-600 truncate">{vm.flavor || "—"}</p>
+          <p className="truncate text-base font-semibold text-foreground">{vm.name}</p>
+          <p className="truncate text-sm text-muted-foreground">
+            {vm.image || "Image chưa rõ"} • {vm.flavor || "Flavor chưa rõ"}
+          </p>
         </div>
       </div>
 
-      {/* IP */}
-      <div className="hidden sm:flex items-center gap-1 min-w-[140px]">
-        {vm.ip ? (
-          <>
-            <code className="text-[13px] font-mono text-cyan-400">{vm.ip}</code>
-            <CopyBtn text={vm.ip} label="IP" />
-          </>
-        ) : (
-          <span className="text-xs text-gray-600 italic">
-            {vm.status === "BUILD" ? "Waiting…" : "No IP"}
-          </span>
-        )}
-      </div>
-
-      {/* Status badge */}
-      <div className="hidden md:block min-w-[80px]">
+      <div className="flex flex-wrap items-center gap-3 md:justify-end">
         <StatusBadge status={vm.status} />
-      </div>
-
-      {/* OS */}
-      <div className="hidden lg:block min-w-[140px]">
-        <span className="text-xs text-gray-500 truncate">
-          {vm.image || "—"}
+        <span className="rounded-full border border-border/70 bg-background/70 px-3 py-1.5 text-xs font-medium text-foreground">
+          {vm.ip || "Chưa có IP"}
         </span>
+        <div className="flex flex-wrap gap-2">
+          <ActionButton
+            label="SSH"
+            icon={Terminal}
+            disabled={!vm.ip}
+            onClick={(event) => {
+              event.stopPropagation();
+              onTerminal(vm);
+            }}
+          />
+          <ActionButton
+            label="Repo"
+            icon={GitBranch}
+            onClick={(event) => {
+              event.stopPropagation();
+              onGitHub(vm.id);
+            }}
+          />
+          <ActionButton
+            label={deleting ? "Đang xoá..." : "Xoá"}
+            icon={deleting ? Loader2 : Trash2}
+            destructive
+            disabled={deleting}
+            onClick={(event) => {
+              event.stopPropagation();
+              onDelete(vm.name);
+            }}
+          />
+        </div>
       </div>
-
-      {/* Actions */}
-      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity ml-auto flex-shrink-0">
-        {!confirmDel ? (
-          <>
-            {vm.ip && <CopyBtn text={sshCmd} label="SSH command" />}
-            {vm.ip && (
-              <button
-                onClick={() => onTerminal(vm)}
-                className="p-1.5 rounded text-gray-600 hover:text-cyan-300 hover:bg-cyan-400/10 transition-all"
-                title="Open Web SSH"
-              >
-                <Terminal className="w-3.5 h-3.5" />
-              </button>
-            )}
-            <button
-              onClick={() => setConfirmDel(true)}
-              className="p-1.5 rounded text-gray-600 hover:text-red-400 hover:bg-red-400/8 transition-all"
-              title="Delete server"
-            >
-              <Trash2 className="w-3.5 h-3.5" />
-            </button>
-          </>
-        ) : (
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-red-400">Delete?</span>
-            <button
-              onClick={() => {
-                onDelete(vm.name);
-                setConfirmDel(false);
-              }}
-              disabled={deleting}
-              className="px-2.5 py-1 rounded text-xs font-medium bg-red-600 hover:bg-red-700 text-white transition-all disabled:opacity-50"
-            >
-              {deleting ? <Loader2 className="w-3 h-3 animate-spin" /> : "Yes"}
-            </button>
-            <button
-              onClick={() => setConfirmDel(false)}
-              className="px-2.5 py-1 rounded text-xs text-gray-400 hover:text-white border border-white/10 hover:border-white/20 transition-all"
-            >
-              No
-            </button>
-          </div>
-        )}
-      </div>
-    </div>
+    </button>
   );
 }
 
-// ── Skeleton row ─────────────────────────────────────────────────────────────
-function SkeletonRow() {
+function ActionButton({
+  label,
+  icon: Icon,
+  onClick,
+  disabled,
+  destructive = false,
+}: {
+  label: string;
+  icon: LucideIcon;
+  onClick: (event: MouseEvent<HTMLButtonElement>) => void;
+  disabled?: boolean;
+  destructive?: boolean;
+}) {
   return (
-    <div className="flex items-center gap-4 px-6 py-4 border-b border-white/6">
-      <div className="skeleton w-2 h-2 rounded-full" />
-      <div className="skeleton h-4 w-36 rounded" />
-      <div className="skeleton h-4 w-28 rounded ml-auto hidden sm:block" />
-      <div className="skeleton h-5 w-14 rounded hidden md:block" />
-    </div>
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      className={`inline-flex items-center gap-2 rounded-full border px-3 py-2 text-xs font-semibold transition disabled:cursor-not-allowed disabled:opacity-50 ${
+        destructive
+          ? "border-rose-500/20 bg-rose-500/10 text-rose-300 hover:border-rose-500/35 hover:bg-rose-500/15"
+          : "border-border/70 bg-background/70 text-foreground hover:border-primary/35 hover:text-primary"
+      }`}
+    >
+      <Icon className={`h-3.5 w-3.5 ${label.includes("Đang") ? "animate-spin" : ""}`} />
+      {label}
+    </button>
   );
 }
 
-// ── Empty state ───────────────────────────────────────────────────────────────
-function EmptyState({ onNew }: { onNew: () => void }) {
+function InfoMiniCard({
+  icon: Icon,
+  label,
+  value,
+  accent = false,
+}: {
+  icon: LucideIcon;
+  label: string;
+  value: string;
+  accent?: boolean;
+}) {
   return (
-    <div className="flex flex-col items-center justify-center py-24 px-6 text-center">
-      <div className="w-14 h-14 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center mb-4">
-        <CloudOff className="w-6 h-6 text-gray-500" />
+    <div className="rounded-[1.2rem] border border-border/70 bg-background/70 p-3">
+      <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">
+        <Icon className={`h-3.5 w-3.5 ${accent ? "text-primary" : ""}`} />
+        {label}
       </div>
-      <h3 className="text-base font-semibold text-white mb-1">
-        No servers yet
-      </h3>
-      <p className="text-sm text-gray-500 mb-6 max-w-xs">
-        Deploy your first virtual server to get started. Choose your hardware,
-        OS and software stack.
-      </p>
-      <button
-        onClick={onNew}
-        className="flex items-center gap-2 px-4 py-2 rounded-lg bg-white text-black text-sm font-semibold hover:bg-gray-100 transition-all"
-      >
-        <Plus className="w-4 h-4" /> New Server
-      </button>
+      <p className="mt-3 line-clamp-2 text-sm font-medium text-foreground">{value}</p>
     </div>
   );
 }
 
-// ── Main Dashboard ────────────────────────────────────────────────────────────
+function DetailRow({
+  label,
+  value,
+}: {
+  label: string;
+  value: string;
+}) {
+  return (
+    <div className="flex items-center justify-between gap-4 rounded-[1.2rem] border border-border/70 bg-background/70 px-4 py-3">
+      <span className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">
+        {label}
+      </span>
+      <span className="max-w-[65%] truncate text-sm font-medium text-foreground">
+        {value}
+      </span>
+    </div>
+  );
+}
+
 export default function Dashboard() {
   const [vms, setVMs] = useState<VM[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
   const [refreshing, setRefreshing] = useState(false);
-  const [filter, setFilter] = useState("all");
+  const [error, setError] = useState("");
+  const [filter, setFilter] = useState<FilterKey>("all");
+  const [sortBy, setSortBy] = useState<SortKey>("status");
+  const [query, setQuery] = useState("");
+  const [viewMode, setViewMode] = useState<ViewMode>(() => readStoredViewMode());
+  const [autoRefresh, setAutoRefresh] = useState<boolean>(() =>
+    readStoredBoolean(AUTO_REFRESH_KEY, true),
+  );
   const [showCreate, setShowCreate] = useState(false);
+  const [createPresetKey, setCreatePresetKey] = useState<string | null>(null);
   const [vmResult, setVmResult] = useState<VMResult | null>(null);
   const [deletingName, setDeletingName] = useState("");
+  const [showGitHub, setShowGitHub] = useState(false);
+  const [githubTargetVmId, setGitHubTargetVmId] = useState<string | null>(null);
+  const [selectedVmId, setSelectedVmId] = useState("");
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [sshSession, setSshSession] = useState<{
     vm: VM;
     command?: string;
   } | null>(null);
-  const [showGitHub, setShowGitHub] = useState(false);
+  const deferredQuery = useDeferredValue(query.trim().toLowerCase());
 
-  const fetchVMs = useCallback(async (silent = false) => {
-    if (!silent) setLoading(true);
-    else setRefreshing(true);
-    setError("");
-    try {
-      const res = await fetch("/api/get-instances");
-      const data = await res.json();
-      if (data.success) setVMs(data.instances || []);
-      else setError(data.error_message || "Không lấy được danh sách server");
-    } catch {
-      setError("Không kết nối được tới OpenStack API");
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  }, []);
+  const fetchFleet = useCallback(
+    async ({ silent = false }: { silent?: boolean } = {}) => {
+      if (silent) {
+        setRefreshing(true);
+      } else {
+        setLoading(true);
+      }
+
+      setError("");
+
+      try {
+        const response = await fetch("/api/get-instances");
+        const data = await response.json();
+
+        if (!response.ok || !data.success) {
+          throw new Error(data.error_message || "Không lấy được danh sách server.");
+        }
+
+        setVMs(data.instances || []);
+        setLastUpdated(new Date());
+      } catch (fetchError) {
+        const message =
+          fetchError instanceof Error
+            ? fetchError.message
+            : "Không kết nối được tới OpenStack API.";
+        setError(message);
+      } finally {
+        setLoading(false);
+        setRefreshing(false);
+      }
+    },
+    [],
+  );
 
   useEffect(() => {
-    fetchVMs();
-    const interval = setInterval(() => fetchVMs(true), 15000);
-    return () => clearInterval(interval);
-  }, [fetchVMs]);
+    void fetchFleet();
+  }, [fetchFleet]);
 
-  const handleDelete = async (name: string) => {
+  useEffect(() => {
+    if (!autoRefresh) {
+      return;
+    }
+
+    const interval = window.setInterval(() => {
+      void fetchFleet({ silent: true });
+    }, 15000);
+
+    return () => window.clearInterval(interval);
+  }, [autoRefresh, fetchFleet]);
+
+  useEffect(() => {
+    window.localStorage.setItem(AUTO_REFRESH_KEY, String(autoRefresh));
+  }, [autoRefresh]);
+
+  useEffect(() => {
+    window.localStorage.setItem(VIEW_MODE_KEY, viewMode);
+  }, [viewMode]);
+
+  let visibleVMs = vms.filter((vm) => {
+    if (filter === "ready" && !(vm.status === "ACTIVE" && vm.ip)) {
+      return false;
+    }
+
+    if (filter === "building" && vm.status !== "BUILD") {
+      return false;
+    }
+
+    if (
+      filter === "attention" &&
+      vm.status !== "ERROR" &&
+      vm.status !== "SHUTOFF" &&
+      !(vm.status === "ACTIVE" && !vm.ip)
+    ) {
+      return false;
+    }
+
+    if (!deferredQuery) {
+      return true;
+    }
+
+    const haystack = [vm.name, vm.ip, vm.flavor, vm.image, vm.status]
+      .join(" ")
+      .toLowerCase();
+
+    return haystack.includes(deferredQuery);
+  });
+
+  visibleVMs = [...visibleVMs].sort((left, right) => {
+    if (sortBy === "name") {
+      return left.name.localeCompare(right.name);
+    }
+
+    if (sortBy === "ip") {
+      return (left.ip || "~").localeCompare(right.ip || "~");
+    }
+
+    const byStatus = statusPriority(left.status) - statusPriority(right.status);
+
+    if (byStatus !== 0) {
+      return byStatus;
+    }
+
+    return left.name.localeCompare(right.name);
+  });
+
+  const visibleVmIds = visibleVMs.map((vm) => vm.id).join("|");
+
+  useEffect(() => {
+    if (!visibleVMs.length) {
+      if (selectedVmId) {
+        setSelectedVmId("");
+      }
+      return;
+    }
+
+    if (!visibleVMs.some((vm) => vm.id === selectedVmId)) {
+      setSelectedVmId(visibleVMs[0].id);
+    }
+  }, [selectedVmId, visibleVmIds, visibleVMs]);
+
+  const selectedVm = visibleVMs.find((vm) => vm.id === selectedVmId) ?? null;
+  const total = vms.length;
+  const readyCount = vms.filter((vm) => vm.status === "ACTIVE" && vm.ip).length;
+  const buildingCount = vms.filter((vm) => vm.status === "BUILD").length;
+  const attentionCount = vms.filter(
+    (vm) =>
+      vm.status === "ERROR" ||
+      vm.status === "SHUTOFF" ||
+      (vm.status === "ACTIVE" && !vm.ip),
+  ).length;
+  const activeCount = vms.filter((vm) => vm.status === "ACTIVE").length;
+
+  async function handleDelete(name: string) {
     setDeletingName(name);
+
     try {
-      await fetch("/api/delete-vm", {
+      const response = await fetch("/api/delete-vm", {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ server_name: name }),
       });
-      toast.success(`Server "${name}" deleted`);
-      fetchVMs(true);
-    } catch {
-      toast.error(`Failed to delete "${name}"`);
+
+      const data = await response.json();
+
+      if (!response.ok || !data.success) {
+        throw new Error(data.error_message || `Không thể xoá ${name}.`);
+      }
+
+      toast.success(`Đã gửi lệnh xoá VM "${name}".`);
+      void fetchFleet({ silent: true });
+    } catch (deleteError) {
+      toast.error(
+        deleteError instanceof Error
+          ? deleteError.message
+          : `Không thể xoá ${name}.`,
+      );
     } finally {
       setDeletingName("");
     }
-  };
+  }
 
-  const handleDeployFromGitHub = (vmId: string, cloneUrl: string) => {
-    const vm = vms.find((item) => item.id === vmId);
-    if (!vm) return;
+  function openPreset(presetKey: string) {
+    setCreatePresetKey(presetKey);
+    setShowCreate(true);
+  }
+
+  function openGitHub(vmId?: string) {
+    setGitHubTargetVmId(vmId ?? selectedVm?.id ?? null);
+    setShowGitHub(true);
+  }
+
+  function handleDeployFromGitHub(vmId: string, cloneUrl: string) {
+    const target = vms.find((vm) => vm.id === vmId);
+
+    if (!target) {
+      return;
+    }
+
     setShowGitHub(false);
-    setSshSession({ vm, command: `git clone ${cloneUrl}` });
-  };
+    setGitHubTargetVmId(null);
+    setSshSession({
+      vm: target,
+      command: `git clone ${cloneUrl}`,
+    });
+  }
 
-  // Filtered VMs
-  const filteredVMs = vms.filter((vm) => {
-    if (filter === "active") return vm.status === "ACTIVE";
-    if (filter === "building") return vm.status === "BUILD";
-    if (filter === "error")
-      return vm.status === "ERROR" || vm.status === "SHUTOFF";
-    return true;
-  });
-
-  const counts = {
-    all: vms.length,
-    active: vms.filter((v) => v.status === "ACTIVE").length,
-    building: vms.filter((v) => v.status === "BUILD").length,
-    error: vms.filter((v) => v.status === "ERROR" || v.status === "SHUTOFF")
-      .length,
-  };
-
-  const FILTERS = [
-    { key: "all", label: "All", count: counts.all },
-    { key: "active", label: "Active", count: counts.active },
-    { key: "building", label: "Building", count: counts.building },
-    { key: "error", label: "Error", count: counts.error },
-  ];
+  const headerTitle = loading ? "Đang tải fleet..." : `${total} VM trong hệ thống`;
 
   return (
-    <div className="min-h-screen bg-black text-white flex flex-col relative">
-      <div className="absolute inset-0 pointer-events-none">
-        <div className="absolute -top-40 right-0 w-[520px] h-[520px] rounded-full bg-cyan-500/10 blur-[120px]" />
-        <div className="absolute top-64 -left-32 w-[420px] h-[420px] rounded-full bg-emerald-500/10 blur-[120px]" />
+    <div className="relative min-h-screen overflow-hidden">
+      <div className="pointer-events-none absolute inset-0">
+        <div className="absolute left-[-12rem] top-[-10rem] h-[26rem] w-[26rem] rounded-full bg-cyan-400/15 blur-3xl dark:bg-cyan-500/18" />
+        <div className="absolute right-[-8rem] top-24 h-[22rem] w-[22rem] rounded-full bg-amber-300/20 blur-3xl dark:bg-amber-400/12" />
+        <div className="absolute bottom-[-12rem] left-1/2 h-[26rem] w-[26rem] -translate-x-1/2 rounded-full bg-emerald-300/14 blur-3xl dark:bg-emerald-500/10" />
       </div>
 
-      {/* ── Navbar ─────────────────────────────────────────────────────────── */}
-      <header className="sticky top-0 z-40 border-b border-white/8 bg-black/80 backdrop-blur-2xl">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-4">
-          {/* Logo */}
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 bg-white rounded-lg flex items-center justify-center flex-shrink-0 shadow-sm">
-              <svg viewBox="0 0 24 24" className="w-4 h-4 fill-black">
-                <path d="M12 2L22 19.7H2L12 2Z" />
-              </svg>
-            </div>
-            <span className="text-sm font-semibold text-white tracking-wide">
-              CloudDeploy
-            </span>
-            <span className="hidden sm:inline text-gray-700 text-sm">/</span>
-            <span className="hidden sm:inline text-sm text-gray-400">
-              Infrastructure
-            </span>
-          </div>
-
-          {/* Nav */}
-          <nav className="hidden lg:flex items-center gap-1.5 text-xs text-gray-400 bg-white/5 border border-white/10 rounded-full px-1 py-1">
-            <a
-              href="#servers"
-              className="px-3 py-1.5 rounded-full bg-white text-black"
-            >
-              Dashboard
-            </a>
-            <a
-              href="#deploy"
-              className="px-3 py-1.5 rounded-full hover:text-white hover:bg-white/10 transition"
-            >
-              Deploy
-            </a>
-          </nav>
-
-          {/* Right */}
-          <div className="flex items-center gap-2">
-            <div className="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-full border border-white/10 bg-white/5">
-              <Search className="w-3.5 h-3.5 text-gray-500" />
-              <input
-                placeholder="Search VMs"
-                className="w-44 bg-transparent text-xs text-gray-200 placeholder:text-gray-600 focus:outline-none"
-              />
-            </div>
-
-            <div className="hidden sm:flex items-center gap-2 text-xs text-gray-400 bg-white/5 border border-white/10 rounded-full px-3 py-1.5">
-              <span
-                className={`w-1.5 h-1.5 rounded-full ${error ? "bg-red-500" : "bg-green-500"}`}
-              />
-              {error ? "Disconnected" : "Connected"}
-            </div>
-
-            <button
-              onClick={() => setShowGitHub(true)}
-              className="hidden sm:inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-emerald-400/30 text-xs text-emerald-200 hover:text-white hover:border-emerald-300/60 transition"
-              title="Connect GitHub"
-            >
-              <span className="w-2 h-2 rounded-full bg-emerald-400" />
-              Connect GitHub
-            </button>
-            <button
-              onClick={() => setShowCreate(true)}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white text-black text-sm font-semibold hover:bg-gray-100 transition-all shadow-sm"
-            >
-              <Plus className="w-4 h-4" />
-              <span>New Server</span>
-            </button>
-            <div className="hidden sm:flex items-center justify-center w-8 h-8 rounded-full bg-white/10 border border-white/10 text-xs text-gray-300">
-              AD
-            </div>
-          </div>
-        </div>
-      </header>
-
-      {/* ── Main ─────────────────────────────────────────────────────────────── */}
-      <main className="flex-1 max-w-6xl mx-auto w-full px-4 sm:px-6 py-8 relative z-10">
-        {/* Page title + stats */}
-        <div
-          id="servers"
-          className="flex items-start justify-between mb-6 scroll-mt-24"
-        >
-          <div>
-            <h1 className="text-xl font-bold text-white">Servers</h1>
-            <p className="text-sm text-gray-500 mt-0.5">
-              {loading
-                ? "Loading..."
-                : `${vms.length} server${vms.length !== 1 ? "s" : ""}`}
-            </p>
-          </div>
-          {!loading && vms.length > 0 && (
-            <div className="flex items-center gap-4 text-xs text-gray-500">
-              <span className="flex items-center gap-1.5">
-                <span className="w-1.5 h-1.5 rounded-full bg-green-500" />
-                {counts.active} active
-              </span>
-              {counts.building > 0 && (
-                <span className="flex items-center gap-1.5">
-                  <span className="w-1.5 h-1.5 rounded-full bg-yellow-400" />
-                  {counts.building} building
-                </span>
-              )}
-              {counts.error > 0 && (
-                <span className="flex items-center gap-1.5">
-                  <span className="w-1.5 h-1.5 rounded-full bg-red-500" />
-                  {counts.error} error
-                </span>
-              )}
-            </div>
-          )}
-        </div>
-
-        {/* Error banner */}
-        {error && (
-          <div className="flex items-center gap-3 px-4 py-3 mb-5 rounded-lg bg-red-950/40 border border-red-800/40">
-            <AlertCircle className="w-4 h-4 text-red-400 flex-shrink-0" />
-            <p className="text-sm text-red-300">{error}</p>
-            <button
-              onClick={() => fetchVMs()}
-              className="ml-auto text-xs text-red-400 hover:text-red-300 underline"
-            >
-              Retry
-            </button>
-          </div>
-        )}
-
-        <section id="deploy" className="mb-6">
-          <div className="rounded-xl border border-white/10 bg-black/40 px-4 py-3 flex items-center justify-between gap-4">
-            <div>
-              <p className="text-sm font-medium text-white">Deploy from GitHub</p>
-              <p className="text-xs text-gray-500">
-                Chon repo public va clone ve VM ubuntu.
-              </p>
-            </div>
-            <button
-              onClick={() => setShowGitHub(true)}
-              className="px-3 py-1.5 rounded-full bg-white text-black text-xs font-semibold hover:bg-gray-100 transition-all"
-            >
-              Connect GitHub
-            </button>
-          </div>
-        </section>
-
-        {/* Main card */}
-        <div className="rounded-xl border border-white/8 bg-[#0a0a0a] overflow-hidden">
-          {/* Filter tabs + table header */}
-          {!loading && vms.length > 0 && (
-            <div className="flex items-center justify-between border-b border-white/8">
-              {/* Tabs */}
-              <div className="flex">
-                {FILTERS.map((f) => (
-                  <button
-                    key={f.key}
-                    onClick={() => setFilter(f.key)}
-                    className={`relative px-4 py-3 text-xs font-medium transition-colors ${
-                      filter === f.key
-                        ? "text-white"
-                        : "text-gray-500 hover:text-gray-300"
-                    }`}
-                  >
-                    {filter === f.key && (
-                      <span className="absolute bottom-0 left-0 right-0 h-px bg-white" />
-                    )}
-                    {f.label}
-                    {f.count > 0 && (
-                      <span
-                        className={`ml-1.5 px-1.5 py-0.5 rounded text-[10px] ${
-                          filter === f.key
-                            ? "bg-white/15 text-white"
-                            : "bg-white/8 text-gray-500"
-                        }`}
-                      >
-                        {f.count}
-                      </span>
-                    )}
-                  </button>
-                ))}
+      <div className="relative z-10 mx-auto max-w-7xl px-4 pb-10 pt-6 sm:px-6 lg:px-8">
+        <header className="surface-panel surface-noise rounded-[2rem] px-5 py-5 sm:px-6">
+          <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
+            <div className="flex items-start gap-4">
+              <div className="flex h-14 w-14 items-center justify-center rounded-[1.3rem] bg-foreground text-background shadow-[0_18px_45px_-28px_rgba(15,23,42,0.7)]">
+                <Activity className="h-6 w-6" />
               </div>
-
-              {/* Table header labels */}
-              <div className="hidden lg:flex items-center gap-4 px-6 text-[10px] font-medium text-gray-600 uppercase tracking-wider">
-                <span className="w-36 text-right">IP</span>
-                <span className="w-20 text-right">Status</span>
-                <span className="w-36 text-right">Image</span>
-              </div>
-            </div>
-          )}
-
-          {/* Loading skeletons */}
-          {loading && (
-            <div>
-              {[1, 2, 3].map((i) => (
-                <SkeletonRow key={i} />
-              ))}
-            </div>
-          )}
-
-          {/* Empty state */}
-          {!loading && !error && vms.length === 0 && (
-            <EmptyState onNew={() => setShowCreate(true)} />
-          )}
-
-          {/* VM list */}
-          {!loading &&
-            filteredVMs.map((vm) => (
-              <VMRow
-                key={vm.id}
-                vm={vm}
-                onDelete={handleDelete}
-                deleting={deletingName === vm.name}
-                onTerminal={(target) => setSshSession({ vm: target })}
-              />
-            ))}
-
-          {/* Filter empty */}
-          {!loading && vms.length > 0 && filteredVMs.length === 0 && (
-            <div className="py-12 text-center text-sm text-gray-500">
-              No servers match filter "{filter}"
-            </div>
-          )}
-        </div>
-
-        {/* Deploy section */}
-        <section id="deploy" className="mt-8">
-          <div className="rounded-2xl border border-white/10 bg-[#0b0d10] p-5">
-            <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
               <div>
-                <h2 className="text-base font-semibold text-white">Deploy from GitHub</h2>
-                <p className="text-xs text-gray-500">
-                  Ket noi GitHub de chon repo, sau do clone ve VM ban chon.
+                <div className="inline-flex items-center gap-2 rounded-full border border-border/70 bg-background/70 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.24em] text-muted-foreground">
+                  <span
+                    className={`h-2 w-2 rounded-full ${
+                      error ? "bg-rose-400" : "bg-emerald-400"
+                    }`}
+                  />
+                  {error ? "OpenStack cần kiểm tra" : "OpenStack đang kết nối"}
+                </div>
+                <h1 className="mt-4 text-3xl font-semibold tracking-tight text-foreground sm:text-4xl">
+                  OrbitStack Console
+                </h1>
+                <p className="mt-2 max-w-3xl text-sm leading-6 text-muted-foreground sm:text-base">
+                  UI mới tập trung vào tốc độ thao tác: theo dõi fleet, tạo VM bằng
+                  preset, triển khai repo từ GitHub và mở Web SSH ngay trong một
+                  chỗ.
                 </p>
               </div>
-              <div className="flex flex-col sm:flex-row gap-3">
+            </div>
+
+            <div className="flex flex-col items-start gap-3 lg:items-end">
+              <ThemeToggle />
+              <div className="flex flex-wrap gap-3">
                 <button
-                  className="px-4 py-2 rounded-lg bg-white/10 hover:bg-white/15 text-white text-sm font-semibold"
+                  type="button"
+                  onClick={() => openGitHub()}
+                  className="inline-flex items-center gap-2 rounded-full border border-border/70 bg-background/75 px-4 py-3 text-sm font-semibold text-foreground transition hover:border-primary/35 hover:text-primary"
                 >
-                  Connect GitHub
+                  <GitBranch className="h-4 w-4" />
+                  GitHub Deploy
                 </button>
                 <button
-                  className="px-4 py-2 rounded-lg border border-white/10 text-gray-300 text-sm font-semibold hover:text-white hover:border-white/20"
+                  type="button"
+                  onClick={() => {
+                    setCreatePresetKey(null);
+                    setShowCreate(true);
+                  }}
+                  className="inline-flex items-center gap-2 rounded-full bg-foreground px-5 py-3 text-sm font-semibold text-background transition hover:opacity-90"
                 >
-                  Select Repo
+                  <Plus className="h-4 w-4" />
+                  Tạo server mới
                 </button>
               </div>
             </div>
           </div>
+        </header>
+
+        <section className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <MetricCard
+            icon={Server}
+            label="Toàn fleet"
+            value={total}
+            helper={headerTitle}
+          />
+          <MetricCard
+            icon={ShieldCheck}
+            label="Sẵn sàng SSH"
+            value={readyCount}
+            helper={`${activeCount} VM đang ACTIVE`}
+          />
+          <MetricCard
+            icon={RefreshCw}
+            label="Provisioning"
+            value={buildingCount}
+            helper={`Làm mới ${formatLastUpdated(lastUpdated)}`}
+          />
+          <MetricCard
+            icon={CircleAlert}
+            label="Cần chú ý"
+            value={attentionCount}
+            helper={error ? error : "Bao gồm VM lỗi, tắt hoặc chưa có IP"}
+          />
         </section>
 
-        {/* Footer note */}
-        {!loading && vms.length > 0 && (
-          <p className="text-xs text-gray-700 text-center mt-4">
-            Auto-refreshes every 15 seconds · Hover a row for actions
-          </p>
-        )}
+        <section className="mt-6 grid gap-6 xl:grid-cols-[minmax(0,1fr)_22rem]">
+          <div className="space-y-6">
+            <div className="surface-panel rounded-[2rem] p-5 sm:p-6">
+              <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.24em] text-muted-foreground">
+                    Fleet Control
+                  </p>
+                  <h2 className="mt-2 text-2xl font-semibold tracking-tight text-foreground">
+                    Tìm nhanh và thao tác trực tiếp trên từng VM
+                  </h2>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => void tryCopy(buildInventoryText(visibleVMs), "Đã copy snapshot fleet.")}
+                    className="inline-flex items-center gap-2 rounded-full border border-border/70 bg-background/70 px-4 py-2.5 text-sm font-semibold text-foreground transition hover:border-primary/35 hover:text-primary"
+                  >
+                    <Copy className="h-4 w-4" />
+                    Copy snapshot
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void fetchFleet({ silent: true })}
+                    className="inline-flex items-center gap-2 rounded-full border border-border/70 bg-background/70 px-4 py-2.5 text-sm font-semibold text-foreground transition hover:border-primary/35 hover:text-primary"
+                  >
+                    <RefreshCw className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />
+                    Làm mới
+                  </button>
+                </div>
+              </div>
 
-      </main>
+              <div className="mt-5 grid gap-4 xl:grid-cols-[minmax(0,1fr)_auto_auto]">
+                <div className="flex items-center gap-3 rounded-[1.3rem] border border-border/70 bg-background/70 px-4 py-3">
+                  <Search className="h-4 w-4 text-muted-foreground" />
+                  <input
+                    value={query}
+                    onChange={(event) => setQuery(event.target.value)}
+                    placeholder="Tìm theo tên, IP, flavor, image..."
+                    className="w-full bg-transparent text-sm text-foreground placeholder:text-muted-foreground focus:outline-none"
+                  />
+                </div>
 
-      {/* ── Modals ─────────────────────────────────────────────────────────── */}
+                <label className="inline-flex items-center gap-3 rounded-[1.3rem] border border-border/70 bg-background/70 px-4 py-3 text-sm font-medium text-foreground">
+                  <span>Sắp xếp</span>
+                  <select
+                    value={sortBy}
+                    onChange={(event) => setSortBy(event.target.value as SortKey)}
+                    className="bg-transparent text-sm text-foreground outline-none"
+                  >
+                    <option value="status">Theo trạng thái</option>
+                    <option value="name">Theo tên</option>
+                    <option value="ip">Theo IP</option>
+                  </select>
+                </label>
+
+                <div className="inline-flex rounded-[1.2rem] border border-border/70 bg-background/70 p-1">
+                  <button
+                    type="button"
+                    onClick={() => setViewMode("grid")}
+                    className={`rounded-[0.95rem] px-3 py-2 text-sm font-semibold transition ${
+                      viewMode === "grid"
+                        ? "bg-foreground text-background"
+                        : "text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    <Grid2X2 className="h-4 w-4" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setViewMode("list")}
+                    className={`rounded-[0.95rem] px-3 py-2 text-sm font-semibold transition ${
+                      viewMode === "list"
+                        ? "bg-foreground text-background"
+                        : "text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    <LayoutList className="h-4 w-4" />
+                  </button>
+                </div>
+              </div>
+
+              <div className="mt-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                <div className="flex flex-wrap gap-2">
+                  {[
+                    { key: "all" as const, label: "Tất cả", count: total },
+                    { key: "ready" as const, label: "Sẵn sàng", count: readyCount },
+                    { key: "building" as const, label: "Provisioning", count: buildingCount },
+                    {
+                      key: "attention" as const,
+                      label: "Cần chú ý",
+                      count: attentionCount,
+                    },
+                  ].map((item) => (
+                    <button
+                      key={item.key}
+                      type="button"
+                      onClick={() => setFilter(item.key)}
+                      className={`inline-flex items-center gap-2 rounded-full border px-4 py-2 text-sm font-semibold transition ${
+                        filter === item.key
+                          ? "border-primary/35 bg-primary/10 text-primary"
+                          : "border-border/70 bg-background/70 text-foreground hover:border-primary/25 hover:text-primary"
+                      }`}
+                    >
+                      <span>{item.label}</span>
+                      <span className="rounded-full bg-background/75 px-2 py-0.5 text-xs text-muted-foreground">
+                        {item.count}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setAutoRefresh((current) => !current)}
+                  className={`inline-flex items-center gap-2 rounded-full border px-4 py-2 text-sm font-semibold transition ${
+                    autoRefresh
+                      ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-300"
+                      : "border-border/70 bg-background/70 text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  <RefreshCw className={`h-4 w-4 ${autoRefresh ? "animate-spin" : ""}`} />
+                  {autoRefresh ? "Tự làm mới: bật" : "Tự làm mới: tắt"}
+                </button>
+              </div>
+            </div>
+
+            {error && (
+              <div className="rounded-[1.6rem] border border-rose-500/25 bg-rose-500/10 px-5 py-4 text-sm text-rose-200 dark:text-rose-300">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="flex items-start gap-3">
+                    <CircleAlert className="mt-0.5 h-4 w-4 flex-shrink-0" />
+                    <p>{error}</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => void fetchFleet()}
+                    className="inline-flex items-center gap-2 rounded-full border border-rose-500/30 px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-rose-200 transition hover:bg-rose-500/10"
+                  >
+                    <RefreshCw className="h-3.5 w-3.5" />
+                    Thử lại
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {loading ? (
+              <FleetSkeleton />
+            ) : total === 0 ? (
+              <EmptyFleet
+                onCreate={() => {
+                  setCreatePresetKey(null);
+                  setShowCreate(true);
+                }}
+                onPreset={openPreset}
+              />
+            ) : visibleVMs.length === 0 ? (
+              <div className="surface-panel rounded-[1.8rem] p-8 text-center">
+                <h3 className="text-2xl font-semibold tracking-tight text-foreground">
+                  Không có VM nào khớp bộ lọc hiện tại
+                </h3>
+                <p className="mt-3 text-sm text-muted-foreground">
+                  Thử đổi filter, bỏ từ khoá tìm kiếm hoặc làm mới lại snapshot fleet.
+                </p>
+              </div>
+            ) : viewMode === "grid" ? (
+              <div className="grid gap-4 md:grid-cols-2">
+                {visibleVMs.map((vm) => (
+                  <ServerCard
+                    key={vm.id}
+                    vm={vm}
+                    selected={selectedVmId === vm.id}
+                    deleting={deletingName === vm.name}
+                    onSelect={() => setSelectedVmId(vm.id)}
+                    onDelete={handleDelete}
+                    onTerminal={(target) => setSshSession({ vm: target })}
+                    onGitHub={openGitHub}
+                  />
+                ))}
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {visibleVMs.map((vm) => (
+                  <ServerRow
+                    key={vm.id}
+                    vm={vm}
+                    selected={selectedVmId === vm.id}
+                    deleting={deletingName === vm.name}
+                    onSelect={() => setSelectedVmId(vm.id)}
+                    onDelete={handleDelete}
+                    onTerminal={(target) => setSshSession({ vm: target })}
+                    onGitHub={openGitHub}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+
+          <aside className="space-y-6">
+            <div className="surface-panel rounded-[2rem] p-5 sm:p-6 xl:sticky xl:top-6">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.24em] text-muted-foreground">
+                    Quick Kits
+                  </p>
+                  <h2 className="mt-2 text-2xl font-semibold tracking-tight text-foreground">
+                    Preset triển khai nhanh
+                  </h2>
+                </div>
+                <Sparkles className="h-5 w-5 text-primary" />
+              </div>
+              <div className="mt-5 space-y-3">
+                {serverPresets.map((preset) => (
+                  <PresetCard
+                    key={preset.key}
+                    presetKey={preset.key}
+                    onClick={openPreset}
+                  />
+                ))}
+              </div>
+            </div>
+
+            <div className="surface-panel rounded-[2rem] p-5 sm:p-6">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.24em] text-muted-foreground">
+                    VM Focus
+                  </p>
+                  <h2 className="mt-2 text-2xl font-semibold tracking-tight text-foreground">
+                    {selectedVm ? selectedVm.name : "Chọn một VM"}
+                  </h2>
+                </div>
+                {selectedVm && <StatusBadge status={selectedVm.status} />}
+              </div>
+
+              {selectedVm ? (
+                <>
+                  <p className="mt-3 text-sm leading-6 text-muted-foreground">
+                    {getStatusMeta(selectedVm.status).description}
+                  </p>
+
+                  <div className="mt-5 space-y-3">
+                    <DetailRow label="IP" value={selectedVm.ip || "Chưa cấp IP"} />
+                    <DetailRow label="Flavor" value={selectedVm.flavor || "Chưa rõ"} />
+                    <DetailRow label="Image" value={selectedVm.image || "Chưa rõ"} />
+                    <DetailRow label="SSH user" value={SSH_USER} />
+                  </div>
+
+                  <div className="mt-5 rounded-[1.5rem] border border-border/70 bg-background/70 p-4">
+                    <p className="text-xs font-semibold uppercase tracking-[0.22em] text-muted-foreground">
+                      Hành động nhanh
+                    </p>
+                    <div className="mt-4 flex flex-wrap gap-2">
+                      {selectedVm.ip && (
+                        <>
+                          <CopyChip
+                            text={`ssh ${SSH_USER}@${selectedVm.ip}`}
+                            label="Copy SSH"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setSshSession({ vm: selectedVm })}
+                            className="inline-flex items-center gap-2 rounded-full border border-border/70 bg-background/70 px-3 py-1.5 text-xs font-semibold text-foreground transition hover:border-primary/35 hover:text-primary"
+                          >
+                            <Terminal className="h-3.5 w-3.5" />
+                            Mở Web SSH
+                          </button>
+                        </>
+                      )}
+
+                      <button
+                        type="button"
+                        onClick={() => openGitHub(selectedVm.id)}
+                        className="inline-flex items-center gap-2 rounded-full border border-border/70 bg-background/70 px-3 py-1.5 text-xs font-semibold text-foreground transition hover:border-primary/35 hover:text-primary"
+                      >
+                        <GitBranch className="h-3.5 w-3.5" />
+                        Deploy repo
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => handleDelete(selectedVm.name)}
+                        disabled={deletingName === selectedVm.name}
+                        className="inline-flex items-center gap-2 rounded-full border border-rose-500/20 bg-rose-500/10 px-3 py-1.5 text-xs font-semibold text-rose-300 transition hover:border-rose-500/35 hover:bg-rose-500/15 disabled:opacity-50"
+                      >
+                        {deletingName === selectedVm.name ? (
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        ) : (
+                          <Trash2 className="h-3.5 w-3.5" />
+                        )}
+                        Xoá VM
+                      </button>
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <div className="mt-5 rounded-[1.6rem] border border-dashed border-border/70 bg-background/60 p-6 text-sm leading-6 text-muted-foreground">
+                  Chọn một VM ở danh sách bên trái để xem chi tiết, copy SSH command
+                  hoặc mở Web SSH ngay tại đây.
+                </div>
+              )}
+            </div>
+          </aside>
+        </section>
+      </div>
+
       {showCreate && (
         <CreateServerModal
-          onClose={() => setShowCreate(false)}
+          initialPresetKey={createPresetKey}
+          onClose={() => {
+            setShowCreate(false);
+            setCreatePresetKey(null);
+          }}
           onSuccess={(data) => {
             setShowCreate(false);
+            setCreatePresetKey(null);
             setVmResult(data);
-            fetchVMs(true);
+            void fetchFleet({ silent: true });
           }}
         />
       )}
@@ -633,9 +1274,21 @@ export default function Dashboard() {
       {vmResult && (
         <VMSuccessModal
           info={vmResult}
+          onOpenTerminal={(host) => {
+            setSshSession({
+              vm: {
+                id: vmResult.vm_id,
+                name: vmResult.vm_name,
+                status: vmResult.status,
+                ip: host,
+                flavor: vmResult.flavor,
+                image: vmResult.os,
+              },
+            });
+          }}
           onClose={() => {
             setVmResult(null);
-            fetchVMs(true);
+            void fetchFleet({ silent: true });
           }}
         />
       )}
@@ -643,8 +1296,12 @@ export default function Dashboard() {
       {showGitHub && (
         <GitHubDeployModal
           vms={vms}
+          initialVmId={githubTargetVmId ?? undefined}
           onDeploy={handleDeployFromGitHub}
-          onClose={() => setShowGitHub(false)}
+          onClose={() => {
+            setShowGitHub(false);
+            setGitHubTargetVmId(null);
+          }}
         />
       )}
 

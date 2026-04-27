@@ -3,13 +3,28 @@ import { runCLI, extractIPv4 } from "@/lib/openstack";
 
 export const dynamic = "force-dynamic";
 
+interface OpenStackServerRow {
+  ID?: string;
+  id?: string;
+  Name?: string;
+  name?: string;
+  Status?: string;
+  status?: string;
+  Networks?: unknown;
+  networks?: unknown;
+  Image?: string;
+  image?: string;
+  Flavor?: string;
+  flavor?: string;
+}
+
 // GET /api/get-instances
 export async function GET() {
   try {
     const raw = await runCLI("openstack server list -f json");
-    const list = JSON.parse(raw);
+    const list: OpenStackServerRow[] = JSON.parse(raw);
 
-    const instances = list.map((vm: any) => ({
+    const instances = list.map((vm) => ({
       id:      vm.ID      || vm.id,
       name:    vm.Name    || vm.name,
       status:  vm.Status  || vm.status,
@@ -20,10 +35,12 @@ export async function GET() {
     }));
 
     return NextResponse.json({ success: true, instances });
-  } catch (err: any) {
-    console.error("[get-instances] error:", err.message);
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : "Không lấy được danh sách server.";
+    console.error("[get-instances] error:", message);
     return NextResponse.json(
-      { success: false, error_message: err.message },
+      { success: false, error_message: message },
       { status: 500 }
     );
   }

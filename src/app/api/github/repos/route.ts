@@ -1,5 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 
+interface GitHubRepo {
+  id: number;
+  name: string;
+  full_name: string;
+  clone_url: string;
+  html_url: string;
+  default_branch: string;
+}
+
 export async function GET(request: NextRequest) {
   const token = request.cookies.get("gh_token")?.value;
   if (!token) {
@@ -20,8 +29,8 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: message }, { status: res.status });
   }
 
-  const repos = await res.json();
-  const simplified = (repos || []).map((repo: any) => ({
+  const repos: GitHubRepo[] = await res.json();
+  const simplified = (repos || []).map((repo) => ({
     id: repo.id,
     name: repo.name,
     full_name: repo.full_name,

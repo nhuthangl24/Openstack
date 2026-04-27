@@ -1,87 +1,208 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { X, Loader2, Server, KeyRound, Cpu, Monitor, Package, Eye, EyeOff, ChevronRight, Rocket } from "lucide-react";
-import { flavors, Flavor } from "@/lib/flavors";
-import { environments, Environment } from "@/lib/environments";
+import { useEffect, useState } from "react";
+import {
+  Check,
+  Eye,
+  EyeOff,
+  KeyRound,
+  Loader2,
+  RefreshCw,
+  Rocket,
+  ShieldCheck,
+  Sparkles,
+  X,
+} from "lucide-react";
+import { environments, type Environment } from "@/lib/environments";
+import { flavors } from "@/lib/flavors";
+import { serverPresets } from "@/lib/presets";
 
 interface CreateServerModalProps {
+  initialPresetKey?: string | null;
   onClose: () => void;
   onSuccess: (data: {
-    vm_name: string; vm_id: string; status: string;
-    flavor: string; os: string; password: string; environments: string[];
+    vm_name: string;
+    vm_id: string;
+    status: string;
+    flavor: string;
+    os: string;
+    password: string;
+    environments: string[];
   }) => void;
 }
 
-interface OSImage { id: string; name: string; status: string; }
+interface OSImage {
+  id: string;
+  name: string;
+  status: string;
+}
 
-export default function CreateServerModal({ onClose, onSuccess }: CreateServerModalProps) {
-  const [step, setStep] = useState(0); // 0=identity, 1=hardware, 2=os, 3=env, 4=review
-  const [name, setName]           = useState("");
-  const [password, setPassword]   = useState("");
-  const [showPass, setShowPass]   = useState(false);
-  const [flavor, setFlavor]       = useState("");
-  const [osImages, setOsImages]   = useState<OSImage[]>([]);
-  const [osName, setOsName]       = useState("");
-  const [envs, setEnvs]           = useState<string[]>([]);
+function buildSuggestedName(prefix: string) {
+  const stamp = new Date().toISOString().slice(5, 10).replace("-", "");
+  const suffix = Math.floor(Math.random() * 90 + 10);
+  return `${prefix}-${stamp}-${suffix}`;
+}
+
+function generateStrongPassword() {
+  const charset =
+    "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$%&*?";
+
+  if (typeof window !== "undefined" && window.crypto?.getRandomValues) {
+    const values = new Uint32Array(16);
+    window.crypto.getRandomValues(values);
+    return Array.from(values, (value) => charset[value % charset.length]).join("");
+  }
+
+  return `Open${Math.random().toString(36).slice(2, 10)}#${Math.floor(
+    100 + Math.random() * 900,
+  )}`;
+}
+
+export default function CreateServerModal({
+  initialPresetKey,
+  onClose,
+  onSuccess,
+}: CreateServerModalProps) {
+  const [name, setName] = useState("");
+  const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [flavor, setFlavor] = useState("");
+  const [osImages, setOsImages] = useState<OSImage[]>([]);
+  const [osName, setOsName] = useState("");
+  const [selectedPresetKey, setSelectedPresetKey] = useState(initialPresetKey ?? "");
+  const [envs, setEnvs] = useState<string[]>([]);
   const [loadingOS, setLoadingOS] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const [errors, setErrors]       = useState<Record<string, string>>({});
-  const [nameError, setNameError] = useState("");
+  const [errors, setErrors] = useState<Record<string, string>>({});
 
-  // Fetch OS images on mount
+  const activePreset = serverPresets.find((item) => item.key === selectedPresetKey);
+
   useEffect(() => {
     setLoadingOS(true);
+
     fetch("/api/images")
-      .then(r => r.json())
-      .then((list: any[]) => {
-        const imgs = (Array.isArray(list) ? list : []).map(img => ({
-          id:     img.ID   || img.id,
-          name:   img.Name || img.name || "Unknown",
-          status: img.Status || img.status || "",
+      .then((response) => response.json())
+      .then((items: Array<Record<string, string>> | { error?: string }) => {
+        if (!Array.isArray(items)) {
+          return;
+        }
+
+        const normalized = items.map((item) => ({
+          id: item.ID || item.id,
+          name: item.Name || item.name || "Unknown image",
+          status: item.Status || item.status || "Unknown",
         }));
-        setOsImages(imgs);
-        if (imgs.length > 0) setOsName(imgs[0].name);
+
+        setOsImages(normalized);
+
+        if (normalized.length > 0) {
+          setOsName((current) => current || normalized[0].name);
+        }
       })
-      .catch(() => {})
+      .catch(() => {
+        setErrors((current) => ({
+          ...current,
+          os: "Không tải được danh sách image từ OpenStack.",
+        }));
+      })
       .finally(() => setLoadingOS(false));
   }, []);
 
-  // Escape to close
   useEffect(() => {
-    const h = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
-    window.addEventListener("keydown", h);
-    return () => window.removeEventListener("keydown", h);
+    function handleEscape(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        onClose();
+      }
+    }
+
+    window.addEventListener("keydown", handleEscape);
+    return () => window.removeEventListener("keydown", handleEscape);
   }, [onClose]);
 
-  const toggleEnv = (id: string) => {
-    setEnvs(prev => prev.includes(id) ? prev.filter(e => e !== id) : [...prev, id]);
-  };
+  useEffect(() => {
+    if (!initialPresetKey) {
+      return;
+    }
 
-  const validateBasic = () => {
-    const e: Record<string, string> = {};
-    if (!name.trim()) e.name = "Tên máy chủ là bắt buộc";
-    else if (!/^[a-zA-Z0-9][a-zA-Z0-9._-]*$/.test(name)) e.name = "Chỉ dùng chữ, số, dấu chấm, gạch ngang";
-    if (!password) e.password = "Mật khẩu là bắt buộc";
-    else if (password.length < 8) e.password = "Tối thiểu 8 ký tự";
-    setErrors(e);
-    return Object.keys(e).length === 0;
-  };
+    const preset = serverPresets.find((item) => item.key === initialPresetKey);
 
-  const handleNext = () => {
-    if (step === 0 && !validateBasic()) return;
-    if (step === 1 && !flavor) { setErrors({ flavor: "Chọn cấu hình máy" }); return; }
-    if (step === 2 && !osName) { setErrors({ os: "Chọn hệ điều hành" }); return; }
-    setErrors({});
-    setStep(s => s + 1);
-  };
+    if (!preset) {
+      return;
+    }
 
-  const handleDeploy = async () => {
+    setSelectedPresetKey(preset.key);
+    setFlavor(preset.flavor);
+    setEnvs(preset.environments);
+    setName((current) => current || buildSuggestedName(preset.namePrefix));
+    setPassword((current) => current || generateStrongPassword());
+  }, [initialPresetKey]);
+
+  function toggleEnv(id: string) {
+    setEnvs((current) =>
+      current.includes(id)
+        ? current.filter((item) => item !== id)
+        : [...current, id],
+    );
+  }
+
+  function applyPreset(presetKey: string) {
+    const preset = serverPresets.find((item) => item.key === presetKey);
+
+    if (!preset) {
+      return;
+    }
+
+    setSelectedPresetKey(preset.key);
+    setFlavor(preset.flavor);
+    setEnvs(preset.environments);
+    setName(buildSuggestedName(preset.namePrefix));
+
+    if (!password) {
+      setPassword(generateStrongPassword());
+    }
+  }
+
+  function validate() {
+    const nextErrors: Record<string, string> = {};
+
+    if (!name.trim()) {
+      nextErrors.name = "Tên máy là bắt buộc.";
+    } else if (!/^[a-zA-Z0-9][a-zA-Z0-9._-]*$/.test(name)) {
+      nextErrors.name =
+        "Tên máy chỉ được dùng chữ, số, dấu chấm, gạch ngang và gạch dưới.";
+    }
+
+    if (!password.trim()) {
+      nextErrors.password = "Mật khẩu SSH là bắt buộc.";
+    } else if (password.length < 8) {
+      nextErrors.password = "Mật khẩu cần ít nhất 8 ký tự.";
+    }
+
+    if (!flavor) {
+      nextErrors.flavor = "Hãy chọn một flavor cho VM.";
+    }
+
+    if (!osName) {
+      nextErrors.os = "Hãy chọn một image hệ điều hành.";
+    }
+
+    setErrors(nextErrors);
+    return Object.keys(nextErrors).length === 0;
+  }
+
+  async function handleDeploy() {
+    if (!validate()) {
+      return;
+    }
+
     setSubmitting(true);
+
     try {
-      const res = await fetch("/api/create-vm", {
+      const response = await fetch("/api/create-vm", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+        },
         body: JSON.stringify({
           instance_name: name,
           hostname: name,
@@ -92,309 +213,538 @@ export default function CreateServerModal({ onClose, onSuccess }: CreateServerMo
           environments: envs,
         }),
       });
-      const data = await res.json();
-      if (data.success) {
-        onSuccess({ vm_name: data.vm_name || name, vm_id: data.vm_id || "", status: data.status, flavor, os: osName, password, environments: envs });
-      } else {
-        setErrors({ submit: data.error_message || data.error || "Tạo máy thất bại" });
-        setStep(0);
+
+      const data = await response.json();
+
+      if (!response.ok || !data.success) {
+        throw new Error(data.error_message || data.error || "Tạo máy thất bại.");
       }
-    } catch {
-      setErrors({ submit: "Lỗi kết nối server" });
+
+      onSuccess({
+        vm_name: data.vm_name || name,
+        vm_id: data.vm_id || "",
+        status: data.status || "BUILD",
+        flavor,
+        os: osName,
+        password,
+        environments: envs,
+      });
+    } catch (submitError) {
+      setErrors({
+        submit:
+          submitError instanceof Error
+            ? submitError.message
+            : "Không thể tạo VM ở thời điểm hiện tại.",
+      });
     } finally {
       setSubmitting(false);
     }
-  };
-
-  const STEPS = ["Identity", "Hardware", "OS", "Software", "Review"];
-  const selectedFlavor = flavors.find(f => f.name === flavor);
+  }
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center"
-      style={{ backgroundColor: "rgba(0,0,0,0.85)", backdropFilter: "blur(4px)" }}
-      onClick={e => { if (e.target === e.currentTarget) onClose(); }}
+      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/55 p-4 backdrop-blur-md"
+      onClick={(event) => {
+        if (event.target === event.currentTarget) {
+          onClose();
+        }
+      }}
     >
-      <div className="relative w-full max-w-2xl max-h-[92vh] flex flex-col rounded-xl border border-white/10 bg-[#0a0a0a] shadow-2xl overflow-hidden">
+      <div className="surface-panel relative flex max-h-[92vh] w-full max-w-6xl flex-col overflow-hidden rounded-[2rem]">
+        <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-primary/40 to-transparent" />
 
-        {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-white/8">
-          <div className="flex items-center gap-3">
-            <div className="w-7 h-7 rounded-md bg-white/10 flex items-center justify-center">
-              <Rocket className="w-4 h-4 text-white" />
+        <div className="flex flex-col gap-4 border-b border-border/70 px-5 py-5 sm:flex-row sm:items-start sm:justify-between sm:px-6">
+          <div className="flex items-start gap-4">
+            <div className="flex h-12 w-12 items-center justify-center rounded-[1.2rem] bg-foreground text-background shadow-[0_16px_40px_-24px_rgba(15,23,42,0.7)]">
+              <Rocket className="h-5 w-5" />
             </div>
             <div>
-              <h2 className="text-sm font-semibold text-white">New Server</h2>
-              <p className="text-xs text-gray-500">OpenStack VM • public network</p>
+              <div className="inline-flex items-center gap-2 rounded-full border border-border/70 bg-background/70 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.24em] text-muted-foreground">
+                <Sparkles className="h-3.5 w-3.5" />
+                Launch Control
+              </div>
+              <h2 className="mt-3 text-2xl font-semibold tracking-tight text-foreground">
+                Tạo VM mới theo giao diện mới
+              </h2>
+              <p className="mt-2 max-w-3xl text-sm leading-6 text-muted-foreground">
+                Chọn preset, tinh chỉnh hardware, chọn image và software cần cài.
+                Mọi thứ được review ngay ở cột bên phải trước khi deploy.
+              </p>
             </div>
           </div>
-          <button onClick={onClose} className="p-1.5 rounded-md text-gray-500 hover:text-white hover:bg-white/8 transition-all">
-            <X className="w-4 h-4" />
+
+          <button
+            type="button"
+            onClick={onClose}
+            className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-border/70 bg-background/70 text-muted-foreground transition hover:border-primary/30 hover:text-foreground"
+          >
+            <X className="h-4 w-4" />
           </button>
         </div>
 
-        {/* Step indicators */}
-        <div className="flex items-center gap-0 px-6 pt-4 pb-3 border-b border-white/8">
-          {STEPS.map((s, i) => (
-            <div key={s} className="flex items-center gap-0">
-              <button
-                onClick={() => { if (i < step) setStep(i); }}
-                className={`flex items-center gap-1.5 text-xs font-medium transition-colors ${
-                  i === step ? "text-white" : i < step ? "text-gray-400 cursor-pointer hover:text-white" : "text-gray-600 cursor-default"
-                }`}
-              >
-                <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold ${
-                  i < step ? "bg-white text-black" : i === step ? "bg-white/20 text-white border border-white/30" : "bg-white/5 text-gray-600"
-                }`}>{i + 1}</span>
-                {s}
-              </button>
-              {i < STEPS.length - 1 && (
-                <ChevronRight className={`w-3 h-3 mx-2 ${i < step ? "text-gray-400" : "text-gray-700"}`} />
-              )}
-            </div>
-          ))}
-        </div>
-
-        {/* Body */}
-        <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5">
-
-          {/* Error banner */}
-          {errors.submit && (
-            <div className="px-4 py-3 rounded-lg bg-red-950/40 border border-red-800/40 text-sm text-red-400">
-              {errors.submit}
-            </div>
-          )}
-
-          {/* ─── Step 0: Identity ─── */}
-          {step === 0 && (
-            <div className="space-y-4">
-              <SectionHeader icon={<Server className="w-4 h-4" />} title="Server Identity" desc="Đặt tên và tạo mật khẩu SSH" />
-
-              <div className="space-y-1.5">
-                <label className="text-xs font-medium text-gray-400 uppercase tracking-wider">Server Name</label>
-                <input
-                  autoFocus
-                  value={name}
-                  onChange={e => { setName(e.target.value); setErrors({}); }}
-                  placeholder="web-server-01"
-                  className={`w-full h-10 px-3 rounded-lg bg-white/5 border text-sm text-white placeholder:text-gray-600 outline-none transition-colors focus:border-white/30 ${errors.name ? "border-red-500/50" : "border-white/10"}`}
-                />
-                {errors.name && <p className="text-xs text-red-400">{errors.name}</p>}
-                <p className="text-xs text-gray-600">Chỉ dùng chữ, số, dấu chấm, gạch ngang, gạch dưới</p>
+        <div className="grid min-h-0 flex-1 gap-0 xl:grid-cols-[minmax(0,1fr)_22rem]">
+          <div className="min-h-0 overflow-y-auto px-5 py-5 sm:px-6">
+            {errors.submit && (
+              <div className="mb-5 rounded-[1.4rem] border border-rose-500/25 bg-rose-500/10 px-4 py-3 text-sm text-rose-200 dark:text-rose-300">
+                {errors.submit}
               </div>
+            )}
 
-              <div className="space-y-1.5">
-                <label className="text-xs font-medium text-gray-400 uppercase tracking-wider">SSH Password</label>
-                <div className="relative">
-                  <input
-                    type={showPass ? "text" : "password"}
-                    value={password}
-                    onChange={e => { setPassword(e.target.value); setErrors({}); }}
-                    placeholder="Tối thiểu 8 ký tự"
-                    className={`w-full h-10 px-3 pr-10 rounded-lg bg-white/5 border text-sm text-white placeholder:text-gray-600 outline-none transition-colors focus:border-white/30 ${errors.password ? "border-red-500/50" : "border-white/10"}`}
-                  />
-                  <button type="button" onClick={() => setShowPass(!showPass)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-white">
-                    {showPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                  </button>
-                </div>
-                {errors.password && <p className="text-xs text-red-400">{errors.password}</p>}
-                {/* Password strength */}
-                {password.length > 0 && (
-                  <div className="flex items-center gap-2">
-                    <div className="flex gap-1">
-                      {[1,2,3,4].map(i => (
-                        <div key={i} className={`h-1 w-8 rounded-full transition-colors ${
-                          password.length >= i * 3 ? (password.length >= 12 ? "bg-green-500" : password.length >= 8 ? "bg-yellow-500" : "bg-red-500") : "bg-white/10"
-                        }`} />
-                      ))}
-                    </div>
-                    <span className="text-xs text-gray-500">{password.length >= 12 ? "Strong" : password.length >= 8 ? "Good" : "Weak"}</span>
-                  </div>
-                )}
-                <p className="text-xs text-gray-600">Dùng cho cả ubuntu và root. Thay đổi ngay sau khi deploy.</p>
-              </div>
-            </div>
-          )}
+            <section className="space-y-4">
+              <SectionHeading
+                kicker="1. Preset"
+                title="Khởi tạo nhanh bằng template"
+                description="Preset sẽ điền sẵn flavor và software stack để bạn không phải cấu hình lại từ đầu."
+              />
+              <div className="grid gap-3 lg:grid-cols-3">
+                {serverPresets.map((preset) => {
+                  const selected = preset.key === selectedPresetKey;
 
-          {/* ─── Step 1: Hardware ─── */}
-          {step === 1 && (
-            <div className="space-y-4">
-              <SectionHeader icon={<Cpu className="w-4 h-4" />} title="Hardware" desc="Chọn cấu hình CPU, RAM và Disk" />
-              {errors.flavor && <p className="text-xs text-red-400">{errors.flavor}</p>}
-              <div className="space-y-2">
-                {flavors.map((f: Flavor) => (
-                  <button
-                    key={f.name}
-                    onClick={() => { setFlavor(f.name); setErrors({}); }}
-                    className={`w-full flex items-center justify-between px-4 py-3 rounded-lg border text-left transition-all ${
-                      flavor === f.name
-                        ? "border-white/40 bg-white/8"
-                        : "border-white/8 bg-white/3 hover:border-white/20 hover:bg-white/5"
-                    }`}
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className={`w-3.5 h-3.5 rounded-full border-2 flex items-center justify-center flex-shrink-0 ${flavor === f.name ? "border-white" : "border-white/30"}`}>
-                        {flavor === f.name && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
-                      </div>
-                      <span className="text-sm font-medium text-white font-mono">{f.name}</span>
-                    </div>
-                    <div className="flex items-center gap-5 text-xs text-gray-400">
-                      <span>{f.vcpus} vCPU</span>
-                      <span>{f.ram} RAM</span>
-                      <span>{f.disk} Disk</span>
-                    </div>
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* ─── Step 2: OS ─── */}
-          {step === 2 && (
-            <div className="space-y-4">
-              <SectionHeader icon={<Monitor className="w-4 h-4" />} title="Operating System" desc="Chọn image hệ điều hành" />
-              {errors.os && <p className="text-xs text-red-400">{errors.os}</p>}
-              {loadingOS ? (
-                <div className="flex items-center gap-2 text-sm text-gray-500 py-4">
-                  <Loader2 className="w-4 h-4 animate-spin" />Đang tải danh sách OS...
-                </div>
-              ) : osImages.length === 0 ? (
-                <p className="text-sm text-gray-500 py-4">Không tìm thấy image nào trong OpenStack.</p>
-              ) : (
-                <div className="space-y-2">
-                  {osImages.map(img => (
-                    <button
-                      key={img.id}
-                      onClick={() => { setOsName(img.name); setErrors({}); }}
-                      className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg border text-left transition-all ${
-                        osName === img.name
-                          ? "border-white/40 bg-white/8"
-                          : "border-white/8 bg-white/3 hover:border-white/20 hover:bg-white/5"
-                      }`}
-                    >
-                      <div className={`w-3.5 h-3.5 rounded-full border-2 flex items-center justify-center flex-shrink-0 ${osName === img.name ? "border-white" : "border-white/30"}`}>
-                        {osName === img.name && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
-                      </div>
-                      <span className="text-xl">🐧</span>
-                      <div>
-                        <p className="text-sm font-medium text-white">{img.name}</p>
-                        <p className="text-xs text-gray-500">{img.status}</p>
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* ─── Step 3: Software/Env ─── */}
-          {step === 3 && (
-            <div className="space-y-4">
-              <SectionHeader icon={<Package className="w-4 h-4" />} title="Preinstall Software" desc="Chọn môi trường cài đặt sẵn (cloud-init)" />
-              <div className="flex flex-wrap gap-2">
-                {environments.map((env: Environment) => {
-                  const selected = envs.includes(env.id);
                   return (
                     <button
-                      key={env.id}
-                      onClick={() => toggleEnv(env.id)}
-                      title={env.description}
-                      className={`env-chip px-3 py-1.5 rounded-md text-sm border transition-all ${
+                      key={preset.key}
+                      type="button"
+                      onClick={() => applyPreset(preset.key)}
+                      className={`rounded-[1.5rem] border p-4 text-left transition ${
                         selected
-                          ? "bg-white text-black border-white font-medium"
-                          : "bg-transparent text-gray-400 border-white/15 hover:text-white"
+                          ? "border-primary/40 bg-primary/10 text-primary"
+                          : "border-border/70 bg-background/65 text-foreground hover:border-primary/25"
                       }`}
                     >
-                      {env.label}
+                      <div className="flex items-center justify-between gap-3">
+                        <p className="text-base font-semibold tracking-tight">
+                          {preset.label}
+                        </p>
+                        {selected && <Check className="h-4 w-4" />}
+                      </div>
+                      <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                        {preset.description}
+                      </p>
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        {preset.highlights.map((item) => (
+                          <span
+                            key={item}
+                            className="rounded-full border border-border/70 bg-background/70 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground"
+                          >
+                            {item}
+                          </span>
+                        ))}
+                      </div>
                     </button>
                   );
                 })}
               </div>
-              {envs.length === 0 ? (
-                <p className="text-xs text-gray-600">Không chọn nào = chỉ cài base OS + SSH.</p>
-              ) : (
-                <p className="text-xs text-gray-500">{envs.length} packages sẽ được cài via cloud-init</p>
+            </section>
+
+            <section className="mt-8 space-y-4">
+              <SectionHeading
+                kicker="2. Identity"
+                title="Tên máy và credential SSH"
+                description="Bạn có thể dùng nút generate để lấy tên máy gợi ý và mật khẩu mạnh ngay lập tức."
+              />
+
+              <div className="grid gap-4 lg:grid-cols-2">
+                <div className="rounded-[1.5rem] border border-border/70 bg-background/70 p-4">
+                  <div className="flex items-center justify-between gap-3">
+                    <label className="text-xs font-semibold uppercase tracking-[0.22em] text-muted-foreground">
+                      Tên máy
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setName(
+                          buildSuggestedName(activePreset?.namePrefix ?? "vm"),
+                        )
+                      }
+                      className="inline-flex items-center gap-2 rounded-full border border-border/70 px-3 py-1.5 text-xs font-semibold text-foreground transition hover:border-primary/35 hover:text-primary"
+                    >
+                      <RefreshCw className="h-3.5 w-3.5" />
+                      Gợi ý tên
+                    </button>
+                  </div>
+                  <input
+                    autoFocus
+                    value={name}
+                    onChange={(event) => {
+                      setName(event.target.value);
+                      setErrors((current) => ({ ...current, name: "" }));
+                    }}
+                    placeholder="api-0427-21"
+                    className={`mt-3 h-12 w-full rounded-[1rem] border bg-card px-4 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none ${
+                      errors.name
+                        ? "border-rose-500/40"
+                        : "border-border/70 focus:border-primary/35"
+                    }`}
+                  />
+                  {errors.name ? (
+                    <p className="mt-2 text-xs text-rose-300">{errors.name}</p>
+                  ) : (
+                    <p className="mt-2 text-xs text-muted-foreground">
+                      Dùng chữ, số, dấu chấm, gạch ngang và gạch dưới.
+                    </p>
+                  )}
+                </div>
+
+                <div className="rounded-[1.5rem] border border-border/70 bg-background/70 p-4">
+                  <div className="flex items-center justify-between gap-3">
+                    <label className="text-xs font-semibold uppercase tracking-[0.22em] text-muted-foreground">
+                      Mật khẩu SSH
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => setPassword(generateStrongPassword())}
+                      className="inline-flex items-center gap-2 rounded-full border border-border/70 px-3 py-1.5 text-xs font-semibold text-foreground transition hover:border-primary/35 hover:text-primary"
+                    >
+                      <KeyRound className="h-3.5 w-3.5" />
+                      Tạo mạnh
+                    </button>
+                  </div>
+
+                  <div className="relative mt-3">
+                    <input
+                      type={showPassword ? "text" : "password"}
+                      value={password}
+                      onChange={(event) => {
+                        setPassword(event.target.value);
+                        setErrors((current) => ({ ...current, password: "" }));
+                      }}
+                      placeholder="Ít nhất 8 ký tự"
+                      className={`h-12 w-full rounded-[1rem] border bg-card px-4 pr-12 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none ${
+                        errors.password
+                          ? "border-rose-500/40"
+                          : "border-border/70 focus:border-primary/35"
+                      }`}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword((current) => !current)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground transition hover:text-foreground"
+                    >
+                      {showPassword ? (
+                        <EyeOff className="h-4 w-4" />
+                      ) : (
+                        <Eye className="h-4 w-4" />
+                      )}
+                    </button>
+                  </div>
+
+                  {errors.password ? (
+                    <p className="mt-2 text-xs text-rose-300">{errors.password}</p>
+                  ) : (
+                    <p className="mt-2 text-xs text-muted-foreground">
+                      Mật khẩu sẽ áp dụng cho cả tài khoản ubuntu và root.
+                    </p>
+                  )}
+                </div>
+              </div>
+            </section>
+
+            <section className="mt-8 space-y-4">
+              <SectionHeading
+                kicker="3. Hardware"
+                title="Chọn flavor cho workload"
+                description="Cân bằng CPU, RAM và dung lượng phù hợp để đỡ phải resize lại sau này."
+              />
+
+              {errors.flavor && (
+                <p className="text-sm text-rose-300">{errors.flavor}</p>
               )}
-            </div>
-          )}
 
-          {/* ─── Step 4: Review ─── */}
-          {step === 4 && (
-            <div className="space-y-4">
-              <SectionHeader icon={<Rocket className="w-4 h-4" />} title="Review & Deploy" desc="Kiểm tra lại cấu hình trước khi deploy" />
+              <div className="grid gap-3 lg:grid-cols-2">
+                {flavors.map((item) => {
+                  const selected = item.name === flavor;
 
-              <div className="rounded-lg border border-white/10 divide-y divide-white/8">
-                <ReviewRow label="Server Name" value={<span className="font-mono">{name}</span>} />
-                <ReviewRow label="SSH Password" value={<span className="font-mono blur-sm hover:blur-none transition-all">{password}</span>} />
-                <ReviewRow label="Flavor" value={
-                  <span>{flavor} {selectedFlavor && <span className="text-gray-500 text-xs">· {selectedFlavor.vcpus} vCPU · {selectedFlavor.ram} · {selectedFlavor.disk}</span>}</span>
-                } />
-                <ReviewRow label="OS" value={<span>🐧 {osName}</span>} />
-                <ReviewRow label="Network" value="public" />
-                <ReviewRow label="Preinstall" value={envs.length > 0 ? envs.join(", ") : <span className="text-gray-500">None</span>} />
+                  return (
+                    <button
+                      key={item.name}
+                      type="button"
+                      onClick={() => {
+                        setFlavor(item.name);
+                        setErrors((current) => ({ ...current, flavor: "" }));
+                      }}
+                      className={`rounded-[1.4rem] border p-4 text-left transition ${
+                        selected
+                          ? "border-primary/40 bg-primary/10"
+                          : "border-border/70 bg-background/65 hover:border-primary/25"
+                      }`}
+                    >
+                      <div className="flex items-center justify-between gap-4">
+                        <div>
+                          <p className="text-base font-semibold text-foreground">
+                            {item.name}
+                          </p>
+                          <p className="mt-1 text-sm text-muted-foreground">
+                            {item.vcpus} vCPU • {item.ram} RAM • {item.disk} Disk
+                          </p>
+                        </div>
+                        {selected && (
+                          <span className="rounded-full bg-foreground px-3 py-1 text-xs font-semibold text-background">
+                            Active
+                          </span>
+                        )}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </section>
+
+            <section className="mt-8 space-y-4">
+              <SectionHeading
+                kicker="4. Image"
+                title="Chọn hệ điều hành"
+                description="Danh sách image được lấy trực tiếp từ OpenStack nên sẽ bám đúng môi trường hiện tại."
+              />
+
+              {errors.os && <p className="text-sm text-rose-300">{errors.os}</p>}
+
+              <div className="rounded-[1.6rem] border border-border/70 bg-background/70 p-4">
+                {loadingOS ? (
+                  <div className="flex items-center gap-3 py-8 text-sm text-muted-foreground">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Đang tải danh sách image...
+                  </div>
+                ) : osImages.length === 0 ? (
+                  <div className="py-8 text-sm text-muted-foreground">
+                    Không tìm thấy image nào từ OpenStack.
+                  </div>
+                ) : (
+                  <div className="grid max-h-72 gap-3 overflow-y-auto pr-1">
+                    {osImages.map((image) => {
+                      const selected = image.name === osName;
+
+                      return (
+                        <button
+                          key={image.id}
+                          type="button"
+                          onClick={() => {
+                            setOsName(image.name);
+                            setErrors((current) => ({ ...current, os: "" }));
+                          }}
+                          className={`rounded-[1.2rem] border p-4 text-left transition ${
+                            selected
+                              ? "border-primary/40 bg-primary/10"
+                              : "border-border/70 bg-card hover:border-primary/25"
+                          }`}
+                        >
+                          <div className="flex items-center justify-between gap-4">
+                            <div>
+                              <p className="text-sm font-semibold text-foreground">
+                                {image.name}
+                              </p>
+                              <p className="mt-1 text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">
+                                {image.status}
+                              </p>
+                            </div>
+                            {selected && <Check className="h-4 w-4 text-primary" />}
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </section>
+
+            <section className="mt-8 space-y-4">
+              <SectionHeading
+                kicker="5. Software"
+                title="Chọn stack cài sẵn"
+                description="Các package này sẽ được cài qua cloud-init sau khi VM khởi động."
+              />
+
+              <div className="grid gap-3 lg:grid-cols-2">
+                {environments.map((env) => (
+                  <EnvironmentCard
+                    key={env.id}
+                    env={env}
+                    selected={envs.includes(env.id)}
+                    onToggle={() => toggleEnv(env.id)}
+                  />
+                ))}
+              </div>
+            </section>
+          </div>
+
+          <aside className="border-t border-border/70 bg-background/45 px-5 py-5 xl:border-l xl:border-t-0 xl:px-6">
+            <div className="space-y-4 xl:sticky xl:top-5">
+              <div className="rounded-[1.6rem] border border-border/70 bg-card/85 p-5">
+                <p className="text-xs font-semibold uppercase tracking-[0.24em] text-muted-foreground">
+                  Review
+                </p>
+                <h3 className="mt-2 text-2xl font-semibold tracking-tight text-foreground">
+                  {name || "Tên VM sẽ hiện ở đây"}
+                </h3>
+                <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                  {activePreset
+                    ? `Preset đang dùng: ${activePreset.label}.`
+                    : "Bạn đang custom một cấu hình hoàn toàn mới."}
+                </p>
+
+                <div className="mt-5 space-y-3">
+                  <SummaryRow label="Network" value="public" />
+                  <SummaryRow label="Flavor" value={flavor || "Chưa chọn"} />
+                  <SummaryRow label="Image" value={osName || "Chưa chọn"} />
+                  <SummaryRow
+                    label="Package"
+                    value={envs.length ? `${envs.length} lựa chọn` : "Không cài sẵn"}
+                  />
+                </div>
               </div>
 
-              <div className="px-4 py-3 rounded-lg bg-amber-950/30 border border-amber-800/30 text-xs text-amber-400/80">
-                ⚠️ Cloud-init sẽ cài đặt sau khi VM khởi động. SSH sẵn sàng sau ~60 giây.
+              <div className="rounded-[1.6rem] border border-border/70 bg-card/85 p-5">
+                <p className="text-xs font-semibold uppercase tracking-[0.24em] text-muted-foreground">
+                  Checklist
+                </p>
+                <div className="mt-4 space-y-3">
+                  <ChecklistItem done={Boolean(name)} label="Đã có tên máy" />
+                  <ChecklistItem done={password.length >= 8} label="Mật khẩu đủ mạnh" />
+                  <ChecklistItem done={Boolean(flavor)} label="Flavor đã chọn" />
+                  <ChecklistItem done={Boolean(osName)} label="Image đã chọn" />
+                </div>
+              </div>
+
+              <div className="rounded-[1.6rem] border border-emerald-500/20 bg-emerald-500/10 p-4 text-sm text-emerald-200 dark:text-emerald-300">
+                <div className="flex items-start gap-3">
+                  <ShieldCheck className="mt-0.5 h-4 w-4 flex-shrink-0" />
+                  <p>
+                    Cloud-init sẽ tự cài package sau khi VM boot. Thường cần khoảng
+                    30 đến 60 giây trước khi SSH sẵn sàng hoàn toàn.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex flex-col gap-3">
+                <button
+                  type="button"
+                  onClick={handleDeploy}
+                  disabled={submitting}
+                  className="inline-flex items-center justify-center gap-2 rounded-full bg-foreground px-5 py-3 text-sm font-semibold text-background transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {submitting ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Đang deploy...
+                    </>
+                  ) : (
+                    <>
+                      <Rocket className="h-4 w-4" />
+                      Deploy VM ngay
+                    </>
+                  )}
+                </button>
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="inline-flex items-center justify-center rounded-full border border-border/70 bg-background/70 px-5 py-3 text-sm font-semibold text-foreground transition hover:border-primary/35 hover:text-primary"
+                >
+                  Đóng panel
+                </button>
               </div>
             </div>
-          )}
-        </div>
-
-        {/* Footer */}
-        <div className="px-6 py-4 border-t border-white/8 flex items-center justify-between">
-          <button
-            onClick={step === 0 ? onClose : () => setStep(s => s - 1)}
-            className="px-4 py-2 rounded-lg text-sm text-gray-400 hover:text-white border border-white/10 hover:border-white/20 transition-all"
-          >
-            {step === 0 ? "Cancel" : "← Back"}
-          </button>
-
-          {step < 4 ? (
-            <button
-              onClick={handleNext}
-              className="px-5 py-2 rounded-lg text-sm font-semibold bg-white text-black hover:bg-gray-100 transition-all"
-            >
-              Continue →
-            </button>
-          ) : (
-            <button
-              onClick={handleDeploy}
-              disabled={submitting}
-              className="flex items-center gap-2 px-5 py-2 rounded-lg text-sm font-semibold bg-white text-black hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
-            >
-              {submitting ? (
-                <><Loader2 className="w-4 h-4 animate-spin" /> Deploying...</>
-              ) : (
-                <><Rocket className="w-4 h-4" /> Deploy Server</>
-              )}
-            </button>
-          )}
+          </aside>
         </div>
       </div>
     </div>
   );
 }
 
-function SectionHeader({ icon, title, desc }: { icon: React.ReactNode; title: string; desc: string }) {
+function SectionHeading({
+  kicker,
+  title,
+  description,
+}: {
+  kicker: string;
+  title: string;
+  description: string;
+}) {
   return (
-    <div className="flex items-start gap-3 pb-1">
-      <div className="w-8 h-8 rounded-lg bg-white/8 border border-white/10 flex items-center justify-center text-gray-300 flex-shrink-0">
-        {icon}
-      </div>
-      <div>
-        <h3 className="text-sm font-semibold text-white">{title}</h3>
-        <p className="text-xs text-gray-500">{desc}</p>
-      </div>
+    <div>
+      <p className="text-xs font-semibold uppercase tracking-[0.24em] text-muted-foreground">
+        {kicker}
+      </p>
+      <h3 className="mt-2 text-2xl font-semibold tracking-tight text-foreground">
+        {title}
+      </h3>
+      <p className="mt-2 max-w-3xl text-sm leading-6 text-muted-foreground">
+        {description}
+      </p>
     </div>
   );
 }
 
-function ReviewRow({ label, value }: { label: string; value: React.ReactNode }) {
+function EnvironmentCard({
+  env,
+  selected,
+  onToggle,
+}: {
+  env: Environment;
+  selected: boolean;
+  onToggle: () => void;
+}) {
   return (
-    <div className="flex items-center justify-between px-4 py-3">
-      <span className="text-xs text-gray-500 font-medium uppercase tracking-wider">{label}</span>
-      <span className="text-sm text-white">{value}</span>
+    <button
+      type="button"
+      onClick={onToggle}
+      className={`env-chip rounded-[1.4rem] border p-4 text-left ${
+        selected
+          ? "border-primary/40 bg-primary/10"
+          : "border-border/70 bg-background/65 hover:border-primary/25"
+      }`}
+    >
+      <div className="flex items-center justify-between gap-4">
+        <div>
+          <p className="text-sm font-semibold text-foreground">{env.label}</p>
+          <p className="mt-1 text-sm leading-6 text-muted-foreground">
+            {env.description}
+          </p>
+        </div>
+        {selected && (
+          <span className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-foreground text-background">
+            <Check className="h-4 w-4" />
+          </span>
+        )}
+      </div>
+    </button>
+  );
+}
+
+function SummaryRow({
+  label,
+  value,
+}: {
+  label: string;
+  value: string;
+}) {
+  return (
+    <div className="flex items-center justify-between gap-3 rounded-[1.15rem] border border-border/70 bg-background/70 px-4 py-3">
+      <span className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">
+        {label}
+      </span>
+      <span className="max-w-[62%] truncate text-sm font-medium text-foreground">
+        {value}
+      </span>
+    </div>
+  );
+}
+
+function ChecklistItem({
+  done,
+  label,
+}: {
+  done: boolean;
+  label: string;
+}) {
+  return (
+    <div className="flex items-center gap-3 rounded-[1.1rem] border border-border/70 bg-background/70 px-4 py-3">
+      <span
+        className={`inline-flex h-6 w-6 items-center justify-center rounded-full ${
+          done ? "bg-emerald-500 text-white" : "bg-muted text-muted-foreground"
+        }`}
+      >
+        <Check className="h-3.5 w-3.5" />
+      </span>
+      <span className="text-sm font-medium text-foreground">{label}</span>
     </div>
   );
 }

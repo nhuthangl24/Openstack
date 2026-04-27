@@ -1,3 +1,5 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
+
 import { Telegraf, Markup } from "telegraf";
 import * as dotenv from "dotenv";
 import {

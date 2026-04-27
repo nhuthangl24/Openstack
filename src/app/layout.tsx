@@ -1,12 +1,14 @@
 import type { Metadata } from "next";
+import { fontMono, fontSans } from "@/app/fonts";
+import { ThemeProvider } from "@/components/theme-provider";
 import { Toaster } from "@/components/ui/sonner";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "CloudDeploy — VM Manager",
+  title: "OrbitStack Console",
   description:
-    "Deploy and manage virtual servers on OpenStack. Configure hardware, choose your OS, and deploy instantly.",
-  keywords: ["OpenStack", "Virtual Machine", "Cloud", "Server", "Deploy"],
+    "Bảng điều khiển OpenStack hiện đại để tạo VM, triển khai repo và thao tác hạ tầng nhanh hơn.",
+  keywords: ["OpenStack", "VM", "Cloud", "Infrastructure", "DevOps"],
 };
 
 export default function RootLayout({
@@ -15,20 +17,17 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="vi" className="h-full antialiased">
-      <body className="min-h-full flex flex-col bg-black text-white">
-        {children}
-        <Toaster
-          position="bottom-right"
-          richColors
-          toastOptions={{
-            style: {
-              background: "#111",
-              border: "1px solid #222",
-              color: "#fff",
-            },
-          }}
-        />
+    <html
+      lang="vi"
+      suppressHydrationWarning
+      data-scroll-behavior="smooth"
+      className={`${fontSans.variable} ${fontMono.variable} antialiased`}
+    >
+      <body className="min-h-screen bg-background text-foreground">
+        <ThemeProvider>
+          {children}
+          <Toaster position="bottom-right" richColors />
+        </ThemeProvider>
       </body>
     </html>
   );

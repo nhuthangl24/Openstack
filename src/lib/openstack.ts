@@ -6,59 +6,63 @@ import { randomUUID } from "crypto";
 import { tmpdir } from "os";
 
 const execAsync = promisify(exec);
-
-// ─── Config ────────────────────────────────────────────────────────────────
 const OPENRC = process.env.OPENRC_PATH || "/opt/stack/devstack/openrc";
 const OS_USER = process.env.OS_USERNAME || "dung";
 const OS_PROJECT = process.env.OS_PROJECT_NAME || "Dung_Prj";
 
-// ─── Network IP extractor ──────────────────────────────────────────────────
-// OpenStack trả networks dạng object: { "public": ["2001:db8::1", "192.168.1.1"] }
-// hoặc string: "public=192.168.1.1, ..."
-export function extractIPv4(networks: any): string {
-  if (!networks) return "";
-  if (typeof networks === "string") {
-    const m = networks.match(/(\d{1,3}(?:\.\d{1,3}){3})/);
-    return m ? m[1] : "";
+export function extractIPv4(networks: unknown): string {
+  if (!networks) {
+    return "";
   }
+
+  if (typeof networks === "string") {
+    const match = networks.match(/(\d{1,3}(?:\.\d{1,3}){3})/);
+    return match ? match[1] : "";
+  }
+
   if (typeof networks === "object") {
-    for (const addrs of Object.values(networks)) {
-      if (Array.isArray(addrs)) {
-        const ipv4 = (addrs as string[]).find((a) =>
-          /^\d{1,3}(\.\d{1,3}){3}$/.test(a)
-        );
-        if (ipv4) return ipv4;
+    for (const addresses of Object.values(networks as Record<string, unknown>)) {
+      if (!Array.isArray(addresses)) {
+        continue;
+      }
+
+      const ipv4 = addresses.find(
+        (address): address is string =>
+          typeof address === "string" &&
+          /^\d{1,3}(?:\.\d{1,3}){3}$/.test(address),
+      );
+
+      if (ipv4) {
+        return ipv4;
       }
     }
   }
+
   return "";
 }
 
-// ─── Core CLI runner ───────────────────────────────────────────────────────
-/**
- * Chạy lệnh OpenStack sau khi source openrc.
- * Mỗi call tự lấy token mới, không dùng token cứng.
- */
 export async function runCLI(command: string): Promise<string> {
-  // bash -l (login shell) để load đầy đủ PATH giống interactive terminal
-  // Nếu không, Node.js subprocess không tìm thấy openstack binary
-  const fullCmd = `bash -lc 'source ${OPENRC} ${OS_USER} ${OS_PROJECT} && ${command} 2>&1'`;
+  const fullCommand = `bash -lc 'source ${OPENRC} ${OS_USER} ${OS_PROJECT} && ${command} 2>&1'`;
+
   try {
-    const { stdout, stderr } = await execAsync(fullCmd, { timeout: 60000 });
-    if (!stdout && stderr) throw new Error(stderr.trim());
+    const { stdout, stderr } = await execAsync(fullCommand, { timeout: 60000 });
+
+    if (!stdout && stderr) {
+      throw new Error(stderr.trim());
+    }
+
     return stdout.trim();
-  } catch (err: any) {
-    const detail = err.stderr?.trim() || err.stdout?.trim() || err.message;
+  } catch (error: unknown) {
+    const detail =
+      error instanceof Error ? error.message : typeof error === "string" ? error : "";
     throw new Error(detail);
   }
 }
 
-// ─── Shell escape ──────────────────────────────────────────────────────────
 export function escapeShellArg(arg: string): string {
   return `'${arg.replace(/'/g, "'\\''")}'`;
 }
 
-// ─── Temp file ─────────────────────────────────────────────────────────────
 export async function writeTempScript(content: string): Promise<string> {
   const path = join(tmpdir(), `userdata-${randomUUID()}.sh`);
   await writeFile(path, content, { mode: 0o755 });
@@ -66,42 +70,39 @@ export async function writeTempScript(content: string): Promise<string> {
 }
 
 export async function cleanupTempFile(path: string): Promise<void> {
-  try { await unlink(path); } catch { /* ignore */ }
+  try {
+    await unlink(path);
+  } catch {
+    // Ignore cleanup errors for temporary files.
+  }
 }
 
-// ─── Lookup ID: lấy full JSON list rồi filter theo Name trong Node.js ──────
 export async function lookupId(
   type: "image" | "flavor" | "network",
-  name: string
+  name: string,
 ): Promise<string> {
   const raw = await runCLI(`openstack ${type} list -f json`);
-  const list: any[] = JSON.parse(raw);
+  const list: Array<Record<string, string>> = JSON.parse(raw);
 
-  // Các field Name khác nhau tùy type
-  const item = list.find((r: any) =>
-    (r.Name === name) || (r.name === name) ||
-    (type === "image" && r.Name === name) ||
-    (type === "flavor" && (r.Name === name || r.name === name)) ||
-    (type === "network" && (r.Name === name || r.name === name))
-  );
+  const item = list.find((row) => row.Name === name || row.name === name);
 
   if (!item) {
     throw Object.assign(
-      new Error(`${type} "${name}" không tìm thấy trong OpenStack`),
-      { notFound: true }
+      new Error(`${type} "${name}" không tồn tại trong OpenStack.`),
+      { notFound: true },
     );
   }
 
   return item.ID || item.id;
 }
 
-// ─── Generate cloud-init script ────────────────────────────────────────────
 export function generatePostCreateScript(
   hostname: string,
   password: string,
-  environments: string[]
+  environments: string[],
 ): string {
   const env = environments || [];
+
   let script = `#!/bin/bash
 # Hostname
 hostnamectl set-hostname ${hostname}
@@ -120,30 +121,57 @@ export DEBIAN_FRONTEND=noninteractive
 apt-get update -y && apt-get upgrade -y
 `;
 
-  if (env.includes("docker")) script += "apt-get install -y docker.io && systemctl enable --now docker\n";
+  if (env.includes("docker")) {
+    script += "apt-get install -y docker.io && systemctl enable --now docker\n";
+  }
   if (env.includes("nodejs")) {
-    script += "curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && apt-get install -y nodejs\n";
+    script +=
+      "curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && apt-get install -y nodejs\n";
   }
-  if (env.includes("pm2")) script += "npm install -g pm2\n";
-  if (env.includes("python") || env.includes("python3")) script += "apt-get install -y python3 python3-pip\n";
-  if (env.includes("java") || env.includes("jdk")) script += "apt-get install -y default-jdk\n";
-  if (env.includes("php")) script += "apt-get install -y php php-cli php-fpm\n";
-  if (env.includes("composer")) script += "apt-get install -y composer\n";
-  if (env.includes("go") || env.includes("golang")) script += "apt-get install -y golang\n";
-  if (env.includes("git")) script += "apt-get install -y git\n";
-  if (env.includes("mysql")) script += "apt-get install -y mysql-server && systemctl enable --now mysql\n";
+  if (env.includes("pm2")) {
+    script += "npm install -g pm2\n";
+  }
+  if (env.includes("python") || env.includes("python3")) {
+    script += "apt-get install -y python3 python3-pip\n";
+  }
+  if (env.includes("java") || env.includes("jdk")) {
+    script += "apt-get install -y default-jdk\n";
+  }
+  if (env.includes("php")) {
+    script += "apt-get install -y php php-cli php-fpm\n";
+  }
+  if (env.includes("composer")) {
+    script += "apt-get install -y composer\n";
+  }
+  if (env.includes("go") || env.includes("golang")) {
+    script += "apt-get install -y golang\n";
+  }
+  if (env.includes("git")) {
+    script += "apt-get install -y git\n";
+  }
+  if (env.includes("mysql")) {
+    script += "apt-get install -y mysql-server && systemctl enable --now mysql\n";
+  }
   if (env.includes("postgresql") || env.includes("postgres")) {
-    script += "apt-get install -y postgresql postgresql-contrib && systemctl enable --now postgresql\n";
+    script +=
+      "apt-get install -y postgresql postgresql-contrib && systemctl enable --now postgresql\n";
   }
-  if (env.includes("mongodb") || env.includes("mongo")) script += "apt-get install -y mongodb && systemctl enable --now mongodb\n";
-  if (env.includes("redis")) script += "apt-get install -y redis-server && systemctl enable --now redis-server\n";
-  if (env.includes("nginx")) script += "apt-get install -y nginx && systemctl enable --now nginx\n";
-  if (env.includes("apache2") || env.includes("apache")) script += "apt-get install -y apache2 && systemctl enable --now apache2\n";
+  if (env.includes("mongodb") || env.includes("mongo")) {
+    script += "apt-get install -y mongodb && systemctl enable --now mongodb\n";
+  }
+  if (env.includes("redis")) {
+    script += "apt-get install -y redis-server && systemctl enable --now redis-server\n";
+  }
+  if (env.includes("nginx")) {
+    script += "apt-get install -y nginx && systemctl enable --now nginx\n";
+  }
+  if (env.includes("apache2") || env.includes("apache")) {
+    script += "apt-get install -y apache2 && systemctl enable --now apache2\n";
+  }
 
   return script;
 }
 
-// ─── Types ─────────────────────────────────────────────────────────────────
 export interface CreateVMData {
   instance_name: string;
   password: string;
@@ -162,25 +190,22 @@ export interface CreateVMResponse {
   error?: string;
 }
 
-// ─── Create VM ─────────────────────────────────────────────────────────────
 export async function createOpenStackVM(
   data: CreateVMData,
-  script: string
+  script: string,
 ): Promise<CreateVMResponse> {
   let scriptPath = "";
+
   try {
-    // 1. Resolve IDs (full list → filter in Node.js)
     const [imageId, flavorId, networkId] = await Promise.all([
       lookupId("image", data.os),
       lookupId("flavor", data.flavor),
       lookupId("network", data.network),
     ]);
 
-    // 2. Write cloud-init script
     scriptPath = await writeTempScript(script);
 
-    // 3. Create server
-    const cmd = [
+    const command = [
       "openstack server create",
       `--image ${escapeShellArg(imageId)}`,
       `--flavor ${escapeShellArg(flavorId)}`,
@@ -190,18 +215,33 @@ export async function createOpenStackVM(
       "-f json",
     ].join(" ");
 
-    const output = await runCLI(cmd);
+    const output = await runCLI(command);
     const result = JSON.parse(output);
     const vmId = result.id || result.ID;
 
-    return { success: true, vm_name: data.instance_name, vm_id: vmId, status: result.status || "BUILD", ip: "" };
+    return {
+      success: true,
+      vm_name: data.instance_name,
+      vm_id: vmId,
+      status: result.status || "BUILD",
+      ip: "",
+    };
   } catch (error) {
-    return { success: false, vm_name: data.instance_name, status: "ERROR", error: String(error instanceof Error ? error.message : error) };
+    return {
+      success: false,
+      vm_name: data.instance_name,
+      status: "ERROR",
+      error: String(error instanceof Error ? error.message : error),
+    };
   } finally {
-    if (scriptPath) await cleanupTempFile(scriptPath);
+    if (scriptPath) {
+      await cleanupTempFile(scriptPath);
+    }
   }
 }
 
-// ─── Backward compat ───────────────────────────────────────────────────────
-export function getOpenStackEnv() { return {}; }
+export function getOpenStackEnv() {
+  return {};
+}
+
 export { runCLI as runOpenStackCommand };

@@ -1,7 +1,16 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { X, GitBranch, ExternalLink, RefreshCw, CheckCircle2 } from "lucide-react";
+import {
+  CheckCircle2,
+  ExternalLink,
+  GitBranch,
+  Loader2,
+  RefreshCw,
+  Search,
+  ShieldCheck,
+  X,
+} from "lucide-react";
 
 interface VMOption {
   id: string;
@@ -20,6 +29,7 @@ interface RepoOption {
 
 interface GitHubDeployModalProps {
   vms: VMOption[];
+  initialVmId?: string;
   onDeploy: (vmId: string, cloneUrl: string) => void;
   onClose: () => void;
 }
@@ -34,6 +44,7 @@ interface DeviceCodeResponse {
 
 export default function GitHubDeployModal({
   vms,
+  initialVmId,
   onDeploy,
   onClose,
 }: GitHubDeployModalProps) {
@@ -43,280 +54,467 @@ export default function GitHubDeployModal({
   const [repos, setRepos] = useState<RepoOption[]>([]);
   const [selectedRepo, setSelectedRepo] = useState("");
   const [repoInput, setRepoInput] = useState("");
-  const [selectedVm, setSelectedVm] = useState("");
+  const [repoQuery, setRepoQuery] = useState("");
+  const [selectedVm, setSelectedVm] = useState(initialVmId ?? "");
   const [error, setError] = useState("");
   const pollRef = useRef<number | null>(null);
 
   const selectedRepoObj = useMemo(
-    () => repos.find((r) => r.full_name === selectedRepo) || null,
+    () => repos.find((repo) => repo.full_name === selectedRepo) ?? null,
     [repos, selectedRepo],
   );
 
   const manualCloneUrl = useMemo(() => {
     const raw = repoInput.trim();
-    if (!raw) return "";
-    if (raw.startsWith("git@") || raw.startsWith("http")) return raw;
-    if (raw.includes("github.com")) return raw;
-    if (raw.includes("/")) return `https://github.com/${raw}.git`;
+
+    if (!raw) {
+      return "";
+    }
+
+    if (raw.startsWith("git@") || raw.startsWith("http")) {
+      return raw;
+    }
+
+    if (raw.includes("github.com")) {
+      return raw;
+    }
+
+    if (raw.includes("/")) {
+      return `https://github.com/${raw}.git`;
+    }
+
     return "";
   }, [repoInput]);
 
-  const stopPolling = () => {
+  const filteredRepos = repos.filter((repo) =>
+    repo.full_name.toLowerCase().includes(repoQuery.trim().toLowerCase()),
+  );
+
+  useEffect(() => {
+    setSelectedVm(initialVmId ?? "");
+  }, [initialVmId]);
+
+  function stopPolling() {
     if (pollRef.current) {
       window.clearInterval(pollRef.current);
       pollRef.current = null;
     }
-  };
+  }
 
-  const fetchRepos = async () => {
+  async function fetchRepos() {
     setLoading(true);
     setError("");
+
     try {
-      const res = await fetch("/api/github/repos");
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Not connected");
-      setRepos(data.repos || []);
-      if (data.repos?.length) {
-        setSelectedRepo(data.repos[0].full_name);
+      const response = await fetch("/api/github/repos");
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Chưa kết nối GitHub.");
       }
-    } catch (err) {
+
+      setRepos(data.repos || []);
+
+      if (data.repos?.length) {
+        setSelectedRepo((current) => current || data.repos[0].full_name);
+      }
+    } catch (repoError) {
       setRepos([]);
-      setError(err instanceof Error ? err.message : "Failed to load repos");
+      setError(
+        repoError instanceof Error
+          ? repoError.message
+          : "Không thể tải danh sách repository.",
+      );
     } finally {
       setLoading(false);
     }
-  };
+  }
 
-  const startDeviceFlow = async () => {
+  async function startDeviceFlow() {
     setLoading(true);
     setError("");
     setStatus("");
+
     try {
-      const res = await fetch("/api/github/device/start", { method: "POST" });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Device flow failed");
+      const response = await fetch("/api/github/device/start", {
+        method: "POST",
+      });
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Không khởi động được device flow.");
+      }
+
       setDevice(data);
-      setStatus("Open GitHub and enter the code");
+      setStatus("Mở GitHub và nhập mã xác thực bên dưới.");
       startPolling(data.device_code, data.interval || 5);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Device flow failed");
+    } catch (deviceError) {
+      setError(
+        deviceError instanceof Error
+          ? deviceError.message
+          : "Không khởi động được GitHub device flow.",
+      );
     } finally {
       setLoading(false);
     }
-  };
+  }
 
-  const startPolling = (deviceCode: string, intervalSec: number) => {
+  function startPolling(deviceCode: string, intervalSec: number) {
     stopPolling();
     pollRef.current = window.setInterval(async () => {
       try {
-        const res = await fetch("/api/github/device/poll", {
+        const response = await fetch("/api/github/device/poll", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ device_code: deviceCode }),
         });
-        const data = await res.json();
+        const data = await response.json();
+
         if (data.status === "authorized") {
           stopPolling();
-          setStatus("Connected");
+          setStatus("Đã kết nối GitHub.");
           await fetchRepos();
-        } else if (data.status === "denied") {
+          return;
+        }
+
+        if (data.status === "denied") {
           stopPolling();
-          setError("Authorization denied");
-        } else if (data.status === "expired") {
+          setError("GitHub từ chối xác thực.");
+          return;
+        }
+
+        if (data.status === "expired") {
           stopPolling();
-          setError("Code expired. Try again.");
-        } else if (data.status === "slow_down") {
-          setStatus("Waiting for approval...");
-        } else if (data.status === "pending") {
-          setStatus("Waiting for approval...");
+          setError("Mã xác thực đã hết hạn. Hãy thử lại.");
+          return;
+        }
+
+        if (data.status === "slow_down" || data.status === "pending") {
+          setStatus("Đang chờ GitHub xác nhận...");
         }
       } catch {
         stopPolling();
-        setError("Polling failed");
+        setError("Không thể tiếp tục polling với GitHub.");
       }
     }, Math.max(intervalSec, 5) * 1000);
-  };
+  }
 
   useEffect(() => {
-    fetchRepos();
+    void fetchRepos();
     return () => stopPolling();
   }, []);
 
-  const handleDeploy = () => {
+  function handleDeploy() {
     const cloneUrl = manualCloneUrl || selectedRepoObj?.clone_url;
-    if (!cloneUrl) return;
-    if (!selectedVm) return;
+
+    if (!selectedVm || !cloneUrl) {
+      return;
+    }
+
     onDeploy(selectedVm, cloneUrl);
-  };
+  }
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4"
-      style={{ backgroundColor: "rgba(3,4,6,0.7)", backdropFilter: "blur(8px)" }}
-      onClick={(e) => {
-        if (e.target === e.currentTarget) onClose();
+      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/55 p-4 backdrop-blur-md"
+      onClick={(event) => {
+        if (event.target === event.currentTarget) {
+          onClose();
+        }
       }}
     >
-      <div className="relative w-full max-w-2xl">
-        <div className="absolute -inset-[1px] rounded-2xl bg-gradient-to-br from-emerald-400/30 via-sky-400/10 to-cyan-500/20 blur-sm" />
-        <div className="relative overflow-hidden rounded-2xl border border-white/10 bg-[#0f1115] shadow-2xl">
-          <div className="flex items-center justify-between px-5 py-4 border-b border-white/10">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center">
-                <GitBranch className="w-5 h-5 text-emerald-300" />
-              </div>
-              <div>
-                <h3 className="text-sm font-semibold text-white">Deploy from GitHub</h3>
-                <p className="text-xs text-gray-500">Connect and choose a public repo</p>
-              </div>
+      <div className="surface-panel relative w-full max-w-6xl overflow-hidden rounded-[2rem]">
+        <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-primary/40 to-transparent" />
+
+        <div className="flex items-center justify-between border-b border-border/70 px-5 py-5 sm:px-6">
+          <div className="flex items-start gap-4">
+            <div className="flex h-12 w-12 items-center justify-center rounded-[1.2rem] bg-foreground text-background shadow-[0_16px_40px_-24px_rgba(15,23,42,0.7)]">
+              <GitBranch className="h-5 w-5" />
             </div>
-            <button
-              onClick={onClose}
-              className="p-2 rounded-lg text-gray-500 hover:text-white hover:bg-white/10 transition"
-            >
-              <X className="w-5 h-5" />
-            </button>
+            <div>
+              <div className="inline-flex items-center gap-2 rounded-full border border-border/70 bg-background/70 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.24em] text-muted-foreground">
+                GitHub Relay
+              </div>
+              <h2 className="mt-3 text-2xl font-semibold tracking-tight text-foreground">
+                Triển khai repo lên VM
+              </h2>
+              <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                Dán repo public trực tiếp hoặc kết nối GitHub để chọn nhanh từ danh
+                sách repository của bạn.
+              </p>
+            </div>
           </div>
 
-          <div className="p-5 space-y-4">
-            {repos.length === 0 && (
-              <div className="rounded-xl border border-white/10 bg-black/40 p-4">
-                <div className="flex items-center justify-between gap-3">
-                  <div>
-                    <p className="text-sm text-white">Connect GitHub</p>
-                    <p className="text-xs text-gray-500">
-                      Use Device Flow to authorize this app.
-                    </p>
-                  </div>
-                  <button
-                    onClick={startDeviceFlow}
-                    disabled={loading}
-                    className="px-4 py-2 rounded-lg bg-emerald-400/90 hover:bg-emerald-300 text-black text-sm font-semibold disabled:opacity-50"
-                  >
-                    {loading ? "Starting..." : "Connect"}
-                  </button>
+          <button
+            type="button"
+            onClick={onClose}
+            className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-border/70 bg-background/70 text-muted-foreground transition hover:border-primary/30 hover:text-foreground"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+
+        <div className="grid gap-0 lg:grid-cols-[0.95fr_1.05fr]">
+          <section className="space-y-5 border-b border-border/70 px-5 py-5 lg:border-b-0 lg:border-r lg:px-6">
+            <div className="rounded-[1.6rem] border border-border/70 bg-background/70 p-5">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.22em] text-muted-foreground">
+                    1. Kết nối GitHub
+                  </p>
+                  <h3 className="mt-2 text-xl font-semibold tracking-tight text-foreground">
+                    OAuth Device Flow
+                  </h3>
+                  <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                    Phù hợp khi bạn muốn chọn repo từ tài khoản GitHub đã xác thực.
+                  </p>
                 </div>
-
-                {!device && !loading && !error && (
-                  <div className="mt-3 text-xs text-gray-500">
-                    No repos loaded yet. Connect GitHub or refresh after approval.
-                  </div>
+                {repos.length > 0 && (
+                  <span className="inline-flex items-center gap-2 rounded-full border border-emerald-500/20 bg-emerald-500/10 px-3 py-1.5 text-xs font-semibold text-emerald-300">
+                    <CheckCircle2 className="h-3.5 w-3.5" />
+                    Connected
+                  </span>
                 )}
+              </div>
 
-                {device && (
-                  <div className="mt-4 rounded-lg border border-white/10 bg-black/60 p-3 text-xs text-gray-400">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <div className="text-gray-500">Code</div>
-                        <div className="text-white text-sm font-semibold tracking-widest">
-                          {device.user_code}
-                        </div>
-                      </div>
-                      <a
-                        href={device.verification_uri}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="inline-flex items-center gap-1 text-emerald-300 hover:text-emerald-200"
-                      >
-                        Open GitHub <ExternalLink className="w-3 h-3" />
-                      </a>
+              <div className="mt-5 flex flex-wrap gap-3">
+                <button
+                  type="button"
+                  onClick={() => void startDeviceFlow()}
+                  disabled={loading}
+                  className="inline-flex items-center gap-2 rounded-full bg-foreground px-4 py-3 text-sm font-semibold text-background transition hover:opacity-90 disabled:opacity-60"
+                >
+                  {loading ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Đang khởi tạo...
+                    </>
+                  ) : (
+                    <>
+                      <GitBranch className="h-4 w-4" />
+                      Kết nối GitHub
+                    </>
+                  )}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => void fetchRepos()}
+                  className="inline-flex items-center gap-2 rounded-full border border-border/70 bg-card px-4 py-3 text-sm font-semibold text-foreground transition hover:border-primary/35 hover:text-primary"
+                >
+                  <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
+                  Làm mới repo
+                </button>
+              </div>
+
+              {device && (
+                <div className="mt-5 rounded-[1.3rem] border border-border/70 bg-card px-4 py-4">
+                  <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                      <p className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">
+                        Verification code
+                      </p>
+                      <p className="mt-2 text-2xl font-semibold tracking-[0.2em] text-foreground">
+                        {device.user_code}
+                      </p>
                     </div>
-                    {status && <div className="mt-2 text-gray-500">{status}</div>}
+                    <a
+                      href={device.verification_uri}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex items-center gap-2 rounded-full border border-border/70 bg-background/70 px-4 py-3 text-sm font-semibold text-foreground transition hover:border-primary/35 hover:text-primary"
+                    >
+                      Mở GitHub
+                      <ExternalLink className="h-4 w-4" />
+                    </a>
                   </div>
-                )}
 
-                {error && (
-                  <div className="mt-3 rounded-lg border border-red-500/30 bg-red-950/30 px-3 py-2 text-xs text-red-300">
-                    {error}
-                  </div>
-                )}
+                  {status && (
+                    <p className="mt-4 text-sm text-muted-foreground">{status}</p>
+                  )}
+                </div>
+              )}
+
+              {error && (
+                <div className="mt-5 rounded-[1.3rem] border border-rose-500/25 bg-rose-500/10 px-4 py-3 text-sm text-rose-200 dark:text-rose-300">
+                  {error}
+                </div>
+              )}
+            </div>
+
+            <div className="rounded-[1.6rem] border border-border/70 bg-background/70 p-5">
+              <p className="text-xs font-semibold uppercase tracking-[0.22em] text-muted-foreground">
+                2. Repo public trực tiếp
+              </p>
+              <h3 className="mt-2 text-xl font-semibold tracking-tight text-foreground">
+                Dán URL hoặc owner/repo
+              </h3>
+              <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                Cách này không cần GitHub OAuth. Ví dụ: `https://github.com/user/repo`
+                hoặc `user/repo`.
+              </p>
+
+              <input
+                value={repoInput}
+                onChange={(event) => setRepoInput(event.target.value)}
+                placeholder="https://github.com/user/repo hoặc user/repo"
+                className="mt-4 h-12 w-full rounded-[1rem] border border-border/70 bg-card px-4 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary/35 focus:outline-none"
+              />
+
+              {manualCloneUrl && (
+                <div className="mt-4 rounded-[1.2rem] border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-200 dark:text-emerald-300">
+                  Clone URL sẽ dùng: <span className="font-medium">{manualCloneUrl}</span>
+                </div>
+              )}
+            </div>
+
+            <div className="rounded-[1.6rem] border border-emerald-500/20 bg-emerald-500/10 p-4 text-sm text-emerald-200 dark:text-emerald-300">
+              <div className="flex items-start gap-3">
+                <ShieldCheck className="mt-0.5 h-4 w-4 flex-shrink-0" />
+                <p>
+                  Khi bấm deploy, giao diện sẽ mở Web SSH cho đúng VM và tự chạy
+                  lệnh `git clone` với repo bạn chọn.
+                </p>
               </div>
-            )}
+            </div>
+          </section>
 
-            <div className="rounded-xl border border-white/10 bg-black/40 p-4 space-y-3">
-              <div>
-                <label className="text-xs text-gray-400">Paste repo link (optional)</label>
+          <section className="space-y-5 px-5 py-5 lg:px-6">
+            <div className="rounded-[1.6rem] border border-border/70 bg-background/70 p-5">
+              <p className="text-xs font-semibold uppercase tracking-[0.22em] text-muted-foreground">
+                3. Chọn repository
+              </p>
+              <div className="mt-4 flex items-center gap-3 rounded-[1rem] border border-border/70 bg-card px-4 py-3">
+                <Search className="h-4 w-4 text-muted-foreground" />
                 <input
-                  value={repoInput}
-                  onChange={(e) => setRepoInput(e.target.value)}
-                  placeholder="https://github.com/user/repo"
-                  className="mt-1 w-full rounded-lg border border-white/10 bg-black/60 px-3 py-2 text-sm text-white"
+                  value={repoQuery}
+                  onChange={(event) => setRepoQuery(event.target.value)}
+                  placeholder="Lọc repo theo tên..."
+                  className="w-full bg-transparent text-sm text-foreground placeholder:text-muted-foreground focus:outline-none"
                 />
-                {manualCloneUrl && (
-                  <div className="mt-2 text-xs text-gray-500">
-                    Clone: <span className="text-gray-300">{manualCloneUrl}</span>
-                  </div>
-                )}
+              </div>
+
+              {repos.length > 0 ? (
+                <div className="mt-4 max-h-72 space-y-3 overflow-y-auto pr-1">
+                  {filteredRepos.map((repo) => {
+                    const selected = repo.full_name === selectedRepo;
+
+                    return (
+                      <button
+                        key={repo.id}
+                        type="button"
+                        onClick={() => setSelectedRepo(repo.full_name)}
+                        className={`w-full rounded-[1.2rem] border p-4 text-left transition ${
+                          selected
+                            ? "border-primary/40 bg-primary/10"
+                            : "border-border/70 bg-card hover:border-primary/25"
+                        }`}
+                      >
+                        <div className="flex items-center justify-between gap-4">
+                          <div>
+                            <p className="text-sm font-semibold text-foreground">
+                              {repo.full_name}
+                            </p>
+                            <p className="mt-1 text-xs uppercase tracking-[0.18em] text-muted-foreground">
+                              default branch: {repo.default_branch}
+                            </p>
+                          </div>
+                          {selected && <CheckCircle2 className="h-4 w-4 text-primary" />}
+                        </div>
+                      </button>
+                    );
+                  })}
+
+                  {filteredRepos.length === 0 && (
+                    <div className="rounded-[1.2rem] border border-dashed border-border/70 bg-card px-4 py-6 text-sm text-muted-foreground">
+                      Không có repo nào khớp từ khoá hiện tại.
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="mt-4 rounded-[1.2rem] border border-dashed border-border/70 bg-card px-4 py-6 text-sm text-muted-foreground">
+                  Chưa có repo nào từ GitHub OAuth. Bạn vẫn có thể dán repo public ở
+                  cột bên trái và deploy trực tiếp.
+                </div>
+              )}
+            </div>
+
+            <div className="rounded-[1.6rem] border border-border/70 bg-background/70 p-5">
+              <p className="text-xs font-semibold uppercase tracking-[0.22em] text-muted-foreground">
+                4. Chọn VM đích
+              </p>
+
+              <select
+                value={selectedVm}
+                onChange={(event) => setSelectedVm(event.target.value)}
+                className="mt-4 h-12 w-full rounded-[1rem] border border-border/70 bg-card px-4 text-sm text-foreground focus:border-primary/35 focus:outline-none"
+              >
+                <option value="">Chọn VM để deploy</option>
+                {vms.map((vm) => (
+                  <option key={vm.id} value={vm.id}>
+                    {vm.name} {vm.ip ? `(${vm.ip})` : "(chưa có IP)"}
+                  </option>
+                ))}
+              </select>
+
+              <div className="mt-4 space-y-3">
+                <SummaryRow
+                  label="Repository"
+                  value={manualCloneUrl || selectedRepoObj?.full_name || "Chưa chọn"}
+                />
+                <SummaryRow
+                  label="Clone URL"
+                  value={manualCloneUrl || selectedRepoObj?.clone_url || "Chưa có"}
+                />
+                <SummaryRow
+                  label="Target VM"
+                  value={
+                    vms.find((vm) => vm.id === selectedVm)?.name || "Chưa chọn"
+                  }
+                />
               </div>
             </div>
 
-            {repos.length > 0 && (
-              <div className="rounded-xl border border-white/10 bg-black/40 p-4 space-y-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2 text-sm text-white">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-300" /> Connected
-                  </div>
-                  <button
-                    onClick={fetchRepos}
-                    className="inline-flex items-center gap-1 text-xs text-gray-400 hover:text-white"
-                  >
-                    <RefreshCw className="w-3.5 h-3.5" /> Refresh
-                  </button>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  <div>
-                    <label className="text-xs text-gray-400">Repository</label>
-                    <select
-                      value={selectedRepo}
-                      onChange={(e) => setSelectedRepo(e.target.value)}
-                      className="mt-1 w-full rounded-lg border border-white/10 bg-black/60 px-3 py-2 text-sm text-white"
-                    >
-                      {repos.map((repo) => (
-                        <option key={repo.id} value={repo.full_name}>
-                          {repo.full_name}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="text-xs text-gray-400">Target VM</label>
-                    <select
-                      value={selectedVm}
-                      onChange={(e) => setSelectedVm(e.target.value)}
-                      className="mt-1 w-full rounded-lg border border-white/10 bg-black/60 px-3 py-2 text-sm text-white"
-                    >
-                      <option value="">Select a VM</option>
-                      {vms.map((vm) => (
-                        <option key={vm.id} value={vm.id}>
-                          {vm.name} {vm.ip ? `(${vm.ip})` : "(no IP)"}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-
-                {selectedRepoObj && !manualCloneUrl && (
-                  <div className="text-xs text-gray-500">
-                    Repo: <span className="text-gray-300">{selectedRepoObj.clone_url}</span>
-                  </div>
-                )}
-
-                <div className="flex items-center justify-end gap-2">
-                  <button
-                    onClick={handleDeploy}
-                    disabled={!selectedVm || (!manualCloneUrl && !selectedRepoObj)}
-                    className="px-4 py-2 rounded-lg bg-white text-black text-sm font-semibold hover:bg-gray-100 disabled:opacity-50"
-                  >
-                    Open Web SSH & Clone
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
+            <div className="flex flex-col gap-3">
+              <button
+                type="button"
+                onClick={handleDeploy}
+                disabled={!selectedVm || (!manualCloneUrl && !selectedRepoObj)}
+                className="inline-flex items-center justify-center gap-2 rounded-full bg-foreground px-5 py-3 text-sm font-semibold text-background transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                <GitBranch className="h-4 w-4" />
+                Mở Web SSH và clone repo
+              </button>
+              <button
+                type="button"
+                onClick={onClose}
+                className="inline-flex items-center justify-center rounded-full border border-border/70 bg-background/70 px-5 py-3 text-sm font-semibold text-foreground transition hover:border-primary/35 hover:text-primary"
+              >
+                Đóng panel
+              </button>
+            </div>
+          </section>
         </div>
       </div>
+    </div>
+  );
+}
+
+function SummaryRow({
+  label,
+  value,
+}: {
+  label: string;
+  value: string;
+}) {
+  return (
+    <div className="flex items-center justify-between gap-3 rounded-[1.1rem] border border-border/70 bg-card px-4 py-3">
+      <span className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">
+        {label}
+      </span>
+      <span className="max-w-[64%] truncate text-sm font-medium text-foreground">
+        {value}
+      </span>
     </div>
   );
 }

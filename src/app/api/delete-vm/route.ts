@@ -16,10 +16,11 @@ export async function DELETE(request: NextRequest) {
 
     await runCLI(`openstack server delete ${escapeShellArg(server_name)} --wait`);
     return NextResponse.json({ success: true, server_name });
-  } catch (err: any) {
-    console.error("[delete-vm] error:", err.message);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Delete VM failed.";
+    console.error("[delete-vm] error:", message);
     return NextResponse.json(
-      { success: false, error_message: err.message },
+      { success: false, error_message: message },
       { status: 500 }
     );
   }

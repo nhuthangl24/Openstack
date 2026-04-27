@@ -1,0 +1,1 @@
+GetDlgItemTextA(hwnd ,)
