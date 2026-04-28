@@ -2,11 +2,11 @@ import DashboardClientShell from "@/components/DashboardClientShell";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "OrbitStack Console",
+  title: "OrbitStack Mission Board",
   description:
-    "Điều phối máy ảo OpenStack, kết nối GitHub và mở Web SSH trong một giao diện mới gọn gàng hơn.",
+    "Mission Board cho OrbitStack: theo dõi toàn cảnh OpenStack, phiên GitHub và nhịp điều khiển hiện tại.",
 };
 
 export default function Home() {
-  return <DashboardClientShell />;
+  return <DashboardClientShell tab="mission" />;
 }

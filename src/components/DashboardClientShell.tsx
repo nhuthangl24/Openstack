@@ -3,6 +3,7 @@
 import dynamic from "next/dynamic";
 import { Loader2 } from "lucide-react";
 import GitHubAccessGate from "@/components/GitHubAccessGate";
+import type { ConsoleTab } from "@/components/Dashboard";
 
 const Dashboard = dynamic(() => import("@/components/Dashboard"), {
   ssr: false,
@@ -16,10 +17,14 @@ const Dashboard = dynamic(() => import("@/components/Dashboard"), {
   ),
 });
 
-export default function DashboardClientShell() {
+export default function DashboardClientShell({
+  tab = "mission",
+}: {
+  tab?: ConsoleTab;
+}) {
   return (
     <GitHubAccessGate>
-      <Dashboard />
+      <Dashboard tab={tab} />
     </GitHubAccessGate>
   );
 }

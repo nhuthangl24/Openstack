@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import Image from "next/image";
 import {
   useCallback,
@@ -77,6 +78,12 @@ interface GitHubUser {
 type FilterKey = "all" | "ready" | "building" | "attention";
 type SortKey = "status" | "name" | "ip";
 type ViewMode = "grid" | "list";
+export type ConsoleTab =
+  | "mission"
+  | "fleet"
+  | "launch"
+  | "inspect"
+  | "command";
 
 const SSH_USER = "ubuntu";
 const AUTO_REFRESH_KEY = "orbitstack:auto-refresh";
@@ -887,17 +894,24 @@ function ControlPlaneCard({
 function NavbarLink({
   href,
   label,
+  active = false,
 }: {
   href: string;
   label: string;
+  active?: boolean;
 }) {
   return (
-    <a
+    <Link
       href={href}
-      className="rounded-[0.8rem] border border-transparent px-3 py-2 text-sm font-medium text-muted-foreground transition hover:border-border/70 hover:bg-background/70 hover:text-foreground"
+      aria-current={active ? "page" : undefined}
+      className={`rounded-[0.8rem] border px-3 py-2 text-sm font-medium transition ${
+        active
+          ? "border-border/70 bg-background/80 text-foreground"
+          : "border-transparent text-muted-foreground hover:border-border/70 hover:bg-background/70 hover:text-foreground"
+      }`}
     >
       {label}
-    </a>
+    </Link>
   );
 }
 
@@ -943,7 +957,11 @@ function FooterStatus({
   );
 }
 
-export default function Dashboard() {
+export default function Dashboard({
+  tab = "mission",
+}: {
+  tab?: ConsoleTab;
+}) {
   const [vms, setVMs] = useState<VM[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -1212,10 +1230,748 @@ export default function Dashboard() {
   }
 
   const headerTitle = loading ? "Đang tải fleet..." : `${total} VM trong hệ thống`;
+  const navigationItems: Array<{
+    href: string;
+    key: ConsoleTab;
+    label: string;
+  }> = [
+    { href: "/", key: "mission", label: "Mission Board" },
+    { href: "/fleet", key: "fleet", label: "Fleet Matrix" },
+    { href: "/launch", key: "launch", label: "Launch Kits" },
+    { href: "/inspect", key: "inspect", label: "Inspector" },
+    { href: "/command", key: "command", label: "Command Deck" },
+  ];
+
+  const sessionCard = (
+    <GitHubSessionCard
+      user={githubUser}
+      loading={githubLoading}
+      refreshing={githubRefreshing}
+      selectedVm={selectedVm}
+      onRefresh={() => void fetchGitHubStatus({ silent: true })}
+      onDeploy={() => openGitHub(selectedVm?.id)}
+      onLogout={handleLogout}
+    />
+  );
+
+  const controlPlanePanel = (
+    <ControlPlaneCard
+      total={total}
+      visible={visibleVMs.length}
+      attentionCount={attentionCount}
+      lastUpdated={lastUpdated}
+      autoRefresh={autoRefresh}
+      selectedVm={selectedVm}
+      onRefreshFleet={() => void fetchFleet({ silent: true })}
+      onCreate={() => {
+        setCreatePresetKey(null);
+        setShowCreate(true);
+      }}
+      onCopySnapshot={() =>
+        void tryCopy(
+          buildInventoryText(visibleVMs),
+          "Đã copy snapshot fleet.",
+        )
+      }
+    />
+  );
+
+  const opsRail = (
+    <div className="space-y-4">
+      <div className="surface-panel rounded-[1.5rem] p-5">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-muted-foreground">
+              Ops Rail
+            </p>
+            <h2 className="mt-2 text-2xl font-semibold tracking-tight text-foreground">
+              Dock thao tác nhanh
+            </h2>
+          </div>
+          <Workflow className="h-5 w-5 text-primary" />
+        </div>
+
+        <div className="mt-5 grid gap-3">
+          <button
+            type="button"
+            onClick={() => {
+              setCreatePresetKey(null);
+              setShowCreate(true);
+            }}
+            className="inline-flex w-full items-center justify-between rounded-[1rem] bg-foreground px-4 py-3.5 text-left text-sm font-semibold text-background transition hover:opacity-90"
+          >
+            <span className="inline-flex items-center gap-2">
+              <Plus className="h-4 w-4" />
+              Tạo VM mới
+            </span>
+            <ArrowUpRight className="h-4 w-4" />
+          </button>
+
+          <button
+            type="button"
+            onClick={() => void fetchFleet({ silent: true })}
+            className="inline-flex w-full items-center justify-between rounded-[1rem] border border-border/70 bg-background/75 px-4 py-3.5 text-left text-sm font-semibold text-foreground transition hover:border-primary/35 hover:text-primary"
+          >
+            <span className="inline-flex items-center gap-2">
+              <RefreshCw className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />
+              Đồng bộ fleet
+            </span>
+            <span className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
+              live
+            </span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => openGitHub(selectedVm?.id)}
+            className="inline-flex w-full items-center justify-between rounded-[1rem] border border-border/70 bg-background/75 px-4 py-3.5 text-left text-sm font-semibold text-foreground transition hover:border-primary/35 hover:text-primary"
+          >
+            <span className="inline-flex items-center gap-2">
+              <GitBranch className="h-4 w-4" />
+              Mở repo pipeline
+            </span>
+            <ArrowUpRight className="h-4 w-4" />
+          </button>
+
+          <button
+            type="button"
+            onClick={() =>
+              void tryCopy(
+                buildInventoryText(visibleVMs),
+                "Đã copy snapshot fleet.",
+              )
+            }
+            className="inline-flex w-full items-center justify-between rounded-[1rem] border border-border/70 bg-background/75 px-4 py-3.5 text-left text-sm font-semibold text-foreground transition hover:border-primary/35 hover:text-primary"
+          >
+            <span className="inline-flex items-center gap-2">
+              <Copy className="h-4 w-4" />
+              Copy fleet snapshot
+            </span>
+            <ArrowUpRight className="h-4 w-4" />
+          </button>
+        </div>
+
+        <div className="mt-5 grid gap-3">
+          <InfoMiniCard
+            icon={Network}
+            label="Gateway"
+            value={selectedVm?.ip || "Chưa chọn VM có IP"}
+            accent
+          />
+          <InfoMiniCard
+            icon={Cpu}
+            label="SSH Ready"
+            value={`${total ? Math.round((readyCount / total) * 100) : 0}% VM có thể vào Web SSH`}
+          />
+        </div>
+      </div>
+
+      <div className="surface-panel rounded-[1.5rem] p-5">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-muted-foreground">
+          Deploy Stack
+        </p>
+        <div className="mt-4 space-y-3">
+          {[
+            "Repo từ GitHub đã link hoặc repo ngoài",
+            "Sinh file .env theo biến môi trường",
+            "Install command và after deploy command",
+            "Web SSH nhận sẵn workflow để chạy tiếp",
+          ].map((item) => (
+            <div
+              key={item}
+              className="rounded-[0.95rem] border border-border/70 bg-background/70 px-4 py-3 text-sm text-foreground"
+            >
+              {item}
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+
+  const buildModesPanel = (
+    <div className="surface-panel rounded-[1.5rem] p-5">
+      <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-muted-foreground">
+        Build Modes
+      </p>
+      <div className="mt-4 grid gap-3">
+        <InfoMiniCard
+          icon={Boxes}
+          label="Node / Python / Docker"
+          value="Recipe deploy đổi theo stack thay vì chỉ git clone."
+        />
+        <InfoMiniCard
+          icon={Database}
+          label="Biến môi trường"
+          value="File .env được tạo tự động nếu bạn truyền env trong modal."
+        />
+        <InfoMiniCard
+          icon={GitBranch}
+          label="Repo ngoài"
+          value="Hỗ trợ URL ngoài hoặc owner/repo để cấy source nhanh."
+        />
+      </div>
+    </div>
+  );
+
+  const inspectorPanel = (
+    <div className="surface-panel rounded-[1.5rem] p-5 sm:p-6">
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-muted-foreground">
+            VM Inspector
+          </p>
+          <h2 className="mt-2 text-2xl font-semibold tracking-tight text-foreground">
+            {selectedVm ? selectedVm.name : "Chọn một VM"}
+          </h2>
+        </div>
+        {selectedVm && <StatusBadge status={selectedVm.status} />}
+      </div>
+
+      {selectedVm ? (
+        <>
+          <p className="mt-3 text-sm leading-6 text-muted-foreground">
+            {getStatusMeta(selectedVm.status).description}
+          </p>
+
+          <div className="mt-5 space-y-3">
+            <DetailRow label="IP" value={selectedVm.ip || "Chưa cấp IP"} />
+            <DetailRow label="Flavor" value={selectedVm.flavor || "Chưa rõ"} />
+            <DetailRow label="Image" value={selectedVm.image || "Chưa rõ"} />
+            <DetailRow label="SSH user" value={SSH_USER} />
+          </div>
+
+          <div className="mt-5 rounded-[1.2rem] border border-border/70 bg-background/75 p-4">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">
+              Action Dock
+            </p>
+            <div className="mt-4 flex flex-wrap gap-2">
+              {selectedVm.ip && (
+                <>
+                  <CopyChip
+                    text={`ssh ${SSH_USER}@${selectedVm.ip}`}
+                    label="Copy SSH"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setSshSession({ vm: selectedVm })}
+                    className="inline-flex items-center gap-2 rounded-[0.85rem] border border-border/70 bg-background/70 px-3 py-2 text-xs font-semibold text-foreground transition hover:border-primary/35 hover:text-primary"
+                  >
+                    <Terminal className="h-3.5 w-3.5" />
+                    Mở Web SSH
+                  </button>
+                </>
+              )}
+
+              <button
+                type="button"
+                onClick={() => openGitHub(selectedVm.id)}
+                className="inline-flex items-center gap-2 rounded-[0.85rem] border border-border/70 bg-background/70 px-3 py-2 text-xs font-semibold text-foreground transition hover:border-primary/35 hover:text-primary"
+              >
+                <GitBranch className="h-3.5 w-3.5" />
+                Repo pipeline
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleDelete(selectedVm.name)}
+                disabled={deletingName === selectedVm.name}
+                className="inline-flex items-center gap-2 rounded-[0.85rem] border border-rose-500/20 bg-rose-500/10 px-3 py-2 text-xs font-semibold text-rose-300 transition hover:border-rose-500/35 hover:bg-rose-500/15 disabled:opacity-50"
+              >
+                {deletingName === selectedVm.name ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <Trash2 className="h-3.5 w-3.5" />
+                )}
+                Xóa VM
+              </button>
+            </div>
+          </div>
+        </>
+      ) : (
+        <div className="mt-5 rounded-[1.25rem] border border-dashed border-border/70 bg-background/60 p-6 text-sm leading-6 text-muted-foreground">
+          Chọn một VM trong fleet để inspector hiển thị IP, SSH, trạng thái và các
+          nút thao tác nhanh theo đúng máy đang focus.
+        </div>
+      )}
+    </div>
+  );
+
+  const launchKitsPanel = (
+    <div className="surface-panel rounded-[1.5rem] p-5 sm:p-6">
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-muted-foreground">
+            Launch Kits
+          </p>
+          <h2 className="mt-2 text-3xl font-semibold tracking-tight text-foreground">
+            Preset để bắn VM nhanh hơn nhiều
+          </h2>
+        </div>
+        <Sparkles className="h-5 w-5 text-primary" />
+      </div>
+      <p className="mt-3 max-w-3xl text-sm leading-7 text-muted-foreground">
+        Chọn thẳng preset thay vì lướt một landing page dài. Mỗi kit sẽ mở modal
+        tạo VM với cấu hình gợi ý riêng cho stack của bạn.
+      </p>
+
+      <div className="mt-6 grid gap-4 lg:grid-cols-2">
+        {serverPresets.map((preset) => (
+          <PresetCard
+            key={preset.key}
+            presetKey={preset.key}
+            onClick={openPreset}
+          />
+        ))}
+      </div>
+    </div>
+  );
+
+  const fleetAlert = error ? (
+    <div className="rounded-[1.3rem] border border-rose-500/25 bg-rose-500/10 px-5 py-4 text-sm text-rose-200 dark:text-rose-300">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-start gap-3">
+          <CircleAlert className="mt-0.5 h-4 w-4 flex-shrink-0" />
+          <p>{error}</p>
+        </div>
+        <button
+          type="button"
+          onClick={() => void fetchFleet()}
+          className="inline-flex items-center gap-2 rounded-[0.9rem] border border-rose-500/30 px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-rose-200 transition hover:bg-rose-500/10"
+        >
+          <RefreshCw className="h-3.5 w-3.5" />
+          Thử lại
+        </button>
+      </div>
+    </div>
+  ) : null;
+
+  const fleetCollection = loading ? (
+    <FleetSkeleton />
+  ) : total === 0 ? (
+    <EmptyFleet
+      onCreate={() => {
+        setCreatePresetKey(null);
+        setShowCreate(true);
+      }}
+      onPreset={openPreset}
+    />
+  ) : visibleVMs.length === 0 ? (
+    <div className="surface-panel rounded-[1.5rem] p-8 text-center">
+      <h3 className="text-2xl font-semibold tracking-tight text-foreground">
+        Không có VM nào khớp bộ lọc hiện tại
+      </h3>
+      <p className="mt-3 text-sm text-muted-foreground">
+        Thử đổi filter, bỏ từ khóa tìm kiếm hoặc làm mới snapshot fleet.
+      </p>
+    </div>
+  ) : viewMode === "grid" ? (
+    <div className="grid gap-4 md:grid-cols-2">
+      {visibleVMs.map((vm) => (
+        <ServerCard
+          key={vm.id}
+          vm={vm}
+          selected={selectedVmId === vm.id}
+          deleting={deletingName === vm.name}
+          onSelect={() => setSelectedVmId(vm.id)}
+          onDelete={handleDelete}
+          onTerminal={(target) => setSshSession({ vm: target })}
+          onGitHub={openGitHub}
+        />
+      ))}
+    </div>
+  ) : (
+    <div className="space-y-3">
+      {visibleVMs.map((vm) => (
+        <ServerRow
+          key={vm.id}
+          vm={vm}
+          selected={selectedVmId === vm.id}
+          deleting={deletingName === vm.name}
+          onSelect={() => setSelectedVmId(vm.id)}
+          onDelete={handleDelete}
+          onTerminal={(target) => setSshSession({ vm: target })}
+          onGitHub={openGitHub}
+        />
+      ))}
+    </div>
+  );
+
+  const fleetMatrixPanel = (
+    <div className="surface-panel rounded-[1.7rem] p-5 sm:p-6">
+      <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+        <div className="min-w-0 flex-1 pr-0 xl:pr-6">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-muted-foreground">
+            Fleet Matrix
+          </p>
+          <h2 className="mt-2 max-w-3xl text-3xl font-semibold leading-tight tracking-tight text-foreground">
+            Điều phối máy ảo như một bảng vận hành, không còn kiểu landing block.
+          </h2>
+        </div>
+
+        <div className="flex shrink-0 flex-wrap gap-2 xl:justify-end">
+          <button
+            type="button"
+            onClick={() =>
+              void tryCopy(
+                buildInventoryText(visibleVMs),
+                "Đã copy snapshot fleet.",
+              )
+            }
+            className="inline-flex items-center gap-2 rounded-[0.95rem] border border-border/70 bg-background/75 px-4 py-2.5 text-sm font-semibold text-foreground transition hover:border-primary/35 hover:text-primary"
+          >
+            <Copy className="h-4 w-4" />
+            Snapshot
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setAutoRefresh((current) => !current)}
+            className={`inline-flex items-center gap-2 rounded-[0.95rem] border px-4 py-2.5 text-sm font-semibold transition ${
+              autoRefresh
+                ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-300"
+                : "border-border/70 bg-background/75 text-foreground hover:border-primary/35 hover:text-primary"
+            }`}
+          >
+            <RefreshCw className={`h-4 w-4 ${autoRefresh ? "animate-spin" : ""}`} />
+            {autoRefresh ? "Auto refresh bật" : "Auto refresh tắt"}
+          </button>
+        </div>
+      </div>
+
+      <div className="mt-5 grid gap-4 xl:grid-cols-[minmax(0,1fr)_auto_auto]">
+        <div className="flex items-center gap-3 rounded-[1.15rem] border border-border/70 bg-background/75 px-4 py-3">
+          <Search className="h-4 w-4 text-muted-foreground" />
+          <input
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder="Tìm theo tên, IP, flavor, image..."
+            className="w-full bg-transparent text-sm text-foreground placeholder:text-muted-foreground focus:outline-none"
+          />
+        </div>
+
+        <label className="inline-flex items-center gap-3 rounded-[1.15rem] border border-border/70 bg-background/75 px-4 py-3 text-sm font-medium text-foreground">
+          <span>Sắp xếp</span>
+          <select
+            value={sortBy}
+            onChange={(event) => setSortBy(event.target.value as SortKey)}
+            className="bg-transparent text-sm text-foreground outline-none"
+          >
+            <option value="status">Theo trạng thái</option>
+            <option value="name">Theo tên</option>
+            <option value="ip">Theo IP</option>
+          </select>
+        </label>
+
+        <div className="inline-flex rounded-[1rem] border border-border/70 bg-background/75 p-1">
+          <button
+            type="button"
+            onClick={() => setViewMode("grid")}
+            className={`rounded-[0.8rem] px-3 py-2 text-sm font-semibold transition ${
+              viewMode === "grid"
+                ? "bg-foreground text-background"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            <Grid2X2 className="h-4 w-4" />
+          </button>
+          <button
+            type="button"
+            onClick={() => setViewMode("list")}
+            className={`rounded-[0.8rem] px-3 py-2 text-sm font-semibold transition ${
+              viewMode === "list"
+                ? "bg-foreground text-background"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            <LayoutList className="h-4 w-4" />
+          </button>
+        </div>
+      </div>
+
+      <div className="mt-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+        <div className="flex flex-wrap gap-2">
+          {[
+            { key: "all" as const, label: "Tất cả", count: total },
+            { key: "ready" as const, label: "Sẵn sàng", count: readyCount },
+            { key: "building" as const, label: "Provisioning", count: buildingCount },
+            { key: "attention" as const, label: "Cần chú ý", count: attentionCount },
+          ].map((item) => (
+            <button
+              key={item.key}
+              type="button"
+              onClick={() => setFilter(item.key)}
+              className={`inline-flex items-center gap-2 rounded-[0.95rem] border px-4 py-2 text-sm font-semibold transition ${
+                filter === item.key
+                  ? "border-primary/35 bg-primary/10 text-primary"
+                  : "border-border/70 bg-background/75 text-foreground hover:border-primary/25 hover:text-primary"
+              }`}
+            >
+              <span>{item.label}</span>
+              <span className="rounded-full bg-background/75 px-2 py-0.5 text-xs text-muted-foreground">
+                {item.count}
+              </span>
+            </button>
+          ))}
+        </div>
+
+        <div className="rounded-[0.95rem] border border-border/70 bg-background/75 px-4 py-2 text-sm text-muted-foreground">
+          Hiển thị {visibleVMs.length} / {total} VM
+        </div>
+      </div>
+    </div>
+  );
+
+  const missionPage = (
+    <section className="mt-6 grid gap-4 xl:grid-cols-[280px_minmax(0,1fr)_360px] xl:items-start">
+      <aside>{opsRail}</aside>
+
+      <div className="space-y-4">
+        <div className="surface-panel surface-noise overflow-hidden rounded-[1.8rem] p-5 sm:p-6">
+          <div className="inline-flex items-center gap-2 rounded-full border border-border/70 bg-background/72 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.22em] text-muted-foreground">
+            <span
+              className={`h-2 w-2 rounded-full ${
+                error ? "bg-rose-400" : "bg-emerald-400"
+              }`}
+            />
+            {error ? "Control plane cần kiểm tra" : "Mission board đang hoạt động"}
+          </div>
+
+          <h1 className="mt-5 max-w-4xl text-3xl font-semibold leading-tight tracking-tight text-foreground sm:text-4xl xl:text-[3.7rem]">
+            Mỗi tab là một workspace riêng, không còn là một landing page kéo dài.
+          </h1>
+          <p className="mt-5 max-w-3xl text-sm leading-7 text-muted-foreground sm:text-base">
+            Mission Board giờ chỉ tập trung vào bức tranh tổng thể: trạng thái
+            OpenStack, nhịp cập nhật, phiên GitHub và VM đang được khóa làm mục tiêu.
+          </p>
+
+          <div className="mt-6 grid gap-3 lg:grid-cols-3">
+            <MetricCard
+              icon={Server}
+              label="Fleet Live"
+              value={total}
+              helper={headerTitle}
+            />
+            <MetricCard
+              icon={ShieldCheck}
+              label="SSH Ready"
+              value={readyCount}
+              helper={`${activeCount} VM đang ACTIVE`}
+            />
+            <MetricCard
+              icon={CircleAlert}
+              label="Attention"
+              value={attentionCount}
+              helper={error || "Theo dõi VM lỗi, tắt hoặc chưa cấp IP"}
+            />
+          </div>
+
+          <div className="mt-6 grid gap-3 lg:grid-cols-3">
+            <HeroFeatureCard
+              icon={RefreshCw}
+              label="Provisioning"
+              value={`${buildingCount} workflow`}
+              helper={`Cập nhật lần cuối ${formatLastUpdated(lastUpdated)}`}
+            />
+            <HeroFeatureCard
+              icon={GitBranch}
+              label="Repo Relay"
+              value={githubUser ? `@${githubUser.login}` : "GitHub gate đang chờ"}
+              helper="Repo linked và repo ngoài được gom vào cùng một flow deploy."
+            />
+            <HeroFeatureCard
+              icon={Terminal}
+              label="VM Focus"
+              value={selectedVm?.name || "Chưa khóa VM"}
+              helper="Inspector và Web SSH sẽ dùng máy đang focus làm mục tiêu mặc định."
+            />
+          </div>
+        </div>
+      </div>
+
+      <aside className="space-y-4">
+        {sessionCard}
+        {buildModesPanel}
+      </aside>
+    </section>
+  );
+
+  const fleetPage = (
+    <section className="mt-6 grid gap-4 xl:grid-cols-[280px_minmax(0,1fr)_360px] xl:items-start">
+      <aside>{opsRail}</aside>
+      <div className="space-y-4">
+        {fleetMatrixPanel}
+        {fleetAlert}
+        {fleetCollection}
+      </div>
+      <aside className="space-y-4">
+        {controlPlanePanel}
+        {inspectorPanel}
+      </aside>
+    </section>
+  );
+
+  const launchPage = (
+    <section className="mt-6 grid gap-4 xl:grid-cols-[280px_minmax(0,1fr)_360px] xl:items-start">
+      <aside>{opsRail}</aside>
+      <div className="space-y-4">
+        {launchKitsPanel}
+        <div className="surface-panel rounded-[1.5rem] p-5 sm:p-6">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-muted-foreground">
+            Launch Notes
+          </p>
+          <div className="mt-4 grid gap-3 lg:grid-cols-3">
+            <HeroFeatureCard
+              icon={Boxes}
+              label="Preset Speed"
+              value="1 click"
+              helper="Mỗi launch kit đẩy thẳng sang modal tạo VM với gợi ý đúng stack."
+            />
+            <HeroFeatureCard
+              icon={Database}
+              label="Env Setup"
+              value="Đã tích hợp"
+              helper="Có thể sinh file .env từ bước deploy sau khi máy khởi tạo xong."
+            />
+            <HeroFeatureCard
+              icon={Terminal}
+              label="Post Deploy"
+              value="Hook sẵn"
+              helper="Sau khi tạo máy xong có thể nối thẳng sang Web SSH để cài tiếp."
+            />
+          </div>
+        </div>
+      </div>
+      <aside className="space-y-4">
+        {sessionCard}
+        {buildModesPanel}
+      </aside>
+    </section>
+  );
+
+  const inspectPage = (
+    <section className="mt-6 grid gap-4 xl:grid-cols-[minmax(0,1fr)_360px] xl:items-start">
+      <div className="space-y-4">
+        {fleetMatrixPanel}
+        {fleetAlert}
+        <div className="surface-panel rounded-[1.5rem] p-5 sm:p-6">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-muted-foreground">
+            VM Selector
+          </p>
+          <h2 className="mt-2 text-3xl font-semibold tracking-tight text-foreground">
+            Chọn máy ở đây để khoá inspector bên phải
+          </h2>
+          <div className="mt-5 space-y-3">
+            {loading ? (
+              <FleetSkeleton />
+            ) : visibleVMs.length === 0 ? (
+              <div className="rounded-[1.2rem] border border-dashed border-border/70 bg-background/60 p-6 text-sm text-muted-foreground">
+                Không có máy nào khả dụng để inspect trong bộ lọc hiện tại.
+              </div>
+            ) : (
+              visibleVMs.map((vm) => (
+                <ServerRow
+                  key={vm.id}
+                  vm={vm}
+                  selected={selectedVmId === vm.id}
+                  deleting={deletingName === vm.name}
+                  onSelect={() => setSelectedVmId(vm.id)}
+                  onDelete={handleDelete}
+                  onTerminal={(target) => setSshSession({ vm: target })}
+                  onGitHub={openGitHub}
+                />
+              ))
+            )}
+          </div>
+        </div>
+      </div>
+
+      <aside className="space-y-4">
+        {inspectorPanel}
+        {sessionCard}
+        {controlPlanePanel}
+      </aside>
+    </section>
+  );
+
+  const commandPage = (
+    <section className="mt-6 grid gap-4 xl:grid-cols-[280px_minmax(0,1fr)_360px] xl:items-start">
+      <aside>{opsRail}</aside>
+      <div className="space-y-4">
+        <div className="surface-panel surface-noise rounded-[1.5rem] p-5 sm:p-6">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-muted-foreground">
+            Command Deck
+          </p>
+          <h2 className="mt-2 text-3xl font-semibold tracking-tight text-foreground">
+            Trung tâm điều phối deploy, runtime và phiên điều khiển
+          </h2>
+          <p className="mt-3 max-w-3xl text-sm leading-7 text-muted-foreground">
+            Trang này gom các trạng thái quan trọng nhất để vận hành: session GitHub,
+            tốc độ refresh fleet, máy đang focus và mô hình deploy mới hỗ trợ repo
+            ngoài, biến môi trường, install command và hook sau triển khai.
+          </p>
+
+          <div className="mt-6 grid gap-4 lg:grid-cols-3">
+            <FooterStatus label="Fleet hiển thị" value={`${visibleVMs.length}/${total} VM`} />
+            <FooterStatus
+              label="GitHub session"
+              value={githubUser ? `@${githubUser.login}` : "Chưa đồng bộ"}
+            />
+            <FooterStatus
+              label="Auto refresh"
+              value={autoRefresh ? "Bật mỗi 15 giây" : "Đang tắt"}
+            />
+            <FooterStatus label="VM focus" value={selectedVm?.name || "Chưa chọn VM"} />
+            <FooterStatus label="SSH user" value={SSH_USER} />
+            <FooterStatus
+              label="Repo workflow"
+              value="Clone, env, install, post deploy"
+            />
+          </div>
+        </div>
+
+        <div className="surface-panel rounded-[1.5rem] p-5 sm:p-6">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-muted-foreground">
+            Runtime Notes
+          </p>
+          <div className="mt-4 space-y-3">
+            <div className="rounded-[1rem] border border-border/70 bg-background/70 px-4 py-3 text-sm text-foreground">
+              OpenStack CLI vẫn chạy trên server có openrc, không đổi kiến trúc nền.
+            </div>
+            <div className="rounded-[1rem] border border-border/70 bg-background/70 px-4 py-3 text-sm text-foreground">
+              GitHub login là OAuth callback flow, không còn device code.
+            </div>
+            <div className="rounded-[1rem] border border-border/70 bg-background/70 px-4 py-3 text-sm text-foreground">
+              Deploy repo đã hỗ trợ repo ngoài, biến môi trường và hook sau cài đặt.
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <aside className="space-y-4">
+        {sessionCard}
+        {controlPlanePanel}
+        {inspectorPanel}
+      </aside>
+    </section>
+  );
+
+  const pageContent =
+    tab === "fleet"
+      ? fleetPage
+      : tab === "launch"
+        ? launchPage
+        : tab === "inspect"
+          ? inspectPage
+          : tab === "command"
+            ? commandPage
+            : missionPage;
 
   return (
     <div className="relative min-h-screen overflow-hidden">
       <div className="pointer-events-none absolute inset-0">
+        <div className="absolute inset-y-0 left-[4%] w-px bg-gradient-to-b from-transparent via-border/60 to-transparent" />
+        <div className="absolute inset-y-0 right-[4%] w-px bg-gradient-to-b from-transparent via-border/40 to-transparent" />
         <div className="absolute left-[-12rem] top-[-10rem] h-[26rem] w-[26rem] rounded-full bg-cyan-400/15 blur-3xl dark:bg-cyan-500/18" />
         <div className="absolute right-[-8rem] top-24 h-[22rem] w-[22rem] rounded-full bg-amber-300/20 blur-3xl dark:bg-amber-400/12" />
         <div className="absolute bottom-[-12rem] left-1/2 h-[26rem] w-[26rem] -translate-x-1/2 rounded-full bg-emerald-300/14 blur-3xl dark:bg-emerald-500/10" />
@@ -1233,17 +1989,20 @@ export default function Dashboard() {
                   OrbitStack // Workbench
                 </p>
                 <p className="text-sm font-semibold text-foreground">
-                  OpenStack control shell cho van hanh that
+                  OpenStack control shell cho vận hành thật
                 </p>
               </div>
             </div>
 
             <div className="flex flex-wrap items-center gap-2 xl:justify-center">
-              <NavbarLink href="#mission" label="Mission Board" />
-              <NavbarLink href="#fleet" label="Fleet Matrix" />
-              <NavbarLink href="#launch" label="Launch Kits" />
-              <NavbarLink href="#inspect" label="Inspector" />
-              <NavbarLink href="#footer" label="Command Deck" />
+              {navigationItems.map((item) => (
+                <NavbarLink
+                  key={item.key}
+                  href={item.href}
+                  label={item.label}
+                  active={tab === item.key}
+                />
+              ))}
             </div>
 
             <div className="flex flex-wrap items-center gap-3 xl:justify-end">
@@ -1255,644 +2014,14 @@ export default function Dashboard() {
           </div>
         </nav>
 
-        <header
-          id="mission"
-          className="mt-4 grid gap-4 xl:grid-cols-[280px_minmax(0,1fr)_360px] xl:items-start"
-        >
-          <aside className="space-y-4">
-            <div className="surface-panel rounded-[1.5rem] p-5">
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-muted-foreground">
-                    Ops Rail
-                  </p>
-                  <h2 className="mt-2 text-2xl font-semibold tracking-tight text-foreground">
-                    Dock thao tác nhanh
-                  </h2>
-                </div>
-                <Workflow className="h-5 w-5 text-primary" />
-              </div>
+        {pageContent}
 
-              <div className="mt-5 grid gap-3">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setCreatePresetKey(null);
-                    setShowCreate(true);
-                  }}
-                  className="inline-flex w-full items-center justify-between rounded-[1rem] bg-foreground px-4 py-3.5 text-left text-sm font-semibold text-background transition hover:opacity-90"
-                >
-                  <span className="inline-flex items-center gap-2">
-                    <Plus className="h-4 w-4" />
-                    Tạo VM mới
-                  </span>
-                  <ArrowUpRight className="h-4 w-4" />
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => void fetchFleet({ silent: true })}
-                  className="inline-flex w-full items-center justify-between rounded-[1rem] border border-border/70 bg-background/75 px-4 py-3.5 text-left text-sm font-semibold text-foreground transition hover:border-primary/35 hover:text-primary"
-                >
-                  <span className="inline-flex items-center gap-2">
-                    <RefreshCw className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />
-                    Đồng bộ fleet
-                  </span>
-                  <span className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
-                    live
-                  </span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => openGitHub(selectedVm?.id)}
-                  className="inline-flex w-full items-center justify-between rounded-[1rem] border border-border/70 bg-background/75 px-4 py-3.5 text-left text-sm font-semibold text-foreground transition hover:border-primary/35 hover:text-primary"
-                >
-                  <span className="inline-flex items-center gap-2">
-                    <GitBranch className="h-4 w-4" />
-                    Mở repo pipeline
-                  </span>
-                  <ArrowUpRight className="h-4 w-4" />
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() =>
-                    void tryCopy(
-                      buildInventoryText(visibleVMs),
-                      "Đã copy snapshot fleet.",
-                    )
-                  }
-                  className="inline-flex w-full items-center justify-between rounded-[1rem] border border-border/70 bg-background/75 px-4 py-3.5 text-left text-sm font-semibold text-foreground transition hover:border-primary/35 hover:text-primary"
-                >
-                  <span className="inline-flex items-center gap-2">
-                    <Copy className="h-4 w-4" />
-                    Copy fleet snapshot
-                  </span>
-                  <ArrowUpRight className="h-4 w-4" />
-                </button>
-              </div>
-
-              <div className="mt-5 grid gap-3">
-                <InfoMiniCard
-                  icon={Network}
-                  label="Gateway"
-                  value={selectedVm?.ip || "Chưa chọn VM có IP"}
-                  accent
-                />
-                <InfoMiniCard
-                  icon={Cpu}
-                  label="SSH Ready"
-                  value={`${total ? Math.round((readyCount / total) * 100) : 0}% VM có thể vào Web SSH`}
-                />
-              </div>
-            </div>
-
-            <div className="surface-panel rounded-[1.5rem] p-5">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-muted-foreground">
-                Deploy Stack
-              </p>
-              <div className="mt-4 space-y-3">
-                {[
-                  "Repo từ GitHub đã link hoặc repo ngoài",
-                  "Sinh file .env theo biến môi trường",
-                  "Install command và after deploy command",
-                  "Web SSH nhận sẵn workflow để chạy tiếp",
-                ].map((item) => (
-                  <div
-                    key={item}
-                    className="rounded-[0.95rem] border border-border/70 bg-background/70 px-4 py-3 text-sm text-foreground"
-                  >
-                    {item}
-                  </div>
-                ))}
-              </div>
-            </div>
-          </aside>
-
-          <div className="space-y-4">
-            <div className="surface-panel surface-noise overflow-hidden rounded-[1.8rem] p-5 sm:p-6">
-              <div className="flex flex-col gap-6 xl:flex-row xl:items-start xl:justify-between">
-                <div className="min-w-0 flex-1">
-                  <div className="inline-flex items-center gap-2 rounded-full border border-border/70 bg-background/72 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.22em] text-muted-foreground">
-                    <span
-                      className={`h-2 w-2 rounded-full ${
-                        error ? "bg-rose-400" : "bg-emerald-400"
-                      }`}
-                    />
-                    {error ? "Control plane cần kiểm tra" : "Mission board đang hoạt động"}
-                  </div>
-
-                  <h1 className="mt-5 max-w-4xl text-4xl font-semibold leading-[0.95] tracking-tight text-foreground sm:text-5xl xl:text-[4.4rem]">
-                    Một shell vận hành mới, không còn là landing page trá hình.
-                  </h1>
-                  <p className="mt-5 max-w-3xl text-sm leading-7 text-muted-foreground sm:text-base">
-                    Toàn bộ giao diện được chuyển sang dạng workbench: có dock thao tác,
-                    mission board ở giữa, fleet matrix để điều phối VM và inspector ở
-                    bên phải cho GitHub, SSH và deploy pipeline.
-                  </p>
-                </div>
-
-                <div className="grid gap-3 sm:grid-cols-2 xl:w-[22rem] xl:grid-cols-1">
-                  <MetricCard
-                    icon={Server}
-                    label="Fleet Live"
-                    value={total}
-                    helper={headerTitle}
-                  />
-                  <MetricCard
-                    icon={ShieldCheck}
-                    label="SSH Ready"
-                    value={readyCount}
-                    helper={`${activeCount} VM đang ACTIVE`}
-                  />
-                </div>
-              </div>
-
-              <div className="mt-6 grid gap-3 lg:grid-cols-3">
-                <div className="rounded-[1.2rem] border border-border/70 bg-background/75 p-4">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">
-                    OpenStack Runtime
-                  </p>
-                  <p className="mt-3 text-lg font-semibold text-foreground">
-                    CLI chạy trực tiếp trên server có openrc
-                  </p>
-                  <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                    Không giả lập local, không bẻ flow Windows. Mọi lệnh VM vẫn bám đúng
-                    môi trường OpenStack thật.
-                  </p>
-                </div>
-
-                <div className="rounded-[1.2rem] border border-border/70 bg-background/75 p-4">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">
-                    Repo Relay
-                  </p>
-                  <p className="mt-3 text-lg font-semibold text-foreground">
-                    {githubUser ? `Đang gắn với @${githubUser.login}` : "GitHub gate đang chờ"}
-                  </p>
-                  <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                    Repo linked, repo ngoài, env file, install và post-deploy hook đều đi
-                    chung một pipeline trong modal deploy.
-                  </p>
-                </div>
-
-                <div className="rounded-[1.2rem] border border-border/70 bg-background/75 p-4">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">
-                    VM Focus
-                  </p>
-                  <p className="mt-3 text-lg font-semibold text-foreground">
-                    {selectedVm ? selectedVm.name : "Chưa khóa một VM"}
-                  </p>
-                  <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                    Chọn một máy trong fleet matrix để mở Web SSH, dán workflow deploy
-                    hoặc quan sát nhanh trạng thái hạ tầng.
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            <div className="grid gap-4 lg:grid-cols-3">
-              <HeroFeatureCard
-                icon={RefreshCw}
-                label="Provisioning"
-                value={`${buildingCount} workflow`}
-                helper={`Cập nhật lần cuối ${formatLastUpdated(lastUpdated)}`}
-              />
-              <HeroFeatureCard
-                icon={CircleAlert}
-                label="Attention"
-                value={`${attentionCount} mục`}
-                helper={error || "Theo dõi VM lỗi, tắt hoặc chưa cấp IP"}
-              />
-              <HeroFeatureCard
-                icon={Terminal}
-                label="Web SSH"
-                value={selectedVm?.ip || "Chưa chọn IP đích"}
-                helper="Script deploy sẽ được đẩy sẵn vào terminal khi bạn mở phiên."
-              />
-            </div>
-          </div>
-
-          <aside className="space-y-4">
-            <GitHubSessionCard
-              user={githubUser}
-              loading={githubLoading}
-              refreshing={githubRefreshing}
-              selectedVm={selectedVm}
-              onRefresh={() => void fetchGitHubStatus({ silent: true })}
-              onDeploy={() => openGitHub(selectedVm?.id)}
-              onLogout={handleLogout}
-            />
-          </aside>
-        </header>
-
-        <main
-          id="fleet"
-          className="mt-4 grid gap-4 xl:grid-cols-[280px_minmax(0,1fr)_360px] xl:items-start"
-        >
-          <aside className="space-y-4">
-            <div
-              id="launch"
-              className="surface-panel rounded-[1.5rem] p-5 xl:sticky xl:top-24"
-            >
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-muted-foreground">
-                    Launch Kits
-                  </p>
-                  <h2 className="mt-2 text-2xl font-semibold tracking-tight text-foreground">
-                    Preset để bắn VM nhanh
-                  </h2>
-                </div>
-                <Sparkles className="h-5 w-5 text-primary" />
-              </div>
-
-              <div className="mt-5 space-y-3">
-                {serverPresets.map((preset) => (
-                  <PresetCard
-                    key={preset.key}
-                    presetKey={preset.key}
-                    onClick={openPreset}
-                  />
-                ))}
-              </div>
-            </div>
-
-            <div className="surface-panel rounded-[1.5rem] p-5">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-muted-foreground">
-                Build Modes
-              </p>
-              <div className="mt-4 grid gap-3">
-                <InfoMiniCard
-                  icon={Boxes}
-                  label="Node / Python / Docker"
-                  value="Recipe deploy đổi theo stack thay vì chỉ git clone."
-                />
-                <InfoMiniCard
-                  icon={Database}
-                  label="Biến môi trường"
-                  value="File .env được tạo tự động nếu bạn truyền env trong modal."
-                />
-                <InfoMiniCard
-                  icon={GitBranch}
-                  label="Repo ngoài"
-                  value="Hỗ trợ URL ngoài hoặc owner/repo để cấy source nhanh."
-                />
-              </div>
-            </div>
-          </aside>
-
-          <section className="space-y-4">
-            <div className="surface-panel rounded-[1.7rem] p-5 sm:p-6">
-              <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
-                <div className="min-w-0 flex-1 pr-0 xl:pr-6">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-muted-foreground">
-                    Fleet Matrix
-                  </p>
-                  <h2 className="mt-2 max-w-3xl text-3xl font-semibold leading-tight tracking-tight text-foreground">
-                    Điều phối máy ảo như một bảng vận hành, không còn kiểu landing block.
-                  </h2>
-                </div>
-
-                <div className="flex shrink-0 flex-wrap gap-2 xl:justify-end">
-                  <button
-                    type="button"
-                    onClick={() =>
-                      void tryCopy(
-                        buildInventoryText(visibleVMs),
-                        "Đã copy snapshot fleet.",
-                      )
-                    }
-                    className="inline-flex items-center gap-2 rounded-[0.95rem] border border-border/70 bg-background/75 px-4 py-2.5 text-sm font-semibold text-foreground transition hover:border-primary/35 hover:text-primary"
-                  >
-                    <Copy className="h-4 w-4" />
-                    Snapshot
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => setAutoRefresh((current) => !current)}
-                    className={`inline-flex items-center gap-2 rounded-[0.95rem] border px-4 py-2.5 text-sm font-semibold transition ${
-                      autoRefresh
-                        ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-300"
-                        : "border-border/70 bg-background/75 text-foreground hover:border-primary/35 hover:text-primary"
-                    }`}
-                  >
-                    <RefreshCw className={`h-4 w-4 ${autoRefresh ? "animate-spin" : ""}`} />
-                    {autoRefresh ? "Auto refresh bật" : "Auto refresh tắt"}
-                  </button>
-                </div>
-              </div>
-
-              <div className="mt-5 grid gap-4 xl:grid-cols-[minmax(0,1fr)_auto_auto]">
-                <div className="flex items-center gap-3 rounded-[1.15rem] border border-border/70 bg-background/75 px-4 py-3">
-                  <Search className="h-4 w-4 text-muted-foreground" />
-                  <input
-                    value={query}
-                    onChange={(event) => setQuery(event.target.value)}
-                    placeholder="Tìm theo tên, IP, flavor, image..."
-                    className="w-full bg-transparent text-sm text-foreground placeholder:text-muted-foreground focus:outline-none"
-                  />
-                </div>
-
-                <label className="inline-flex items-center gap-3 rounded-[1.15rem] border border-border/70 bg-background/75 px-4 py-3 text-sm font-medium text-foreground">
-                  <span>Sắp xếp</span>
-                  <select
-                    value={sortBy}
-                    onChange={(event) => setSortBy(event.target.value as SortKey)}
-                    className="bg-transparent text-sm text-foreground outline-none"
-                  >
-                    <option value="status">Theo trạng thái</option>
-                    <option value="name">Theo tên</option>
-                    <option value="ip">Theo IP</option>
-                  </select>
-                </label>
-
-                <div className="inline-flex rounded-[1rem] border border-border/70 bg-background/75 p-1">
-                  <button
-                    type="button"
-                    onClick={() => setViewMode("grid")}
-                    className={`rounded-[0.8rem] px-3 py-2 text-sm font-semibold transition ${
-                      viewMode === "grid"
-                        ? "bg-foreground text-background"
-                        : "text-muted-foreground hover:text-foreground"
-                    }`}
-                  >
-                    <Grid2X2 className="h-4 w-4" />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setViewMode("list")}
-                    className={`rounded-[0.8rem] px-3 py-2 text-sm font-semibold transition ${
-                      viewMode === "list"
-                        ? "bg-foreground text-background"
-                        : "text-muted-foreground hover:text-foreground"
-                    }`}
-                  >
-                    <LayoutList className="h-4 w-4" />
-                  </button>
-                </div>
-              </div>
-
-              <div className="mt-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-                <div className="flex flex-wrap gap-2">
-                  {[
-                    { key: "all" as const, label: "Tất cả", count: total },
-                    { key: "ready" as const, label: "Sẵn sàng", count: readyCount },
-                    { key: "building" as const, label: "Provisioning", count: buildingCount },
-                    { key: "attention" as const, label: "Cần chú ý", count: attentionCount },
-                  ].map((item) => (
-                    <button
-                      key={item.key}
-                      type="button"
-                      onClick={() => setFilter(item.key)}
-                      className={`inline-flex items-center gap-2 rounded-[0.95rem] border px-4 py-2 text-sm font-semibold transition ${
-                        filter === item.key
-                          ? "border-primary/35 bg-primary/10 text-primary"
-                          : "border-border/70 bg-background/75 text-foreground hover:border-primary/25 hover:text-primary"
-                      }`}
-                    >
-                      <span>{item.label}</span>
-                      <span className="rounded-full bg-background/75 px-2 py-0.5 text-xs text-muted-foreground">
-                        {item.count}
-                      </span>
-                    </button>
-                  ))}
-                </div>
-
-                <div className="rounded-[0.95rem] border border-border/70 bg-background/75 px-4 py-2 text-sm text-muted-foreground">
-                  Hiển thị {visibleVMs.length} / {total} VM
-                </div>
-              </div>
-            </div>
-
-            {error && (
-              <div className="rounded-[1.3rem] border border-rose-500/25 bg-rose-500/10 px-5 py-4 text-sm text-rose-200 dark:text-rose-300">
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                  <div className="flex items-start gap-3">
-                    <CircleAlert className="mt-0.5 h-4 w-4 flex-shrink-0" />
-                    <p>{error}</p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => void fetchFleet()}
-                    className="inline-flex items-center gap-2 rounded-[0.9rem] border border-rose-500/30 px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-rose-200 transition hover:bg-rose-500/10"
-                  >
-                    <RefreshCw className="h-3.5 w-3.5" />
-                    Thử lại
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {loading ? (
-              <FleetSkeleton />
-            ) : total === 0 ? (
-              <EmptyFleet
-                onCreate={() => {
-                  setCreatePresetKey(null);
-                  setShowCreate(true);
-                }}
-                onPreset={openPreset}
-              />
-            ) : visibleVMs.length === 0 ? (
-              <div className="surface-panel rounded-[1.5rem] p-8 text-center">
-                <h3 className="text-2xl font-semibold tracking-tight text-foreground">
-                  Không có VM nào khớp bộ lọc hiện tại
-                </h3>
-                <p className="mt-3 text-sm text-muted-foreground">
-                  Thử đổi filter, bỏ từ khóa tìm kiếm hoặc làm mới snapshot fleet.
-                </p>
-              </div>
-            ) : viewMode === "grid" ? (
-              <div className="grid gap-4 md:grid-cols-2">
-                {visibleVMs.map((vm) => (
-                  <ServerCard
-                    key={vm.id}
-                    vm={vm}
-                    selected={selectedVmId === vm.id}
-                    deleting={deletingName === vm.name}
-                    onSelect={() => setSelectedVmId(vm.id)}
-                    onDelete={handleDelete}
-                    onTerminal={(target) => setSshSession({ vm: target })}
-                    onGitHub={openGitHub}
-                  />
-                ))}
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {visibleVMs.map((vm) => (
-                  <ServerRow
-                    key={vm.id}
-                    vm={vm}
-                    selected={selectedVmId === vm.id}
-                    deleting={deletingName === vm.name}
-                    onSelect={() => setSelectedVmId(vm.id)}
-                    onDelete={handleDelete}
-                    onTerminal={(target) => setSshSession({ vm: target })}
-                    onGitHub={openGitHub}
-                  />
-                ))}
-              </div>
-            )}
-          </section>
-
-          <aside id="inspect" className="space-y-4">
-            <ControlPlaneCard
-              total={total}
-              visible={visibleVMs.length}
-              attentionCount={attentionCount}
-              lastUpdated={lastUpdated}
-              autoRefresh={autoRefresh}
-              selectedVm={selectedVm}
-              onRefreshFleet={() => void fetchFleet({ silent: true })}
-              onCreate={() => {
-                setCreatePresetKey(null);
-                setShowCreate(true);
-              }}
-              onCopySnapshot={() =>
-                void tryCopy(
-                  buildInventoryText(visibleVMs),
-                  "Đã copy snapshot fleet.",
-                )
-              }
-            />
-
-            <div className="surface-panel rounded-[1.5rem] p-5 sm:p-6">
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-muted-foreground">
-                    VM Inspector
-                  </p>
-                  <h2 className="mt-2 text-2xl font-semibold tracking-tight text-foreground">
-                    {selectedVm ? selectedVm.name : "Chọn một VM"}
-                  </h2>
-                </div>
-                {selectedVm && <StatusBadge status={selectedVm.status} />}
-              </div>
-
-              {selectedVm ? (
-                <>
-                  <p className="mt-3 text-sm leading-6 text-muted-foreground">
-                    {getStatusMeta(selectedVm.status).description}
-                  </p>
-
-                  <div className="mt-5 space-y-3">
-                    <DetailRow label="IP" value={selectedVm.ip || "Chưa cấp IP"} />
-                    <DetailRow label="Flavor" value={selectedVm.flavor || "Chưa rõ"} />
-                    <DetailRow label="Image" value={selectedVm.image || "Chưa rõ"} />
-                    <DetailRow label="SSH user" value={SSH_USER} />
-                  </div>
-
-                  <div className="mt-5 rounded-[1.2rem] border border-border/70 bg-background/75 p-4">
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">
-                      Action Dock
-                    </p>
-                    <div className="mt-4 flex flex-wrap gap-2">
-                      {selectedVm.ip && (
-                        <>
-                          <CopyChip
-                            text={`ssh ${SSH_USER}@${selectedVm.ip}`}
-                            label="Copy SSH"
-                          />
-                          <button
-                            type="button"
-                            onClick={() => setSshSession({ vm: selectedVm })}
-                            className="inline-flex items-center gap-2 rounded-[0.85rem] border border-border/70 bg-background/70 px-3 py-2 text-xs font-semibold text-foreground transition hover:border-primary/35 hover:text-primary"
-                          >
-                            <Terminal className="h-3.5 w-3.5" />
-                            Mở Web SSH
-                          </button>
-                        </>
-                      )}
-
-                      <button
-                        type="button"
-                        onClick={() => openGitHub(selectedVm.id)}
-                        className="inline-flex items-center gap-2 rounded-[0.85rem] border border-border/70 bg-background/70 px-3 py-2 text-xs font-semibold text-foreground transition hover:border-primary/35 hover:text-primary"
-                      >
-                        <GitBranch className="h-3.5 w-3.5" />
-                        Repo pipeline
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => handleDelete(selectedVm.name)}
-                        disabled={deletingName === selectedVm.name}
-                        className="inline-flex items-center gap-2 rounded-[0.85rem] border border-rose-500/20 bg-rose-500/10 px-3 py-2 text-xs font-semibold text-rose-300 transition hover:border-rose-500/35 hover:bg-rose-500/15 disabled:opacity-50"
-                      >
-                        {deletingName === selectedVm.name ? (
-                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                        ) : (
-                          <Trash2 className="h-3.5 w-3.5" />
-                        )}
-                        Xóa VM
-                      </button>
-                    </div>
-                  </div>
-                </>
-              ) : (
-                <div className="mt-5 rounded-[1.25rem] border border-dashed border-border/70 bg-background/60 p-6 text-sm leading-6 text-muted-foreground">
-                  Chọn một VM ở fleet matrix để inspector hiển thị IP, SSH, trạng thái
-                  và các nút thao tác nhanh theo đúng máy đang focus.
-                </div>
-              )}
-            </div>
-          </aside>
-        </main>
-
-        <footer
-          id="footer"
-          className="mt-4 grid gap-4 xl:grid-cols-[280px_minmax(0,1fr)_360px]"
-        >
-          <div className="surface-panel rounded-[1.5rem] p-5">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-muted-foreground">
-              Footer Rail
-            </p>
-            <h2 className="mt-2 text-2xl font-semibold tracking-tight text-foreground">
-              Dải trạng thái cuối màn hình
-            </h2>
-            <p className="mt-3 text-sm leading-6 text-muted-foreground">
-              Footer không còn là phần mô tả dài nữa. Nó trở thành nơi chốt ngắn tình
-              hình runtime, deploy và đối tượng đang được bạn theo dõi.
-            </p>
-          </div>
-
-          <div className="surface-panel surface-noise rounded-[1.5rem] p-5 sm:p-6">
-            <div className="grid gap-4 lg:grid-cols-3">
-              <FooterStatus label="Fleet hiển thị" value={`${visibleVMs.length}/${total} VM`} />
-              <FooterStatus
-                label="GitHub session"
-                value={githubUser ? `@${githubUser.login}` : "Chưa đồng bộ"}
-              />
-              <FooterStatus
-                label="Auto refresh"
-                value={autoRefresh ? "Bật mỗi 15 giây" : "Đang tắt"}
-              />
-              <FooterStatus label="VM focus" value={selectedVm?.name || "Chưa chọn VM"} />
-              <FooterStatus label="SSH user" value={SSH_USER} />
-              <FooterStatus
-                label="Repo workflow"
-                value="Clone, env, install, post deploy"
-              />
-            </div>
-          </div>
-
-          <div className="surface-panel rounded-[1.5rem] p-5">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-muted-foreground">
-              Runtime Notes
-            </p>
-            <div className="mt-4 space-y-3">
-              <div className="rounded-[1rem] border border-border/70 bg-background/70 px-4 py-3 text-sm text-foreground">
-                OpenStack CLI vẫn chạy trên server có openrc, không đổi kiến trúc nền.
-              </div>
-              <div className="rounded-[1rem] border border-border/70 bg-background/70 px-4 py-3 text-sm text-foreground">
-                GitHub login là OAuth callback flow, không còn device code.
-              </div>
-              <div className="rounded-[1rem] border border-border/70 bg-background/70 px-4 py-3 text-sm text-foreground">
-                Deploy repo đã hỗ trợ repo ngoài, biến môi trường và hook sau cài đặt.
-              </div>
-            </div>
+        <footer className="mt-4 rounded-[1.2rem] border border-border/70 bg-background/60 px-4 py-3 text-sm text-muted-foreground">
+          <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
+            <span>OrbitStack đang chạy theo dạng multi-page workspace, không còn one-page landing shell.</span>
+            <span>
+              Route hiện tại: <span className="font-semibold text-foreground">{tab}</span>
+            </span>
           </div>
         </footer>
       </div>
