@@ -1,4 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
+import {
+  clearGitHubAccessToken,
+  getGitHubAccessToken,
+} from "@/lib/github-session";
 
 interface GitHubRepo {
   id: number;
@@ -10,9 +14,12 @@ interface GitHubRepo {
 }
 
 export async function GET(request: NextRequest) {
-  const token = request.cookies.get("gh_token")?.value;
+  const token = request.cookies.get("gh_token")?.value || getGitHubAccessToken();
   if (!token) {
-    return NextResponse.json({ error: "Not connected" }, { status: 401 });
+    return NextResponse.json(
+      { error: "Not connected" },
+      { status: 401, headers: { "Cache-Control": "no-store" } },
+    );
   }
 
   const res = await fetch("https://api.github.com/user/repos?per_page=100&sort=updated", {
@@ -26,7 +33,17 @@ export async function GET(request: NextRequest) {
   if (!res.ok) {
     const data = await res.json().catch(() => ({}));
     const message = data.message || "GitHub API error";
-    return NextResponse.json({ error: message }, { status: res.status });
+    const response = NextResponse.json(
+      { error: message },
+      { status: res.status, headers: { "Cache-Control": "no-store" } },
+    );
+
+    if (res.status === 401) {
+      clearGitHubAccessToken();
+      response.cookies.delete("gh_token");
+    }
+
+    return response;
   }
 
   const repos: GitHubRepo[] = await res.json();
@@ -39,5 +56,8 @@ export async function GET(request: NextRequest) {
     default_branch: repo.default_branch,
   }));
 
-  return NextResponse.json({ repos: simplified });
+  return NextResponse.json(
+    { repos: simplified },
+    { headers: { "Cache-Control": "no-store" } },
+  );
 }

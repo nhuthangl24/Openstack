@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { setGitHubAccessToken } from "@/lib/github-session";
 
 export async function POST(request: NextRequest) {
   const clientId = process.env.GITHUB_CLIENT_ID;
@@ -30,6 +31,8 @@ export async function POST(request: NextRequest) {
 
   const data = await res.json();
   if (data.access_token) {
+    setGitHubAccessToken(data.access_token);
+
     const response = NextResponse.json({ status: "authorized" });
     response.cookies.set({
       name: "gh_token",
@@ -39,21 +42,37 @@ export async function POST(request: NextRequest) {
       path: "/",
       maxAge: 60 * 60 * 24 * 7,
     });
+    response.headers.set("Cache-Control", "no-store");
     return response;
   }
 
   if (data.error === "authorization_pending") {
-    return NextResponse.json({ status: "pending" });
+    return NextResponse.json(
+      { status: "pending" },
+      { headers: { "Cache-Control": "no-store" } },
+    );
   }
   if (data.error === "slow_down") {
-    return NextResponse.json({ status: "slow_down" });
+    return NextResponse.json(
+      { status: "slow_down" },
+      { headers: { "Cache-Control": "no-store" } },
+    );
   }
   if (data.error === "access_denied") {
-    return NextResponse.json({ status: "denied" });
+    return NextResponse.json(
+      { status: "denied" },
+      { headers: { "Cache-Control": "no-store" } },
+    );
   }
   if (data.error === "expired_token") {
-    return NextResponse.json({ status: "expired" });
+    return NextResponse.json(
+      { status: "expired" },
+      { headers: { "Cache-Control": "no-store" } },
+    );
   }
 
-  return NextResponse.json({ status: "error" }, { status: 500 });
+  return NextResponse.json(
+    { status: "error" },
+    { status: 500, headers: { "Cache-Control": "no-store" } },
+  );
 }

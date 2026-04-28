@@ -119,7 +119,10 @@ export default function GitHubDeployModal({
     setError("");
 
     try {
-      const response = await fetch("/api/github/repos");
+      const response = await fetch("/api/github/repos", {
+        credentials: "include",
+        cache: "no-store",
+      });
       const data = await response.json();
 
       if (!response.ok) {
@@ -151,6 +154,7 @@ export default function GitHubDeployModal({
     try {
       const response = await fetch("/api/github/device/start", {
         method: "POST",
+        credentials: "include",
       });
       const data = await response.json();
 
@@ -178,6 +182,8 @@ export default function GitHubDeployModal({
       try {
         const response = await fetch("/api/github/device/poll", {
           method: "POST",
+          credentials: "include",
+          cache: "no-store",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ device_code: deviceCode }),
         });
