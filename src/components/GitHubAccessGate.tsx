@@ -130,7 +130,7 @@ export default function GitHubAccessGate({
                 "Muốn tạo VM hay deploy repo thì phải qua GitHub gate trước.",
                 "Repo linked được kéo tự động từ tài khoản đã xác thực.",
                 "Repo ngoài vẫn có thể dán thủ công ở bước deploy pipeline.",
-                "Web SSH sẽ nhận workflow deploy sau khi bạn chọn VM đích.",
+                "Terminal Lab sẽ nhận workflow deploy sau khi bạn chọn VM đích.",
               ].map((item) => (
                 <div
                   key={item}

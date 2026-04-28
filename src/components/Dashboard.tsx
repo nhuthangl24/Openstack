@@ -2,7 +2,9 @@
 
 import Link from "next/link";
 import Image from "next/image";
+import { useRouter } from "next/navigation";
 import {
+  startTransition,
   useCallback,
   useDeferredValue,
   useEffect,
@@ -43,11 +45,12 @@ import CreateServerModal from "@/components/CreateServerModal";
 import GitHubDeployModal, {
   type GitHubDeployPlan,
 } from "@/components/GitHubDeployModal";
+import TerminalWorkbench from "@/components/TerminalWorkbench";
 import ThemeToggle from "@/components/ThemeToggle";
 import VMSuccessModal from "@/components/VMSuccessModal";
-import WebSSHModal from "@/components/WebSSHModal";
 import { copyToClipboard } from "@/lib/clipboard";
 import { serverPresets } from "@/lib/presets";
+import { writeTerminalWorkspace } from "@/lib/terminal-workspace";
 
 interface VM {
   id: string;
@@ -83,7 +86,8 @@ export type ConsoleTab =
   | "fleet"
   | "launch"
   | "inspect"
-  | "command";
+  | "command"
+  | "terminal";
 
 const SSH_USER = "ubuntu";
 const AUTO_REFRESH_KEY = "orbitstack:auto-refresh";
@@ -505,7 +509,7 @@ function ServerCard({
 
       <div className="mt-5 flex flex-wrap gap-2">
         <ActionButton
-          label="Web SSH"
+          label="Terminal Lab"
           icon={Terminal}
           disabled={!vm.ip}
           onClick={(event) => {
@@ -769,7 +773,7 @@ function GitHubSessionCard({
             Deploy repo
           </p>
           <p className="mt-2 text-sm font-medium text-foreground">
-            {deployReady ? "Sẵn sàng Web SSH" : "Cần VM có IP"}
+            {deployReady ? "Sẵn sàng Terminal Lab" : "Cần VM có IP"}
           </p>
         </div>
       </div>
@@ -962,6 +966,7 @@ export default function Dashboard({
 }: {
   tab?: ConsoleTab;
 }) {
+  const router = useRouter();
   const [vms, setVMs] = useState<VM[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -980,10 +985,6 @@ export default function Dashboard({
   const [githubTargetVmId, setGitHubTargetVmId] = useState<string | null>(null);
   const [selectedVmId, setSelectedVmId] = useState("");
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
-  const [sshSession, setSshSession] = useState<{
-    vm: VM;
-    command?: string;
-  } | null>(null);
   const [githubUser, setGitHubUser] = useState<GitHubUser | null>(null);
   const [githubLoading, setGitHubLoading] = useState(true);
   const [githubRefreshing, setGitHubRefreshing] = useState(false);
@@ -1208,6 +1209,21 @@ export default function Dashboard({
     setShowGitHub(true);
   }
 
+  function openTerminalLab(target: VM, initialCommand?: string) {
+    setSelectedVmId(target.id);
+    writeTerminalWorkspace({
+      vmId: target.id,
+      vmName: target.name,
+      host: target.ip,
+      username: SSH_USER,
+      initialCommand,
+    });
+
+    startTransition(() => {
+      router.push("/terminal");
+    });
+  }
+
   function handleDeployFromGitHub(plan: GitHubDeployPlan) {
     const target = vms.find((vm) => vm.id === plan.vmId);
 
@@ -1217,10 +1233,7 @@ export default function Dashboard({
 
     setShowGitHub(false);
     setGitHubTargetVmId(null);
-    setSshSession({
-      vm: target,
-      command: plan.initialCommand,
-    });
+    openTerminalLab(target, plan.initialCommand);
 
     toast.success(`Đã chuẩn bị workflow deploy cho ${plan.repoLabel}.`);
   }
@@ -1240,6 +1253,7 @@ export default function Dashboard({
     { href: "/launch", key: "launch", label: "Launch Kits" },
     { href: "/inspect", key: "inspect", label: "Inspector" },
     { href: "/command", key: "command", label: "Command Deck" },
+    { href: "/terminal", key: "terminal", label: "Terminal Lab" },
   ];
 
   const sessionCard = (
@@ -1361,7 +1375,7 @@ export default function Dashboard({
           <InfoMiniCard
             icon={Cpu}
             label="SSH Ready"
-            value={`${total ? Math.round((readyCount / total) * 100) : 0}% VM có thể vào Web SSH`}
+            value={`${total ? Math.round((readyCount / total) * 100) : 0}% VM có thể vào Terminal Lab`}
           />
         </div>
       </div>
@@ -1375,7 +1389,7 @@ export default function Dashboard({
             "Repo từ GitHub đã link hoặc repo ngoài",
             "Sinh file .env theo biến môi trường",
             "Install command và after deploy command",
-            "Web SSH nhận sẵn workflow để chạy tiếp",
+            "Terminal Lab nhận sẵn workflow để chạy tiếp",
           ].map((item) => (
             <div
               key={item}
@@ -1454,11 +1468,11 @@ export default function Dashboard({
                   />
                   <button
                     type="button"
-                    onClick={() => setSshSession({ vm: selectedVm })}
+                    onClick={() => openTerminalLab(selectedVm)}
                     className="inline-flex items-center gap-2 rounded-[0.85rem] border border-border/70 bg-background/70 px-3 py-2 text-xs font-semibold text-foreground transition hover:border-primary/35 hover:text-primary"
                   >
                     <Terminal className="h-3.5 w-3.5" />
-                    Mở Web SSH
+                    Mở Terminal Lab
                   </button>
                 </>
               )}
@@ -1575,7 +1589,7 @@ export default function Dashboard({
           deleting={deletingName === vm.name}
           onSelect={() => setSelectedVmId(vm.id)}
           onDelete={handleDelete}
-          onTerminal={(target) => setSshSession({ vm: target })}
+          onTerminal={(target) => openTerminalLab(target)}
           onGitHub={openGitHub}
         />
       ))}
@@ -1590,7 +1604,7 @@ export default function Dashboard({
           deleting={deletingName === vm.name}
           onSelect={() => setSelectedVmId(vm.id)}
           onDelete={handleDelete}
-          onTerminal={(target) => setSshSession({ vm: target })}
+          onTerminal={(target) => openTerminalLab(target)}
           onGitHub={openGitHub}
         />
       ))}
@@ -1783,7 +1797,7 @@ export default function Dashboard({
               icon={Terminal}
               label="VM Focus"
               value={selectedVm?.name || "Chưa khóa VM"}
-              helper="Inspector và Web SSH sẽ dùng máy đang focus làm mục tiêu mặc định."
+              helper="Inspector và Terminal Lab sẽ dùng máy đang focus làm mục tiêu mặc định."
             />
           </div>
         </div>
@@ -1837,7 +1851,7 @@ export default function Dashboard({
               icon={Terminal}
               label="Post Deploy"
               value="Hook sẵn"
-              helper="Sau khi tạo máy xong có thể nối thẳng sang Web SSH để cài tiếp."
+              helper="Sau khi tạo máy xong có thể nối thẳng sang Terminal Lab để cài tiếp."
             />
           </div>
         </div>
@@ -1877,7 +1891,7 @@ export default function Dashboard({
                   deleting={deletingName === vm.name}
                   onSelect={() => setSelectedVmId(vm.id)}
                   onDelete={handleDelete}
-                  onTerminal={(target) => setSshSession({ vm: target })}
+                  onTerminal={(target) => openTerminalLab(target)}
                   onGitHub={openGitHub}
                 />
               ))
@@ -1956,6 +1970,17 @@ export default function Dashboard({
     </section>
   );
 
+  const terminalPage = (
+    <TerminalWorkbench
+      vms={vms}
+      selectedVmId={selectedVmId}
+      refreshing={refreshing}
+      onSelectVm={setSelectedVmId}
+      onRefreshFleet={() => void fetchFleet({ silent: true })}
+      onOpenDeploy={openGitHub}
+    />
+  );
+
   const pageContent =
     tab === "fleet"
       ? fleetPage
@@ -1965,6 +1990,8 @@ export default function Dashboard({
           ? inspectPage
           : tab === "command"
             ? commandPage
+            : tab === "terminal"
+              ? terminalPage
             : missionPage;
 
   return (
@@ -2046,15 +2073,13 @@ export default function Dashboard({
         <VMSuccessModal
           info={vmResult}
           onOpenTerminal={(host) => {
-            setSshSession({
-              vm: {
-                id: vmResult.vm_id,
-                name: vmResult.vm_name,
-                status: vmResult.status,
-                ip: host,
-                flavor: vmResult.flavor,
-                image: vmResult.os,
-              },
+            openTerminalLab({
+              id: vmResult.vm_id,
+              name: vmResult.vm_name,
+              status: vmResult.status,
+              ip: host,
+              flavor: vmResult.flavor,
+              image: vmResult.os,
             });
           }}
           onClose={() => {
@@ -2074,15 +2099,6 @@ export default function Dashboard({
             setShowGitHub(false);
             setGitHubTargetVmId(null);
           }}
-        />
-      )}
-
-      {sshSession && (
-        <WebSSHModal
-          vmName={sshSession.vm.name}
-          host={sshSession.vm.ip}
-          initialCommand={sshSession.command}
-          onClose={() => setSshSession(null)}
         />
       )}
     </div>

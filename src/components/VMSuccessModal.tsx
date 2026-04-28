@@ -158,7 +158,7 @@ export default function VMSuccessModal({
                 VM đã được tạo thành công
               </h2>
               <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                Cloud-init đang chạy trong nền. Bạn có thể theo dõi IP và mở Web SSH
+                Cloud-init đang chạy trong nền. Bạn có thể theo dõi IP và mở Terminal Lab
                 ngay khi máy sẵn sàng.
               </p>
             </div>
@@ -223,7 +223,7 @@ export default function VMSuccessModal({
                   className="mt-4 inline-flex items-center gap-2 rounded-full border border-border/70 bg-card px-4 py-3 text-sm font-semibold text-foreground transition hover:border-primary/35 hover:text-primary"
                 >
                   <Terminal className="h-4 w-4" />
-                  Mở Web SSH ngay
+                  Mở Terminal Lab ngay
                 </button>
               )}
             </div>

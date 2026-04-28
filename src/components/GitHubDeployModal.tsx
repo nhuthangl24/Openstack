@@ -241,7 +241,7 @@ export default function GitHubDeployModal({
     setValidationError("");
 
     if (!selectedVm) {
-      setValidationError("Hãy chọn VM đích trước khi mở Web SSH.");
+      setValidationError("Hãy chọn VM đích trước khi mở Terminal Lab.");
       return;
     }
 
@@ -285,7 +285,7 @@ export default function GitHubDeployModal({
                 </h2>
                 <p className="mt-2 max-w-3xl text-sm leading-6 text-muted-foreground">
                   Chọn repo từ GitHub đã liên kết hoặc dán repo ngoài, thêm file môi
-                  trường, lệnh cài đặt và bước sau deploy để Web SSH mở ra là có thể
+                  trường, lệnh cài đặt và bước sau deploy để Terminal Lab mở ra là có thể
                   chạy tiếp ngay.
                 </p>
 
@@ -619,7 +619,7 @@ export default function GitHubDeployModal({
                   <div className="flex items-start gap-3">
                     <ShieldCheck className="mt-0.5 h-4 w-4 flex-shrink-0" />
                     <p>
-                      Web SSH sẽ mở vào đúng VM, sau đó tự chạy workflow bạn vừa cấu hình:
+                      Terminal Lab sẽ mở vào đúng VM, sau đó tự chạy workflow bạn vừa cấu hình:
                       clone hoặc pull source, ghi file môi trường, rồi chạy lệnh cài và
                       lệnh sau deploy nếu có.
                     </p>
@@ -685,7 +685,7 @@ export default function GitHubDeployModal({
                     </p>
                   </div>
                   <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                    Đây là workflow sẽ được bơm sẵn vào terminal ngay sau khi SSH kết nối.
+                    Đây là workflow sẽ được bơm sẵn vào Terminal Lab ngay sau khi SSH kết nối.
                   </p>
 
                   <pre className="mt-4 max-h-[20rem] overflow-auto rounded-[1.2rem] border border-border/70 bg-slate-950 px-4 py-4 text-xs leading-6 text-slate-100">
@@ -723,7 +723,7 @@ export default function GitHubDeployModal({
                 className="inline-flex items-center justify-center gap-2 rounded-full bg-foreground px-5 py-3 text-sm font-semibold text-background transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
               >
                 <GitBranch className="h-4 w-4" />
-                Mở Web SSH và chạy workflow
+                Mở Terminal Lab và chạy workflow
               </button>
             </div>
           </div>
