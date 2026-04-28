@@ -2,6 +2,7 @@
 
 import dynamic from "next/dynamic";
 import { Loader2 } from "lucide-react";
+import GitHubAccessGate from "@/components/GitHubAccessGate";
 
 const Dashboard = dynamic(() => import("@/components/Dashboard"), {
   ssr: false,
@@ -16,5 +17,9 @@ const Dashboard = dynamic(() => import("@/components/Dashboard"), {
 });
 
 export default function DashboardClientShell() {
-  return <Dashboard />;
+  return (
+    <GitHubAccessGate>
+      <Dashboard />
+    </GitHubAccessGate>
+  );
 }
