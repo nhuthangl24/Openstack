@@ -6,6 +6,7 @@ import {
   ExternalLink,
   GitBranch,
   Loader2,
+  RefreshCw,
   ShieldCheck,
   Sparkles,
 } from "lucide-react";
@@ -27,6 +28,7 @@ export default function GitHubAccessGate({
   const [connected, setConnected] = useState(false);
   const [device, setDevice] = useState<DeviceCodeResponse | null>(null);
   const [loading, setLoading] = useState(false);
+  const [verifying, setVerifying] = useState(false);
   const [status, setStatus] = useState("");
   const [error, setError] = useState("");
   const pollRef = useRef<number | null>(null);
@@ -62,6 +64,58 @@ export default function GitHubAccessGate({
     }
   }
 
+  const pollDeviceCode = useCallback(
+    async (deviceCode: string, options?: { showSpinner?: boolean }) => {
+      if (options?.showSpinner) {
+        setVerifying(true);
+      }
+
+      try {
+        const response = await fetch("/api/github/device/poll", {
+          method: "POST",
+          credentials: "include",
+          cache: "no-store",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ device_code: deviceCode }),
+        });
+        const data = await response.json();
+
+        if (data.status === "authorized") {
+          stopPolling();
+          setStatus("Đăng nhập thành công. Đang mở dashboard...");
+          await fetchStatus();
+          return;
+        }
+
+        if (data.status === "denied") {
+          stopPolling();
+          setError("GitHub đã từ chối xác thực.");
+          return;
+        }
+
+        if (data.status === "expired") {
+          stopPolling();
+          setError("Mã xác thực đã hết hạn. Hãy đăng nhập lại.");
+          return;
+        }
+
+        if (data.status === "slow_down" || data.status === "pending") {
+          setStatus("Đang chờ GitHub xác nhận...");
+          return;
+        }
+
+        setError("Không lấy được trạng thái xác thực GitHub.");
+      } catch {
+        setError("Không thể hoàn tất đăng nhập GitHub.");
+      } finally {
+        if (options?.showSpinner) {
+          setVerifying(false);
+        }
+      }
+    },
+    [fetchStatus],
+  );
+
   async function startDeviceFlow() {
     setLoading(true);
     setError("");
@@ -95,42 +149,7 @@ export default function GitHubAccessGate({
   function startPolling(deviceCode: string, intervalSec: number) {
     stopPolling();
     pollRef.current = window.setInterval(async () => {
-      try {
-        const response = await fetch("/api/github/device/poll", {
-          method: "POST",
-          credentials: "include",
-          cache: "no-store",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ device_code: deviceCode }),
-        });
-        const data = await response.json();
-
-        if (data.status === "authorized") {
-          stopPolling();
-          setStatus("Đăng nhập thành công. Đang mở dashboard...");
-          await fetchStatus();
-          return;
-        }
-
-        if (data.status === "denied") {
-          stopPolling();
-          setError("GitHub đã từ chối xác thực.");
-          return;
-        }
-
-        if (data.status === "expired") {
-          stopPolling();
-          setError("Mã xác thực đã hết hạn. Hãy đăng nhập lại.");
-          return;
-        }
-
-        if (data.status === "slow_down" || data.status === "pending") {
-          setStatus("Đang chờ GitHub xác nhận...");
-        }
-      } catch {
-        stopPolling();
-        setError("Không thể hoàn tất đăng nhập GitHub.");
-      }
+      await pollDeviceCode(deviceCode);
     }, Math.max(intervalSec, 5) * 1000);
   }
 
@@ -138,6 +157,20 @@ export default function GitHubAccessGate({
     void fetchStatus();
     return () => stopPolling();
   }, [fetchStatus]);
+
+  useEffect(() => {
+    function handleVisibilityChange() {
+      if (document.visibilityState !== "visible" || !device || connected) {
+        return;
+      }
+
+      void pollDeviceCode(device.device_code, { showSpinner: true });
+    }
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () =>
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+  }, [connected, device, pollDeviceCode]);
 
   if (checking) {
     return (
@@ -241,6 +274,26 @@ export default function GitHubAccessGate({
                   Mở GitHub để xác thực
                   <ExternalLink className="h-4 w-4" />
                 </a>
+                <button
+                  type="button"
+                  onClick={() =>
+                    void pollDeviceCode(device.device_code, { showSpinner: true })
+                  }
+                  disabled={verifying}
+                  className="mt-3 inline-flex items-center gap-2 rounded-full border border-border/70 bg-background/70 px-4 py-3 text-sm font-semibold text-foreground transition hover:border-primary/35 hover:text-primary disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {verifying ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Đang kiểm tra lại...
+                    </>
+                  ) : (
+                    <>
+                      <RefreshCw className="h-4 w-4" />
+                      Tôi đã xác thực xong
+                    </>
+                  )}
+                </button>
               </div>
             )}
 
