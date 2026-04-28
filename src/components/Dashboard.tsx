@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import {
   useCallback,
   useDeferredValue,
@@ -18,10 +19,12 @@ import {
   Copy,
   Cpu,
   Database,
+  ExternalLink,
   GitBranch,
   Grid2X2,
   LayoutList,
   Loader2,
+  LogOut,
   Network,
   Plus,
   RefreshCw,
@@ -60,6 +63,13 @@ interface VMResult {
   os: string;
   password: string;
   environments: string[];
+}
+
+interface GitHubUser {
+  login: string;
+  name: string | null;
+  avatar_url: string;
+  html_url: string;
 }
 
 type FilterKey = "all" | "ready" | "building" | "attention";
@@ -665,6 +675,210 @@ function DetailRow({
   );
 }
 
+function GitHubSessionCard({
+  user,
+  loading,
+  refreshing,
+  selectedVm,
+  onRefresh,
+  onDeploy,
+  onLogout,
+}: {
+  user: GitHubUser | null;
+  loading: boolean;
+  refreshing: boolean;
+  selectedVm: VM | null;
+  onRefresh: () => void;
+  onDeploy: () => void;
+  onLogout: () => void;
+}) {
+  const deployReady = Boolean(selectedVm?.ip);
+
+  return (
+    <div className="rounded-[1.5rem] border border-border/70 bg-background/76 p-4">
+      <div className="flex items-start gap-3">
+        {user ? (
+          <Image
+            src={user.avatar_url}
+            alt={user.login}
+            width={44}
+            height={44}
+            className="h-11 w-11 rounded-[1rem] border border-border/70 object-cover"
+          />
+        ) : (
+          <div className="flex h-11 w-11 items-center justify-center rounded-[1rem] border border-border/70 bg-card text-primary">
+            <GitBranch className="h-5 w-5" />
+          </div>
+        )}
+
+        <div className="min-w-0 flex-1">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">
+            GitHub Access
+          </p>
+          {loading ? (
+            <div className="mt-2 flex items-center gap-2 text-sm text-muted-foreground">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Đang đồng bộ phiên GitHub...
+            </div>
+          ) : user ? (
+            <>
+              <p className="mt-1 truncate text-base font-semibold text-foreground">
+                {user.name || user.login}
+              </p>
+              <p className="truncate text-sm text-muted-foreground">@{user.login}</p>
+            </>
+          ) : (
+            <p className="mt-1 text-sm text-muted-foreground">
+              Chưa đọc được phiên GitHub hiện tại.
+            </p>
+          )}
+        </div>
+      </div>
+
+      <div className="mt-4 grid gap-3 sm:grid-cols-3">
+        <div className="rounded-[1.1rem] border border-border/70 bg-card px-3 py-3">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+            Phiên
+          </p>
+          <p className="mt-2 text-sm font-medium text-foreground">
+            {user ? "Đã xác thực" : "Cần kiểm tra"}
+          </p>
+        </div>
+        <div className="rounded-[1.1rem] border border-border/70 bg-card px-3 py-3">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+            VM mục tiêu
+          </p>
+          <p className="mt-2 truncate text-sm font-medium text-foreground">
+            {selectedVm?.name || "Chưa chọn"}
+          </p>
+        </div>
+        <div className="rounded-[1.1rem] border border-border/70 bg-card px-3 py-3">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+            Deploy repo
+          </p>
+          <p className="mt-2 text-sm font-medium text-foreground">
+            {deployReady ? "Sẵn sàng Web SSH" : "Cần VM có IP"}
+          </p>
+        </div>
+      </div>
+
+      <div className="mt-4 flex flex-wrap gap-2">
+        {user?.html_url && (
+          <a
+            href={user.html_url}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex items-center gap-2 rounded-full border border-border/70 bg-card px-4 py-2 text-sm font-semibold text-foreground transition hover:border-primary/35 hover:text-primary"
+          >
+            <ExternalLink className="h-4 w-4" />
+            Hồ sơ GitHub
+          </a>
+        )}
+        <button
+          type="button"
+          onClick={onRefresh}
+          className="inline-flex items-center gap-2 rounded-full border border-border/70 bg-card px-4 py-2 text-sm font-semibold text-foreground transition hover:border-primary/35 hover:text-primary"
+        >
+          <RefreshCw className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />
+          Làm mới phiên
+        </button>
+        <button
+          type="button"
+          onClick={onLogout}
+          className="inline-flex items-center gap-2 rounded-full border border-rose-500/20 bg-rose-500/10 px-4 py-2 text-sm font-semibold text-rose-300 transition hover:border-rose-500/35 hover:bg-rose-500/15"
+        >
+          <LogOut className="h-4 w-4" />
+          Đăng xuất
+        </button>
+      </div>
+
+      <button
+        type="button"
+        onClick={onDeploy}
+        disabled={!selectedVm}
+        className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-[1.1rem] bg-foreground px-4 py-3 text-sm font-semibold text-background transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+      >
+        <GitBranch className="h-4 w-4" />
+        {selectedVm ? `Chọn repo cho ${selectedVm.name}` : "Chọn VM để deploy repo"}
+      </button>
+    </div>
+  );
+}
+
+function ControlPlaneCard({
+  total,
+  visible,
+  attentionCount,
+  lastUpdated,
+  autoRefresh,
+  selectedVm,
+  onRefreshFleet,
+  onCreate,
+  onCopySnapshot,
+}: {
+  total: number;
+  visible: number;
+  attentionCount: number;
+  lastUpdated: Date | null;
+  autoRefresh: boolean;
+  selectedVm: VM | null;
+  onRefreshFleet: () => void;
+  onCreate: () => void;
+  onCopySnapshot: () => void;
+}) {
+  return (
+    <div className="surface-panel rounded-[2rem] p-5 sm:p-6">
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-[0.24em] text-muted-foreground">
+            Control Plane
+          </p>
+          <h2 className="mt-2 text-2xl font-semibold tracking-tight text-foreground">
+            Nhịp vận hành OpenStack
+          </h2>
+        </div>
+        <ShieldCheck className="h-5 w-5 text-primary" />
+      </div>
+
+      <div className="mt-5 space-y-3">
+        <DetailRow label="Hiển thị" value={`${visible}/${total} VM`} />
+        <DetailRow label="Cảnh báo" value={`${attentionCount} mục cần xem`} />
+        <DetailRow label="Lần sync" value={formatLastUpdated(lastUpdated)} />
+        <DetailRow label="Tự refresh" value={autoRefresh ? "Đang bật" : "Đang tắt"} />
+        <DetailRow label="VM đang focus" value={selectedVm?.name || "Chưa chọn"} />
+      </div>
+
+      <div className="mt-5 flex flex-wrap gap-2">
+        <button
+          type="button"
+          onClick={onRefreshFleet}
+          className="inline-flex items-center gap-2 rounded-full border border-border/70 bg-background/70 px-4 py-2 text-sm font-semibold text-foreground transition hover:border-primary/35 hover:text-primary"
+        >
+          <RefreshCw className="h-4 w-4" />
+          Đồng bộ fleet
+        </button>
+        <button
+          type="button"
+          onClick={onCopySnapshot}
+          className="inline-flex items-center gap-2 rounded-full border border-border/70 bg-background/70 px-4 py-2 text-sm font-semibold text-foreground transition hover:border-primary/35 hover:text-primary"
+        >
+          <Copy className="h-4 w-4" />
+          Copy snapshot
+        </button>
+      </div>
+
+      <button
+        type="button"
+        onClick={onCreate}
+        className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-[1.1rem] border border-border/70 bg-background/70 px-4 py-3 text-sm font-semibold text-foreground transition hover:border-primary/35 hover:text-primary"
+      >
+        <Plus className="h-4 w-4" />
+        Tạo VM mới từ control plane
+      </button>
+    </div>
+  );
+}
+
 export default function Dashboard() {
   const [vms, setVMs] = useState<VM[]>([]);
   const [loading, setLoading] = useState(true);
@@ -688,6 +902,9 @@ export default function Dashboard() {
     vm: VM;
     command?: string;
   } | null>(null);
+  const [githubUser, setGitHubUser] = useState<GitHubUser | null>(null);
+  const [githubLoading, setGitHubLoading] = useState(true);
+  const [githubRefreshing, setGitHubRefreshing] = useState(false);
   const deferredQuery = useDeferredValue(query.trim().toLowerCase());
 
   const fetchFleet = useCallback(
@@ -727,6 +944,40 @@ export default function Dashboard() {
   useEffect(() => {
     void fetchFleet();
   }, [fetchFleet]);
+
+  const fetchGitHubStatus = useCallback(
+    async ({ silent = false }: { silent?: boolean } = {}) => {
+      if (silent) {
+        setGitHubRefreshing(true);
+      } else {
+        setGitHubLoading(true);
+      }
+
+      try {
+        const response = await fetch("/api/github/status", {
+          credentials: "include",
+          cache: "no-store",
+        });
+
+        if (!response.ok) {
+          throw new Error("Không kiểm tra được phiên GitHub.");
+        }
+
+        const data = await response.json();
+        setGitHubUser(data.user ?? null);
+      } catch {
+        setGitHubUser(null);
+      } finally {
+        setGitHubLoading(false);
+        setGitHubRefreshing(false);
+      }
+    },
+    [],
+  );
+
+  useEffect(() => {
+    void fetchGitHubStatus();
+  }, [fetchGitHubStatus]);
 
   useEffect(() => {
     setAutoRefresh(readStoredBoolean(AUTO_REFRESH_KEY, true));
@@ -890,6 +1141,10 @@ export default function Dashboard() {
     });
   }
 
+  function handleLogout() {
+    window.location.assign("/api/github/logout");
+  }
+
   const headerTitle = loading ? "Đang tải fleet..." : `${total} VM trong hệ thống`;
 
   return (
@@ -931,6 +1186,15 @@ export default function Dashboard() {
               <div className="w-full xl:flex xl:justify-end">
                 <ThemeToggle />
               </div>
+              <GitHubSessionCard
+                user={githubUser}
+                loading={githubLoading}
+                refreshing={githubRefreshing}
+                selectedVm={selectedVm}
+                onRefresh={() => void fetchGitHubStatus({ silent: true })}
+                onDeploy={() => openGitHub(selectedVm?.id)}
+                onLogout={handleLogout}
+              />
               <div className="flex w-full flex-col gap-3 sm:flex-row xl:justify-end">
                 <button
                   type="button"
@@ -1182,6 +1446,23 @@ export default function Dashboard() {
           </div>
 
           <aside className="space-y-6">
+            <ControlPlaneCard
+              total={total}
+              visible={visibleVMs.length}
+              attentionCount={attentionCount}
+              lastUpdated={lastUpdated}
+              autoRefresh={autoRefresh}
+              selectedVm={selectedVm}
+              onRefreshFleet={() => void fetchFleet({ silent: true })}
+              onCreate={() => {
+                setCreatePresetKey(null);
+                setShowCreate(true);
+              }}
+              onCopySnapshot={() =>
+                void tryCopy(buildInventoryText(visibleVMs), "Đã copy snapshot fleet.")
+              }
+            />
+
             <div className="surface-panel rounded-[2rem] p-5 sm:p-6 xl:sticky xl:top-6">
               <div className="flex items-center justify-between gap-3">
                 <div>
@@ -1330,6 +1611,7 @@ export default function Dashboard() {
       {showGitHub && (
         <GitHubDeployModal
           vms={vms}
+          githubUser={githubUser}
           initialVmId={githubTargetVmId ?? undefined}
           onDeploy={handleDeployFromGitHub}
           onClose={() => {

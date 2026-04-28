@@ -1,8 +1,10 @@
 "use client";
 
+import Image from "next/image";
 import { useEffect, useMemo, useState } from "react";
 import {
   CheckCircle2,
+  ExternalLink,
   GitBranch,
   Loader2,
   RefreshCw,
@@ -26,8 +28,16 @@ interface RepoOption {
   default_branch: string;
 }
 
+interface GitHubUser {
+  login: string;
+  name: string | null;
+  avatar_url: string;
+  html_url: string;
+}
+
 interface GitHubDeployModalProps {
   vms: VMOption[];
+  githubUser?: GitHubUser | null;
   initialVmId?: string;
   onDeploy: (vmId: string, cloneUrl: string) => void;
   onClose: () => void;
@@ -43,6 +53,7 @@ function normalizeGitHubError(message: string) {
 
 export default function GitHubDeployModal({
   vms,
+  githubUser,
   initialVmId,
   onDeploy,
   onClose,
@@ -145,6 +156,30 @@ export default function GitHubDeployModal({
                   GitHub đã đăng nhập sẵn, giờ bạn chỉ cần chọn repository muốn clone và
                   VM đích để mở Web SSH.
                 </p>
+
+                {githubUser && (
+                  <div className="mt-4 inline-flex items-center gap-3 rounded-full border border-border/70 bg-background/70 px-3.5 py-2 text-sm text-foreground">
+                    <Image
+                      src={githubUser.avatar_url}
+                      alt={githubUser.login}
+                      width={28}
+                      height={28}
+                      className="h-7 w-7 rounded-full border border-border/70 object-cover"
+                    />
+                    <span className="truncate font-medium">
+                      Repo đang sync từ @{githubUser.login}
+                    </span>
+                    <a
+                      href={githubUser.html_url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex items-center gap-1 text-primary transition hover:opacity-80"
+                    >
+                      Hồ sơ
+                      <ExternalLink className="h-3.5 w-3.5" />
+                    </a>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -303,6 +338,18 @@ export default function GitHubDeployModal({
                       value={selectedVmObj?.name || "Chưa chọn"}
                     />
                   </div>
+
+                  {selectedRepoObj?.html_url && (
+                    <a
+                      href={selectedRepoObj.html_url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="mt-4 inline-flex items-center gap-2 rounded-full border border-border/70 bg-card px-4 py-2 text-sm font-semibold text-foreground transition hover:border-primary/35 hover:text-primary"
+                    >
+                      <ExternalLink className="h-4 w-4" />
+                      Mở repository trên GitHub
+                    </a>
+                  )}
                 </div>
               </div>
             </section>
