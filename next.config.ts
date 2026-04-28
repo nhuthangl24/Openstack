@@ -4,7 +4,12 @@ import type { NextConfig } from "next";
 const rootDir = fileURLToPath(new URL(".", import.meta.url));
 
 const nextConfig: NextConfig = {
-  allowedDevOrigins: ["192.168.10.11"],
+  allowedDevOrigins: [
+    "192.168.10.11",
+    "8767-42-114-112-109.ngrok-free.app",
+    ".ngrok-free.app",
+    "*",
+  ],
   images: {
     remotePatterns: [
       {
