@@ -396,8 +396,12 @@ export default function WebSSHModal({
 
               {initialCommand && (
                 <div className="mt-3 rounded-[1.1rem] border border-border/70 bg-background/70 px-4 py-3 text-sm text-muted-foreground">
-                  Lệnh sẽ chạy sau khi kết nối:{" "}
-                  <span className="font-mono text-foreground">{initialCommand}</span>
+                  <p className="font-semibold text-foreground">
+                    Workflow sẽ chạy sau khi kết nối:
+                  </p>
+                  <pre className="mt-3 max-h-32 overflow-auto whitespace-pre-wrap rounded-[0.9rem] border border-border/70 bg-slate-950 px-3 py-3 text-xs leading-6 text-slate-100">
+                    <code>{initialCommand}</code>
+                  </pre>
                 </div>
               )}
 

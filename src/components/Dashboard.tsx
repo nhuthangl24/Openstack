@@ -39,7 +39,9 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import CreateServerModal from "@/components/CreateServerModal";
-import GitHubDeployModal from "@/components/GitHubDeployModal";
+import GitHubDeployModal, {
+  type GitHubDeployPlan,
+} from "@/components/GitHubDeployModal";
 import ThemeToggle from "@/components/ThemeToggle";
 import VMSuccessModal from "@/components/VMSuccessModal";
 import WebSSHModal from "@/components/WebSSHModal";
@@ -879,6 +881,65 @@ function ControlPlaneCard({
   );
 }
 
+function NavbarLink({
+  href,
+  label,
+}: {
+  href: string;
+  label: string;
+}) {
+  return (
+    <a
+      href={href}
+      className="rounded-full border border-transparent px-3 py-2 text-sm font-medium text-muted-foreground transition hover:border-border/70 hover:bg-background/70 hover:text-foreground"
+    >
+      {label}
+    </a>
+  );
+}
+
+function HeroFeatureCard({
+  icon: Icon,
+  label,
+  value,
+  helper,
+}: {
+  icon: LucideIcon;
+  label: string;
+  value: string;
+  helper: string;
+}) {
+  return (
+    <div className="rounded-[1.35rem] border border-border/70 bg-background/70 p-4">
+      <div className="flex items-center gap-2 text-muted-foreground">
+        <Icon className="h-4 w-4 text-primary" />
+        <span className="text-[11px] font-semibold uppercase tracking-[0.18em]">
+          {label}
+        </span>
+      </div>
+      <p className="mt-3 text-lg font-semibold tracking-tight text-foreground">{value}</p>
+      <p className="mt-1 text-sm text-muted-foreground">{helper}</p>
+    </div>
+  );
+}
+
+function FooterStatus({
+  label,
+  value,
+}: {
+  label: string;
+  value: string;
+}) {
+  return (
+    <div className="rounded-[1.2rem] border border-border/70 bg-background/70 px-4 py-3">
+      <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+        {label}
+      </p>
+      <p className="mt-2 text-sm font-medium text-foreground">{value}</p>
+    </div>
+  );
+}
+
 export default function Dashboard() {
   const [vms, setVMs] = useState<VM[]>([]);
   const [loading, setLoading] = useState(true);
@@ -1126,8 +1187,8 @@ export default function Dashboard() {
     setShowGitHub(true);
   }
 
-  function handleDeployFromGitHub(vmId: string, cloneUrl: string) {
-    const target = vms.find((vm) => vm.id === vmId);
+  function handleDeployFromGitHub(plan: GitHubDeployPlan) {
+    const target = vms.find((vm) => vm.id === plan.vmId);
 
     if (!target) {
       return;
@@ -1137,8 +1198,10 @@ export default function Dashboard() {
     setGitHubTargetVmId(null);
     setSshSession({
       vm: target,
-      command: `git clone ${cloneUrl}`,
+      command: plan.initialCommand,
     });
+
+    toast.success(`Đã chuẩn bị workflow deploy cho ${plan.repoLabel}.`);
   }
 
   function handleLogout() {
@@ -1155,68 +1218,126 @@ export default function Dashboard() {
         <div className="absolute bottom-[-12rem] left-1/2 h-[26rem] w-[26rem] -translate-x-1/2 rounded-full bg-emerald-300/14 blur-3xl dark:bg-emerald-500/10" />
       </div>
 
-      <div className="relative z-10 mx-auto max-w-7xl px-4 pb-10 pt-6 sm:px-6 lg:px-8">
-        <header className="surface-panel surface-noise overflow-hidden rounded-[2.2rem] px-5 py-6 sm:px-6 sm:py-7 xl:px-8">
-          <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(18rem,23rem)] xl:items-start">
-            <div className="flex min-w-0 items-start gap-4 sm:gap-5">
-              <div className="flex h-15 w-15 flex-shrink-0 items-center justify-center rounded-[1.45rem] bg-foreground text-background shadow-[0_18px_45px_-28px_rgba(15,23,42,0.7)]">
-                <Activity className="h-6 w-6" />
-              </div>
-              <div className="min-w-0">
-                <div className="inline-flex items-center gap-2 rounded-full border border-border/70 bg-background/72 px-3.5 py-1.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                  <span
-                    className={`h-2 w-2 rounded-full ${
-                      error ? "bg-rose-400" : "bg-emerald-400"
-                    }`}
-                  />
-                  {error ? "OpenStack cần kiểm tra" : "OpenStack đang kết nối"}
+      <div className="relative z-10 mx-auto max-w-7xl px-4 pb-10 pt-4 sm:px-6 lg:px-8">
+        <nav className="surface-panel sticky top-4 z-30 mb-6 rounded-[1.6rem] px-4 py-3 sm:px-5">
+          <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+            <div className="flex flex-wrap items-center gap-3">
+              <div className="flex items-center gap-3 rounded-full border border-border/70 bg-background/70 px-3 py-2">
+                <div className="flex h-9 w-9 items-center justify-center rounded-full bg-foreground text-background">
+                  <Activity className="h-4 w-4" />
                 </div>
-                <h1 className="mt-4 text-3xl font-semibold leading-none tracking-tight text-foreground sm:text-4xl xl:text-[3.2rem]">
-                  OrbitStack Console
-                </h1>
-                <p className="mt-3 max-w-3xl text-sm leading-7 text-muted-foreground sm:text-base">
-                  UI mới tập trung vào tốc độ thao tác: theo dõi fleet, tạo VM bằng
-                  preset, triển khai repo từ GitHub và mở Web SSH ngay trong một
-                  chỗ.
-                </p>
+                <div>
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                    OrbitStack
+                  </p>
+                  <p className="text-sm font-semibold text-foreground">OpenStack Control</p>
+                </div>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-1">
+                <NavbarLink href="#overview" label="Tổng quan" />
+                <NavbarLink href="#fleet" label="Fleet" />
+                <NavbarLink href="#launch" label="Preset" />
+                <NavbarLink href="#focus" label="VM Focus" />
+                <NavbarLink href="#footer" label="Footer" />
               </div>
             </div>
 
-            <div className="flex min-w-0 flex-col gap-3 xl:items-end">
-              <div className="w-full xl:flex xl:justify-end">
-                <ThemeToggle />
+            <div className="flex flex-wrap items-center gap-3">
+              <div className="rounded-full border border-border/70 bg-background/70 px-4 py-2 text-sm text-muted-foreground">
+                Sync {formatLastUpdated(lastUpdated)}
               </div>
-              <GitHubSessionCard
-                user={githubUser}
-                loading={githubLoading}
-                refreshing={githubRefreshing}
-                selectedVm={selectedVm}
-                onRefresh={() => void fetchGitHubStatus({ silent: true })}
-                onDeploy={() => openGitHub(selectedVm?.id)}
-                onLogout={handleLogout}
-              />
-              <div className="flex w-full flex-col gap-3 sm:flex-row xl:justify-end">
-                <button
-                  type="button"
-                  onClick={() => openGitHub()}
-                  className="inline-flex items-center justify-center gap-2 rounded-[1.15rem] border border-border/70 bg-background/75 px-5 py-3 text-sm font-semibold text-foreground transition hover:border-primary/35 hover:text-primary"
-                >
-                  <GitBranch className="h-4 w-4" />
-                  GitHub Deploy
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setCreatePresetKey(null);
-                    setShowCreate(true);
-                  }}
-                  className="inline-flex items-center justify-center gap-2 rounded-[1.15rem] bg-foreground px-5 py-3 text-sm font-semibold text-background transition hover:opacity-90"
-                >
-                  <Plus className="h-4 w-4" />
-                  Tạo server mới
-                </button>
-              </div>
+              <ThemeToggle />
+              <button
+                type="button"
+                onClick={() => openGitHub()}
+                className="inline-flex items-center justify-center gap-2 rounded-full border border-border/70 bg-background/75 px-4 py-2.5 text-sm font-semibold text-foreground transition hover:border-primary/35 hover:text-primary"
+              >
+                <GitBranch className="h-4 w-4" />
+                GitHub Deploy
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setCreatePresetKey(null);
+                  setShowCreate(true);
+                }}
+                className="inline-flex items-center justify-center gap-2 rounded-full bg-foreground px-4 py-2.5 text-sm font-semibold text-background transition hover:opacity-90"
+              >
+                <Plus className="h-4 w-4" />
+                Tạo server mới
+              </button>
             </div>
+          </div>
+        </nav>
+
+        <header
+          id="overview"
+          className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_24rem] xl:items-start"
+        >
+          <div className="surface-panel surface-noise overflow-hidden rounded-[2.2rem] px-5 py-6 sm:px-6 sm:py-7 xl:px-8">
+            <div className="inline-flex items-center gap-2 rounded-full border border-border/70 bg-background/72 px-3.5 py-1.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+              <span
+                className={`h-2 w-2 rounded-full ${
+                  error ? "bg-rose-400" : "bg-emerald-400"
+                }`}
+              />
+              {error ? "OpenStack cần kiểm tra" : "OpenStack đang kết nối"}
+            </div>
+
+            <h1 className="mt-5 text-3xl font-semibold leading-none tracking-tight text-foreground sm:text-4xl xl:text-[3.2rem]">
+              OrbitStack Console
+            </h1>
+            <p className="mt-4 max-w-3xl text-sm leading-7 text-muted-foreground sm:text-base">
+              Dashboard mới được chia lại theo đúng nhịp vận hành OpenStack: có navbar,
+              header, footer, khối fleet rõ ràng và một pipeline deploy repo đủ để đi
+              từ source code đến cấu hình môi trường ngay trong Web SSH.
+            </p>
+
+            <div className="mt-6 grid gap-3 md:grid-cols-3">
+              <HeroFeatureCard
+                icon={ShieldCheck}
+                label="SSH Ready"
+                value={`${readyCount} VM`}
+                helper="Máy đã có IP và có thể vào terminal ngay."
+              />
+              <HeroFeatureCard
+                icon={GitBranch}
+                label="Repo Relay"
+                value={githubUser ? `@${githubUser.login}` : "Chưa đọc phiên"}
+                helper="Có thể lấy repo đã liên kết hoặc dán repo ngoài."
+              />
+              <HeroFeatureCard
+                icon={Terminal}
+                label="Deploy Flow"
+                value={selectedVm ? selectedVm.name : "Chọn một VM"}
+                helper="Web SSH sẽ nhận luôn script clone, env và install."
+              />
+            </div>
+
+            <div className="mt-6 flex flex-wrap gap-2 text-sm text-muted-foreground">
+              <span className="rounded-full border border-border/70 bg-background/70 px-3 py-1.5">
+                OpenStack CLI chạy trực tiếp trên server
+              </span>
+              <span className="rounded-full border border-border/70 bg-background/70 px-3 py-1.5">
+                GitHub OAuth gate đang bật
+              </span>
+              <span className="rounded-full border border-border/70 bg-background/70 px-3 py-1.5">
+                Repo ngoài + `.env` + install command đã sẵn sàng
+              </span>
+            </div>
+          </div>
+
+          <div className="space-y-4">
+            <GitHubSessionCard
+              user={githubUser}
+              loading={githubLoading}
+              refreshing={githubRefreshing}
+              selectedVm={selectedVm}
+              onRefresh={() => void fetchGitHubStatus({ silent: true })}
+              onDeploy={() => openGitHub(selectedVm?.id)}
+              onLogout={handleLogout}
+            />
           </div>
         </header>
 
@@ -1247,7 +1368,10 @@ export default function Dashboard() {
           />
         </section>
 
-        <section className="mt-6 grid gap-6 xl:grid-cols-[minmax(0,1fr)_22rem]">
+        <section
+          id="fleet"
+          className="mt-6 grid gap-6 xl:grid-cols-[minmax(0,1fr)_22rem]"
+        >
           <div className="space-y-6">
             <div className="surface-panel rounded-[2rem] p-5 sm:p-6">
               <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
@@ -1463,7 +1587,10 @@ export default function Dashboard() {
               }
             />
 
-            <div className="surface-panel rounded-[2rem] p-5 sm:p-6 xl:sticky xl:top-6">
+            <div
+              id="launch"
+              className="surface-panel rounded-[2rem] p-5 sm:p-6 xl:sticky xl:top-24"
+            >
               <div className="flex items-center justify-between gap-3">
                 <div>
                   <p className="text-xs font-semibold uppercase tracking-[0.24em] text-muted-foreground">
@@ -1486,7 +1613,7 @@ export default function Dashboard() {
               </div>
             </div>
 
-            <div className="surface-panel rounded-[2rem] p-5 sm:p-6">
+            <div id="focus" className="surface-panel rounded-[2rem] p-5 sm:p-6">
               <div className="flex items-center justify-between gap-3">
                 <div>
                   <p className="text-xs font-semibold uppercase tracking-[0.24em] text-muted-foreground">
@@ -1568,6 +1695,40 @@ export default function Dashboard() {
             </div>
           </aside>
         </section>
+
+        <footer
+          id="footer"
+          className="surface-panel surface-noise mt-8 rounded-[2rem] px-5 py-5 sm:px-6"
+        >
+          <div className="grid gap-6 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,0.95fr)_minmax(0,0.9fr)]">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.22em] text-muted-foreground">
+                Footer Console
+              </p>
+              <h2 className="mt-2 text-2xl font-semibold tracking-tight text-foreground">
+                Shell giao diện đã được làm lại theo kiểu control app
+              </h2>
+              <p className="mt-3 text-sm leading-7 text-muted-foreground">
+                Navbar dùng cho điều hướng và action nhanh, header tập trung vào trạng
+                thái hệ thống, footer gom các thông tin vận hành để nhìn phát là hiểu
+                app đang chạy trên server nào, GitHub đang ở phiên nào và VM nào đang
+                được focus.
+              </p>
+            </div>
+
+            <div className="grid gap-3">
+              <FooterStatus label="Fleet đang hiển thị" value={`${visibleVMs.length}/${total} VM`} />
+              <FooterStatus label="GitHub session" value={githubUser ? `@${githubUser.login}` : "Chưa đồng bộ"} />
+              <FooterStatus label="Auto refresh" value={autoRefresh ? "Đang bật mỗi 15 giây" : "Đang tắt"} />
+            </div>
+
+            <div className="grid gap-3">
+              <FooterStatus label="VM focus" value={selectedVm?.name || "Chưa chọn VM"} />
+              <FooterStatus label="SSH user mặc định" value={SSH_USER} />
+              <FooterStatus label="Bước repo mới" value="Clone, env, install, post deploy" />
+            </div>
+          </div>
+        </footer>
       </div>
 
       {showCreate && (
