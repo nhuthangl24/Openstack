@@ -1,10 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { setGitHubAccessToken } from "@/lib/github-session";
-import {
-  getGitHubCallbackUrl,
-  hasGitHubOAuthConfig,
-  isHttpsRequest,
-} from "@/lib/github-oauth";
+import { hasGitHubOAuthConfig, isHttpsRequest } from "@/lib/github-oauth";
 
 function buildErrorRedirect(request: NextRequest, code: string) {
   const url = new URL("/", request.url);
@@ -41,14 +37,12 @@ export async function GET(request: NextRequest) {
 
   const clientId = process.env.GITHUB_CLIENT_ID!.trim();
   const clientSecret = process.env.GITHUB_CLIENT_SECRET!.trim();
-  const callbackUrl = getGitHubCallbackUrl(request);
   const secure = isHttpsRequest(request);
 
   const body = new URLSearchParams({
     client_id: clientId,
     client_secret: clientSecret,
     code,
-    redirect_uri: callbackUrl,
     code_verifier: verifier,
   });
 
