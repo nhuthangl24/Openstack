@@ -34,7 +34,7 @@ export default function ThemeToggle() {
   const activeTheme = mounted ? theme ?? "system" : "system";
 
   return (
-    <div className="inline-grid w-full grid-cols-3 gap-1 rounded-[1.25rem] border border-border/70 bg-background/78 p-1.5 shadow-[0_20px_48px_-34px_rgba(15,23,42,0.55)] backdrop-blur sm:w-auto">
+    <div className="inline-grid w-full grid-cols-3 gap-1 rounded-[0.9rem] border border-border/80 bg-card/95 p-1 shadow-[0_18px_42px_-34px_rgba(15,23,42,0.42)] sm:w-auto">
       {THEMES.map(({ value, label, icon: Icon }) => {
         const isActive = activeTheme === value;
         const buttonTitle =
@@ -46,10 +46,10 @@ export default function ThemeToggle() {
             type="button"
             onClick={() => setTheme(value)}
             className={cn(
-              "inline-flex min-w-0 items-center justify-center gap-2 rounded-[1rem] px-3.5 py-2.5 text-[12px] font-semibold transition-all",
+              "inline-flex min-w-0 items-center justify-center gap-2 rounded-[0.7rem] px-3.5 py-2.5 text-[12px] font-semibold transition-all",
               isActive
-                ? "bg-foreground text-background shadow-[0_16px_34px_-24px_rgba(2,6,23,0.9)]"
-                : "text-muted-foreground hover:bg-muted/70 hover:text-foreground",
+                ? "bg-foreground text-background shadow-[0_10px_24px_-18px_rgba(2,6,23,0.9)]"
+                : "text-muted-foreground hover:bg-muted/80 hover:text-foreground",
             )}
             aria-pressed={isActive}
             title={buttonTitle}

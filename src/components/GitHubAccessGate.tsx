@@ -99,60 +99,102 @@ export default function GitHubAccessGate({
 
   return (
     <div className="relative min-h-screen overflow-hidden">
-      <div className="pointer-events-none absolute inset-0">
-        <div className="absolute left-[-10rem] top-[-8rem] h-[24rem] w-[24rem] rounded-full bg-cyan-400/16 blur-3xl dark:bg-cyan-500/18" />
-        <div className="absolute right-[-8rem] top-24 h-[20rem] w-[20rem] rounded-full bg-amber-300/18 blur-3xl dark:bg-amber-400/12" />
-        <div className="absolute bottom-[-10rem] left-1/2 h-[24rem] w-[24rem] -translate-x-1/2 rounded-full bg-emerald-300/14 blur-3xl dark:bg-emerald-500/10" />
-      </div>
-
-      <div className="relative z-10 mx-auto flex min-h-screen max-w-6xl items-center px-4 py-10 sm:px-6 lg:px-8">
-        <div className="surface-panel surface-noise grid w-full gap-6 overflow-hidden rounded-[2.2rem] p-6 lg:grid-cols-[minmax(0,1fr)_24rem] lg:p-8">
-          <div>
-            <div className="inline-flex items-center gap-2 rounded-full border border-border/70 bg-background/72 px-3.5 py-1.5 text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">
-              <Sparkles className="h-3.5 w-3.5" />
-              GitHub Access
+      <div className="relative z-10 mx-auto max-w-7xl px-4 py-5 sm:px-6 lg:px-8">
+        <div className="surface-panel mb-5 flex flex-col gap-4 rounded-[1.3rem] px-4 py-3 lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-[0.9rem] bg-foreground text-background">
+              <Sparkles className="h-4 w-4" />
             </div>
-            <h1 className="mt-5 max-w-3xl text-3xl font-semibold leading-tight tracking-tight text-foreground sm:text-4xl">
-              Đăng nhập GitHub trước khi tạo VM hay triển khai repo
-            </h1>
-            <p className="mt-4 max-w-3xl text-sm leading-7 text-muted-foreground sm:text-base">
-              OrbitStack giờ dùng GitHub OAuth callback chuẩn. Bạn bấm đăng nhập,
-              GitHub xác thực xong sẽ tự quay về app và mở dashboard ngay.
-            </p>
+            <div>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">
+                OrbitStack Access Gate
+              </p>
+              <p className="text-sm font-semibold text-foreground">
+                GitHub xác thực trước khi mở control plane
+              </p>
+            </div>
+          </div>
 
-            <div className="mt-8 grid gap-3 sm:grid-cols-3">
+          <div className="rounded-full border border-border/70 bg-background/70 px-4 py-2 text-sm text-muted-foreground">
+            Callback: `/api/github/callback`
+          </div>
+        </div>
+
+        <div className="grid gap-5 xl:grid-cols-[280px_minmax(0,1fr)_360px]">
+          <aside className="surface-panel rounded-[1.6rem] p-5">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-muted-foreground">
+              Access Rules
+            </p>
+            <div className="mt-5 space-y-3">
               {[
-                "Đăng nhập GitHub xong mới mở toàn bộ dashboard",
-                "Repository lấy trực tiếp từ tài khoản đã xác thực",
-                "Deploy repo sang VM mà không cần nhập mã hay dán URL thủ công",
+                "Muốn tạo VM hay deploy repo thì phải qua GitHub gate trước.",
+                "Repo linked được kéo tự động từ tài khoản đã xác thực.",
+                "Repo ngoài vẫn có thể dán thủ công ở bước deploy pipeline.",
+                "Web SSH sẽ nhận workflow deploy sau khi bạn chọn VM đích.",
               ].map((item) => (
                 <div
                   key={item}
-                  className="rounded-[1.4rem] border border-border/70 bg-background/70 px-4 py-4 text-sm text-foreground"
+                  className="rounded-[1rem] border border-border/70 bg-background/70 px-4 py-4 text-sm leading-6 text-foreground"
                 >
                   {item}
                 </div>
               ))}
             </div>
+          </aside>
 
-            <div className="mt-6 rounded-[1.5rem] border border-border/70 bg-background/70 px-4 py-4 text-sm leading-6 text-muted-foreground">
-              Callback URL cần khai báo trong GitHub OAuth App:
-              <div className="mt-2 font-medium text-foreground">
-                `/api/github/callback` trên đúng domain/port đang chạy app
+          <main className="surface-panel surface-noise overflow-hidden rounded-[1.8rem] p-6 sm:p-7">
+            <div className="inline-flex items-center gap-2 rounded-full border border-border/70 bg-background/72 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.22em] text-muted-foreground">
+              <ShieldCheck className="h-3.5 w-3.5 text-primary" />
+              Identity Check
+            </div>
+
+            <h1 className="mt-5 max-w-4xl text-4xl font-semibold leading-[1.04] tracking-tight text-foreground sm:text-5xl">
+              Vào GitHub trước, rồi mới bật toàn bộ OpenStack workbench
+            </h1>
+            <p className="mt-5 max-w-3xl text-sm leading-7 text-muted-foreground sm:text-base">
+              Mình đã bỏ hẳn flow nhập mã. Từ đây bạn chỉ việc bấm đăng nhập, GitHub
+              authorize xong sẽ tự quay lại app và mở dashboard mới ngay lập tức.
+            </p>
+
+            <div className="mt-8 grid gap-3 md:grid-cols-2">
+              <div className="rounded-[1.2rem] border border-border/70 bg-background/70 p-4">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                  Linked Repos
+                </p>
+                <p className="mt-3 text-lg font-semibold text-foreground">
+                  Đồng bộ repo trực tiếp từ GitHub
+                </p>
+                <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                  Sau khi xác thực, modal deploy sẽ thấy repository của tài khoản đó
+                  ngay, không cần dán URL nữa nếu bạn không muốn.
+                </p>
+              </div>
+
+              <div className="rounded-[1.2rem] border border-border/70 bg-background/70 p-4">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                  Deploy Pipeline
+                </p>
+                <p className="mt-3 text-lg font-semibold text-foreground">
+                  Clone, env, install và post-deploy command
+                </p>
+                <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                  Ngay sau khi vào dashboard, bạn có thể build workflow deploy đầy đủ
+                  cho từng VM thay vì chỉ có mỗi `git clone`.
+                </p>
               </div>
             </div>
-          </div>
+          </main>
 
-          <div className="rounded-[1.8rem] border border-border/70 bg-background/70 p-5">
-            <p className="text-xs font-semibold uppercase tracking-[0.22em] text-muted-foreground">
-              1. Đăng nhập GitHub
+          <aside className="surface-panel rounded-[1.6rem] p-5">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-muted-foreground">
+              GitHub Login
             </p>
             <h2 className="mt-2 text-2xl font-semibold tracking-tight text-foreground">
-              Web OAuth Flow
+              OAuth Callback Flow
             </h2>
             <p className="mt-2 text-sm leading-6 text-muted-foreground">
-              Nhấn đăng nhập để chuyển sang GitHub. Sau khi xác thực xong, GitHub sẽ tự
-              redirect ngược về OrbitStack.
+              Nhấn để chuyển sang GitHub. Khi authorize xong, app sẽ quay về bằng
+              callback chuẩn và mở toàn bộ control plane.
             </p>
 
             <button
@@ -160,48 +202,48 @@ export default function GitHubAccessGate({
               onClick={() => {
                 window.location.href = "/api/github/login";
               }}
-              className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-[1.15rem] bg-foreground px-5 py-3 text-sm font-semibold text-background transition hover:opacity-90"
+              className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-[0.95rem] bg-foreground px-5 py-3.5 text-sm font-semibold text-background transition hover:opacity-90"
             >
               <GitBranch className="h-4 w-4" />
-              Đăng nhập GitHub tự động
+              Đăng nhập GitHub
             </button>
 
             <button
               type="button"
               onClick={() => void fetchStatus()}
-              className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-[1.15rem] border border-border/70 bg-background/70 px-5 py-3 text-sm font-semibold text-foreground transition hover:border-primary/35 hover:text-primary"
+              className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-[0.95rem] border border-border/70 bg-background/70 px-5 py-3.5 text-sm font-semibold text-foreground transition hover:border-primary/35 hover:text-primary"
             >
               <RefreshCw className="h-4 w-4" />
               Kiểm tra lại trạng thái
             </button>
 
             {(authError || error) && (
-              <div className="mt-5 rounded-[1.4rem] border border-rose-500/25 bg-rose-500/10 px-4 py-3 text-sm text-rose-200 dark:text-rose-300">
+              <div className="mt-5 rounded-[1rem] border border-rose-500/25 bg-rose-500/10 px-4 py-3 text-sm text-rose-200 dark:text-rose-300">
                 {authError || error}
               </div>
             )}
 
-            <div className="mt-5 rounded-[1.4rem] border border-border/70 bg-card px-4 py-4 text-sm text-muted-foreground">
+            {user && (
+              <div className="mt-5 rounded-[1rem] border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-200 dark:text-emerald-300">
+                Đã thấy phiên GitHub cho {user.name || user.login}.
+              </div>
+            )}
+
+            <div className="mt-5 rounded-[1rem] border border-border/70 bg-card px-4 py-4 text-sm text-muted-foreground">
               <div className="flex items-start gap-3">
                 <ShieldCheck className="mt-0.5 h-4 w-4 flex-shrink-0 text-primary" />
                 <p>
-                  Flow mới không còn dùng device code. GitHub sẽ tự redirect về app sau
-                  khi bạn bấm authorize.
+                  Không còn device code. GitHub sẽ tự redirect về app sau khi bạn bấm
+                  authorize ở tab GitHub.
                 </p>
               </div>
             </div>
 
-            {user && (
-              <div className="mt-5 rounded-[1.4rem] border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-200 dark:text-emerald-300">
-                Đã nhận phiên GitHub cho {user.name || user.login}.
-              </div>
-            )}
-
             <div className="mt-5 inline-flex items-center gap-2 text-sm font-semibold text-primary">
-              Đăng nhập xong là mở toàn bộ control
+              Xác thực xong là mở toàn bộ workbench
               <ArrowRight className="h-4 w-4" />
             </div>
-          </div>
+          </aside>
         </div>
       </div>
     </div>

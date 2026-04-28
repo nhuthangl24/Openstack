@@ -34,55 +34,55 @@
 }
 
 :root {
-  --background: oklch(0.976 0.01 95.13);
-  --foreground: oklch(0.246 0.025 247.86);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.246 0.025 247.86);
-  --popover: oklch(0.995 0.005 95);
-  --popover-foreground: oklch(0.246 0.025 247.86);
-  --primary: oklch(0.36 0.12 222.12);
-  --primary-foreground: oklch(0.985 0.005 95);
-  --secondary: oklch(0.945 0.012 232);
-  --secondary-foreground: oklch(0.246 0.025 247.86);
-  --muted: oklch(0.948 0.008 240);
-  --muted-foreground: oklch(0.54 0.03 255);
-  --accent: oklch(0.94 0.03 90);
-  --accent-foreground: oklch(0.246 0.025 247.86);
+  --background: oklch(0.972 0.012 90);
+  --foreground: oklch(0.245 0.02 250);
+  --card: oklch(0.992 0.008 95);
+  --card-foreground: oklch(0.245 0.02 250);
+  --popover: oklch(0.99 0.008 92);
+  --popover-foreground: oklch(0.245 0.02 250);
+  --primary: oklch(0.61 0.16 66);
+  --primary-foreground: oklch(0.16 0.01 255);
+  --secondary: oklch(0.95 0.012 80);
+  --secondary-foreground: oklch(0.245 0.02 250);
+  --muted: oklch(0.945 0.009 85);
+  --muted-foreground: oklch(0.52 0.025 250);
+  --accent: oklch(0.92 0.028 185);
+  --accent-foreground: oklch(0.23 0.02 250);
   --destructive: oklch(0.61 0.19 27);
-  --border: oklch(0.87 0.012 240);
-  --input: oklch(0.94 0.012 240);
-  --ring: oklch(0.66 0.12 220);
-  --chart-1: oklch(0.68 0.16 225);
-  --chart-2: oklch(0.76 0.16 162);
-  --chart-3: oklch(0.78 0.17 85);
-  --chart-4: oklch(0.66 0.16 25);
-  --radius: 1.1rem;
+  --border: oklch(0.84 0.014 88);
+  --input: oklch(0.955 0.01 88);
+  --ring: oklch(0.61 0.16 66);
+  --chart-1: oklch(0.62 0.18 65);
+  --chart-2: oklch(0.7 0.14 196);
+  --chart-3: oklch(0.75 0.15 150);
+  --chart-4: oklch(0.68 0.17 20);
+  --radius: 0.95rem;
   color-scheme: light;
 }
 
 .dark {
-  --background: oklch(0.17 0.015 248);
-  --foreground: oklch(0.95 0.01 100);
-  --card: oklch(0.23 0.02 248);
-  --card-foreground: oklch(0.95 0.01 100);
-  --popover: oklch(0.21 0.02 248);
-  --popover-foreground: oklch(0.95 0.01 100);
-  --primary: oklch(0.77 0.15 214);
-  --primary-foreground: oklch(0.19 0.015 248);
-  --secondary: oklch(0.28 0.018 248);
-  --secondary-foreground: oklch(0.95 0.01 100);
-  --muted: oklch(0.27 0.012 248);
-  --muted-foreground: oklch(0.73 0.02 252);
-  --accent: oklch(0.3 0.028 88);
-  --accent-foreground: oklch(0.95 0.01 100);
+  --background: oklch(0.15 0.01 255);
+  --foreground: oklch(0.95 0.008 95);
+  --card: oklch(0.2 0.012 255);
+  --card-foreground: oklch(0.95 0.008 95);
+  --popover: oklch(0.18 0.012 255);
+  --popover-foreground: oklch(0.95 0.008 95);
+  --primary: oklch(0.74 0.16 67);
+  --primary-foreground: oklch(0.16 0.01 255);
+  --secondary: oklch(0.24 0.014 250);
+  --secondary-foreground: oklch(0.95 0.008 95);
+  --muted: oklch(0.22 0.012 252);
+  --muted-foreground: oklch(0.75 0.02 250);
+  --accent: oklch(0.28 0.03 190);
+  --accent-foreground: oklch(0.95 0.008 95);
   --destructive: oklch(0.68 0.17 28);
-  --border: oklch(0.33 0.02 248);
-  --input: oklch(0.28 0.018 248);
-  --ring: oklch(0.8 0.12 214);
-  --chart-1: oklch(0.76 0.17 220);
-  --chart-2: oklch(0.79 0.17 160);
-  --chart-3: oklch(0.82 0.17 84);
-  --chart-4: oklch(0.72 0.18 30);
+  --border: oklch(0.3 0.014 252);
+  --input: oklch(0.24 0.014 252);
+  --ring: oklch(0.74 0.16 67);
+  --chart-1: oklch(0.74 0.16 67);
+  --chart-2: oklch(0.72 0.14 198);
+  --chart-3: oklch(0.75 0.15 150);
+  --chart-4: oklch(0.7 0.17 24);
   color-scheme: dark;
 }
 
@@ -100,19 +100,23 @@
     @apply bg-background text-foreground;
     min-height: 100vh;
     background-image:
-      radial-gradient(circle at top left, rgba(43, 152, 255, 0.16), transparent 30%),
-      radial-gradient(circle at top right, rgba(255, 180, 74, 0.16), transparent 24%),
-      linear-gradient(180deg, rgba(255, 255, 255, 0.38), transparent 30%),
-      linear-gradient(180deg, rgba(255, 255, 255, 0), rgba(9, 14, 28, 0.02));
+      linear-gradient(rgba(40, 44, 52, 0.06) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(40, 44, 52, 0.06) 1px, transparent 1px),
+      radial-gradient(circle at top left, rgba(255, 181, 72, 0.18), transparent 28%),
+      radial-gradient(circle at 85% 12%, rgba(65, 170, 204, 0.12), transparent 24%),
+      linear-gradient(180deg, rgba(255, 255, 255, 0.54), rgba(255, 255, 255, 0));
+    background-size: 24px 24px, 24px 24px, auto, auto, auto;
     background-attachment: fixed;
   }
 
   .dark body {
     background-image:
-      radial-gradient(circle at top left, rgba(35, 143, 255, 0.2), transparent 28%),
-      radial-gradient(circle at top right, rgba(255, 162, 72, 0.18), transparent 22%),
-      linear-gradient(180deg, rgba(255, 255, 255, 0.02), transparent 24%),
-      linear-gradient(180deg, rgba(4, 6, 14, 0.12), rgba(4, 6, 14, 0.55));
+      linear-gradient(rgba(255, 255, 255, 0.035) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255, 255, 255, 0.035) 1px, transparent 1px),
+      radial-gradient(circle at top left, rgba(255, 176, 66, 0.18), transparent 24%),
+      radial-gradient(circle at 85% 10%, rgba(44, 185, 210, 0.15), transparent 20%),
+      linear-gradient(180deg, rgba(9, 12, 20, 0.76), rgba(11, 14, 24, 0.98));
+    background-size: 24px 24px, 24px 24px, auto, auto, auto;
   }
 
   ::selection {
@@ -181,14 +185,20 @@
 }
 
 .surface-panel {
-  background: color-mix(in oklab, var(--card) 88%, transparent);
-  border: 1px solid color-mix(in oklab, var(--border) 92%, transparent);
-  box-shadow: 0 30px 90px -55px rgba(15, 23, 42, 0.4);
-  backdrop-filter: blur(22px);
+  background:
+    linear-gradient(180deg, color-mix(in oklab, var(--card) 96%, transparent), color-mix(in oklab, var(--card) 90%, transparent)),
+    radial-gradient(circle at top right, color-mix(in oklab, var(--primary) 8%, transparent), transparent 32%);
+  border: 1px solid color-mix(in oklab, var(--border) 96%, transparent);
+  box-shadow:
+    0 28px 80px -62px rgba(15, 23, 42, 0.5),
+    inset 0 1px 0 rgba(255, 255, 255, 0.28);
+  backdrop-filter: blur(14px);
 }
 
 .dark .surface-panel {
-  box-shadow: 0 42px 110px -65px rgba(2, 8, 23, 0.9);
+  box-shadow:
+    0 34px 96px -70px rgba(0, 0, 0, 0.88),
+    inset 0 1px 0 rgba(255, 255, 255, 0.04);
 }
 
 .surface-noise {
@@ -201,12 +211,10 @@
   inset: 0;
   pointer-events: none;
   border-radius: inherit;
-  background-image: linear-gradient(
-    135deg,
-    rgba(255, 255, 255, 0.08),
-    rgba(255, 255, 255, 0) 35%
-  );
-  opacity: 0.65;
+  background-image:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0) 32%),
+    linear-gradient(0deg, rgba(255, 255, 255, 0.015), rgba(255, 255, 255, 0.015));
+  opacity: 0.7;
 }
 
 .env-chip {
