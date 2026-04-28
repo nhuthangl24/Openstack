@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
   generateOAuthState,
+  getGitHubCallbackUrl,
   generatePkcePair,
   hasGitHubOAuthConfig,
   isHttpsRequest,
@@ -15,12 +16,14 @@ export async function GET(request: NextRequest) {
   }
 
   const clientId = process.env.GITHUB_CLIENT_ID!.trim();
+  const callbackUrl = getGitHubCallbackUrl(request);
   const state = generateOAuthState();
   const { verifier, challenge } = generatePkcePair();
   const secure = isHttpsRequest(request);
 
   const authorizeUrl = new URL("https://github.com/login/oauth/authorize");
   authorizeUrl.searchParams.set("client_id", clientId);
+  authorizeUrl.searchParams.set("redirect_uri", callbackUrl);
   authorizeUrl.searchParams.set("scope", "repo read:user");
   authorizeUrl.searchParams.set("state", state);
   authorizeUrl.searchParams.set("code_challenge", challenge);

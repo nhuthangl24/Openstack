@@ -3,6 +3,27 @@ import type { NextRequest } from "next/server";
 
 const CALLBACK_PATH = "/api/github/callback";
 
+export function getRequestOrigin(request: NextRequest) {
+  const configured = process.env.GITHUB_CALLBACK_URL?.trim();
+
+  if (configured) {
+    return new URL(configured).origin;
+  }
+
+  const forwardedProto =
+    request.headers.get("x-forwarded-proto")?.split(",")[0]?.trim() || "";
+  const forwardedHost =
+    request.headers.get("x-forwarded-host")?.split(",")[0]?.trim() || "";
+  const host = forwardedHost || request.headers.get("host")?.trim() || "";
+  const protocol = forwardedProto || request.nextUrl.protocol.replace(":", "");
+
+  if (host && protocol) {
+    return `${protocol}://${host}`;
+  }
+
+  return request.nextUrl.origin;
+}
+
 export function getGitHubCallbackUrl(request: NextRequest) {
   const configured = process.env.GITHUB_CALLBACK_URL?.trim();
 
@@ -10,7 +31,7 @@ export function getGitHubCallbackUrl(request: NextRequest) {
     return configured;
   }
 
-  return new URL(CALLBACK_PATH, request.nextUrl.origin).toString();
+  return new URL(CALLBACK_PATH, getRequestOrigin(request)).toString();
 }
 
 export function hasGitHubOAuthConfig() {

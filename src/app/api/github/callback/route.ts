@@ -1,9 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { setGitHubAccessToken } from "@/lib/github-session";
-import { hasGitHubOAuthConfig, isHttpsRequest } from "@/lib/github-oauth";
+import {
+  getGitHubCallbackUrl,
+  getRequestOrigin,
+  hasGitHubOAuthConfig,
+  isHttpsRequest,
+} from "@/lib/github-oauth";
 
 function buildErrorRedirect(request: NextRequest, code: string) {
-  const url = new URL("/", request.url);
+  const url = new URL("/", getRequestOrigin(request));
   url.searchParams.set("github_error", code);
   return url;
 }
@@ -37,6 +42,7 @@ export async function GET(request: NextRequest) {
 
   const clientId = process.env.GITHUB_CLIENT_ID!.trim();
   const clientSecret = process.env.GITHUB_CLIENT_SECRET!.trim();
+  const callbackUrl = getGitHubCallbackUrl(request);
   const secure = isHttpsRequest(request);
 
   const body = new URLSearchParams({
@@ -44,6 +50,7 @@ export async function GET(request: NextRequest) {
     client_secret: clientSecret,
     code,
     code_verifier: verifier,
+    redirect_uri: callbackUrl,
   });
 
   const tokenResponse = await fetch("https://github.com/login/oauth/access_token", {
@@ -85,7 +92,7 @@ export async function GET(request: NextRequest) {
 
   setGitHubAccessToken(tokenData.access_token);
 
-  const response = NextResponse.redirect(new URL("/", request.url));
+  const response = NextResponse.redirect(new URL("/", getRequestOrigin(request)));
   response.cookies.set({
     name: "gh_token",
     value: tokenData.access_token,
