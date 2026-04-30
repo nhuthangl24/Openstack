@@ -2041,72 +2041,70 @@ export default function Dashboard({
             : missionPage;
 
   const shellHeader = (
-    <header className="surface-panel sticky top-4 z-40 overflow-hidden rounded-[1.6rem] px-4 py-4 sm:px-5 sm:py-5">
-      <div className="flex flex-col gap-5">
-        <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
-          <div className="flex min-w-0 items-start gap-3">
+    <header className="sticky top-4 z-40">
+      <div className="surface-panel overflow-hidden rounded-[1.6rem]">
+        <div className="flex flex-col gap-4 border-b border-border/70 px-4 py-4 sm:px-5 lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex min-w-0 items-center gap-3">
             <Link
               href="/"
               className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-[1rem] bg-foreground text-background shadow-[0_18px_44px_-28px_rgba(15,23,42,0.78)]"
             >
               <Activity className="h-4 w-4" />
             </Link>
+
             <div className="min-w-0">
-              <div className="inline-flex items-center gap-2 rounded-full border border-border/70 bg-background/75 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.22em] text-muted-foreground">
-                <span className={`h-2 w-2 rounded-full ${error ? "bg-rose-400" : "bg-emerald-400 status-pulse"}`} />
-                OrbitStack // Bảng điều khiển
-              </div>
-              <h1 className="mt-3 text-xl font-semibold tracking-tight text-foreground sm:text-2xl">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-muted-foreground">
+                OrbitStack
+              </p>
+              <h1 className="truncate text-lg font-semibold tracking-tight text-foreground sm:text-xl">
                 {currentShell.title}
               </h1>
-              <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
+              <p className="mt-1 line-clamp-2 max-w-2xl text-sm leading-6 text-muted-foreground">
                 {currentShell.description}
               </p>
             </div>
           </div>
 
-          <div className="flex flex-col items-stretch gap-3 xl:min-w-[24rem] xl:items-end">
-            <div className="flex flex-wrap items-center gap-3 xl:justify-end">
-              <div className="inline-flex items-center gap-2 rounded-[1rem] border border-border/70 bg-background/75 px-3 py-2 text-sm text-muted-foreground">
-                <span className={`h-2.5 w-2.5 rounded-full ${refreshing ? "bg-amber-400 status-pulse" : error ? "bg-rose-400" : "bg-emerald-400"}`} />
-                Sync {formatLastUpdated(lastUpdated)}
-              </div>
-              <div className="inline-flex items-center gap-2 rounded-[1rem] border border-border/70 bg-background/75 px-3 py-2 text-sm text-muted-foreground">
-                <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                  Trang
-                </span>
-                <span className="font-semibold text-foreground">
-                  {currentShell.eyebrow}
-                </span>
-              </div>
-              <ThemeToggle />
+          <div className="flex flex-wrap items-center gap-2 lg:justify-end">
+            <div className="inline-flex items-center gap-2 rounded-full border border-border/70 bg-background/75 px-3 py-2 text-sm text-muted-foreground">
+              <span
+                className={`h-2.5 w-2.5 rounded-full ${
+                  refreshing
+                    ? "bg-amber-400 status-pulse"
+                    : error
+                      ? "bg-rose-400"
+                      : "bg-emerald-400"
+                }`}
+              />
+              Đồng bộ {formatLastUpdated(lastUpdated)}
             </div>
 
-            <div className="flex flex-wrap gap-2 xl:justify-end">
-              <Link
-                href="/dashboard/databases"
-                className="inline-flex items-center gap-2 rounded-full border border-border/70 bg-background/75 px-4 py-2.5 text-sm font-semibold text-foreground transition hover:border-primary/35 hover:text-primary"
-              >
-                <Database className="h-4 w-4" />
-                Cơ sở dữ liệu
-              </Link>
-              <button
-                type="button"
-                onClick={() => {
-                  setCreatePresetKey(null);
-                  setShowCreate(true);
-                }}
-                className="inline-flex items-center gap-2 rounded-full bg-foreground px-4 py-2.5 text-sm font-semibold text-background transition hover:opacity-90"
-              >
-                <Plus className="h-4 w-4" />
-                Tao VM moi
-              </button>
-            </div>
+            <Link
+              href="/dashboard/databases"
+              className="inline-flex items-center gap-2 rounded-full border border-border/70 bg-background/75 px-4 py-2.5 text-sm font-semibold text-foreground transition hover:border-primary/35 hover:text-primary"
+            >
+              <Database className="h-4 w-4" />
+              Cơ sở dữ liệu
+            </Link>
+
+            <button
+              type="button"
+              onClick={() => {
+                setCreatePresetKey(null);
+                setShowCreate(true);
+              }}
+              className="inline-flex items-center gap-2 rounded-full bg-foreground px-4 py-2.5 text-sm font-semibold text-background transition hover:opacity-90"
+            >
+              <Plus className="h-4 w-4" />
+              Tạo VM mới
+            </button>
+
+            <ThemeToggle />
           </div>
         </div>
 
-        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-          <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-col gap-3 px-4 py-3 sm:px-5 lg:flex-row lg:items-center lg:justify-between">
+          <nav className="flex flex-wrap items-center gap-2">
             {navigationItems.map((item) => (
               <NavbarLink
                 key={item.key}
@@ -2115,21 +2113,25 @@ export default function Dashboard({
                 active={tab === item.key}
               />
             ))}
-          </div>
+          </nav>
 
-          <div className="grid gap-2 sm:grid-cols-3 lg:min-w-[32rem]">
-            <FooterStatus
-              label="Máy hiển thị"
-              value={`${visibleVMs.length}/${total} VM`}
-            />
-            <FooterStatus
-              label="Máy đang chọn"
-              value={selectedVm?.name || "Chưa chọn"}
-            />
-            <FooterStatus
-              label="GitHub"
-              value={githubUser ? `@${githubUser.login}` : "Đang khóa"}
-            />
+          <div className="flex flex-wrap gap-2 text-sm">
+            <span className="inline-flex items-center gap-2 rounded-full border border-border/70 bg-background/75 px-3 py-2 text-muted-foreground">
+              <span className="font-semibold text-foreground">Trang:</span>
+              {currentShell.eyebrow}
+            </span>
+            <span className="inline-flex items-center gap-2 rounded-full border border-border/70 bg-background/75 px-3 py-2 text-muted-foreground">
+              <span className="font-semibold text-foreground">Máy:</span>
+              {visibleVMs.length}/{total}
+            </span>
+            <span className="inline-flex items-center gap-2 rounded-full border border-border/70 bg-background/75 px-3 py-2 text-muted-foreground">
+              <span className="font-semibold text-foreground">Đang chọn:</span>
+              {selectedVm?.name || "Chưa có"}
+            </span>
+            <span className="inline-flex items-center gap-2 rounded-full border border-border/70 bg-background/75 px-3 py-2 text-muted-foreground">
+              <span className="font-semibold text-foreground">GitHub:</span>
+              {githubUser ? `@${githubUser.login}` : "Chưa đăng nhập"}
+            </span>
           </div>
         </div>
       </div>
@@ -2137,75 +2139,54 @@ export default function Dashboard({
   );
 
   const shellFooter = (
-    <footer className="surface-panel mt-5 rounded-[1.6rem] px-5 py-5 sm:px-6">
-      <div className="grid gap-4 xl:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)_minmax(0,1fr)]">
-        <div className="rounded-[1.2rem] border border-border/70 bg-background/72 p-4">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-muted-foreground">
-            Tóm tắt nhanh
+    <footer className="mt-6 border-t border-border/70 pt-4">
+      <div className="flex flex-col gap-4 rounded-[1.2rem] border border-border/70 bg-background/45 px-4 py-4 sm:px-5 lg:flex-row lg:items-center lg:justify-between">
+        <div className="min-w-0">
+          <p className="text-sm font-semibold text-foreground">
+            OrbitStack
           </p>
-          <p className="mt-3 text-lg font-semibold tracking-tight text-foreground">
-            Xem nhanh trạng thái hiện tại và đi tới các màn bạn dùng nhiều nhất.
-          </p>
-          <p className="mt-2 text-sm leading-6 text-muted-foreground">
-            Dùng các lối tắt bên dưới để chuyển nhanh sang cơ sở dữ liệu, terminal hoặc danh sách máy ảo.
+          <p className="mt-1 text-sm text-muted-foreground">
+            Điều khiển OpenStack, terminal và cơ sở dữ liệu trong cùng một bảng quản trị.
           </p>
         </div>
 
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
-          <FooterStatus
-            label="Trang hiện tại"
-            value={currentShell.eyebrow}
-          />
-          <FooterStatus
-            label="Lần đồng bộ"
-            value={formatLastUpdated(lastUpdated)}
-          />
-          <FooterStatus
-            label="SSH sẵn sàng"
-            value={`${readyCount}/${total || 0} VM`}
-          />
-          <FooterStatus
-            label="Tự làm mới"
-            value={autoRefresh ? "Đang bật" : "Đang tắt"}
-          />
+        <div className="flex flex-wrap gap-2 text-sm">
+          <span className="inline-flex items-center gap-2 rounded-full border border-border/70 bg-background/70 px-3 py-2 text-muted-foreground">
+            <span className="font-semibold text-foreground">Đồng bộ:</span>
+            {formatLastUpdated(lastUpdated)}
+          </span>
+          <span className="inline-flex items-center gap-2 rounded-full border border-border/70 bg-background/70 px-3 py-2 text-muted-foreground">
+            <span className="font-semibold text-foreground">SSH sẵn sàng:</span>
+            {readyCount}/{total || 0} VM
+          </span>
+          <span className="inline-flex items-center gap-2 rounded-full border border-border/70 bg-background/70 px-3 py-2 text-muted-foreground">
+            <span className="font-semibold text-foreground">Tự làm mới:</span>
+            {autoRefresh ? "Đang bật" : "Đang tắt"}
+          </span>
         </div>
 
-        <div className="rounded-[1.2rem] border border-border/70 bg-background/72 p-4">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-muted-foreground">
-            Đi nhanh
-          </p>
-          <div className="mt-4 grid gap-2">
-            <Link
-              href="/dashboard/databases"
-              className="inline-flex items-center justify-between rounded-[0.95rem] border border-border/70 bg-background/75 px-4 py-3 text-sm font-semibold text-foreground transition hover:border-primary/35 hover:text-primary"
-            >
-              <span className="inline-flex items-center gap-2">
-                <Database className="h-4 w-4" />
-                Cơ sở dữ liệu
-              </span>
-              <ArrowUpRight className="h-4 w-4" />
-            </Link>
-            <Link
-              href="/terminal"
-              className="inline-flex items-center justify-between rounded-[0.95rem] border border-border/70 bg-background/75 px-4 py-3 text-sm font-semibold text-foreground transition hover:border-primary/35 hover:text-primary"
-            >
-              <span className="inline-flex items-center gap-2">
-                <Terminal className="h-4 w-4" />
-                Terminal
-              </span>
-              <ArrowUpRight className="h-4 w-4" />
-            </Link>
-            <Link
-              href="/fleet"
-              className="inline-flex items-center justify-between rounded-[0.95rem] border border-border/70 bg-background/75 px-4 py-3 text-sm font-semibold text-foreground transition hover:border-primary/35 hover:text-primary"
-            >
-              <span className="inline-flex items-center gap-2">
-                <Server className="h-4 w-4" />
-                Máy ảo
-              </span>
-              <ArrowUpRight className="h-4 w-4" />
-            </Link>
-          </div>
+        <div className="flex flex-wrap gap-2">
+          <Link
+            href="/dashboard/databases"
+            className="inline-flex items-center gap-2 rounded-full border border-border/70 bg-background/70 px-4 py-2.5 text-sm font-semibold text-foreground transition hover:border-primary/35 hover:text-primary"
+          >
+            <Database className="h-4 w-4" />
+            Cơ sở dữ liệu
+          </Link>
+          <Link
+            href="/terminal"
+            className="inline-flex items-center gap-2 rounded-full border border-border/70 bg-background/70 px-4 py-2.5 text-sm font-semibold text-foreground transition hover:border-primary/35 hover:text-primary"
+          >
+            <Terminal className="h-4 w-4" />
+            Terminal
+          </Link>
+          <Link
+            href="/fleet"
+            className="inline-flex items-center gap-2 rounded-full border border-border/70 bg-background/70 px-4 py-2.5 text-sm font-semibold text-foreground transition hover:border-primary/35 hover:text-primary"
+          >
+            <Server className="h-4 w-4" />
+            Máy ảo
+          </Link>
         </div>
       </div>
     </footer>
@@ -2224,54 +2205,9 @@ export default function Dashboard({
       <div className="relative z-10 mx-auto max-w-[1640px] px-4 pb-8 pt-4 sm:px-6 lg:px-8">
         {shellHeader}
 
-        <nav className="hidden surface-panel sticky top-4 z-40 rounded-[1.4rem] px-4 py-3 sm:px-5">
-          <div className="grid gap-3 xl:grid-cols-[auto_minmax(0,1fr)_auto] xl:items-center">
-            <div className="flex items-center gap-3">
-              <div className="flex h-11 w-11 items-center justify-center rounded-[1rem] bg-foreground text-background shadow-[0_16px_40px_-26px_rgba(15,23,42,0.7)]">
-                <Activity className="h-4 w-4" />
-              </div>
-              <div>
-                <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-muted-foreground">
-                  OrbitStack // Bảng điều khiển
-                </p>
-                <p className="text-sm font-semibold text-foreground">
-                  OpenStack control shell cho vận hành thật
-                </p>
-              </div>
-            </div>
-
-            <div className="flex flex-wrap items-center gap-2 xl:justify-center">
-              {navigationItems.map((item) => (
-                <NavbarLink
-                  key={item.key}
-                  href={item.href}
-                  label={item.label}
-                  active={tab === item.key}
-                />
-              ))}
-            </div>
-
-            <div className="flex flex-wrap items-center gap-3 xl:justify-end">
-              <div className="rounded-[0.9rem] border border-border/70 bg-background/75 px-3 py-2 text-sm text-muted-foreground">
-                Sync {formatLastUpdated(lastUpdated)}
-              </div>
-              <ThemeToggle />
-            </div>
-          </div>
-        </nav>
-
         {pageContent}
 
         {shellFooter}
-
-        <footer className="hidden mt-4 rounded-[1.2rem] border border-border/70 bg-background/60 px-4 py-3 text-sm text-muted-foreground">
-          <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
-            <span>Giao diện được tách thành nhiều màn riêng để thao tác nhanh và gọn hơn.</span>
-            <span>
-              Trang hiện tại: <span className="font-semibold text-foreground">{tab}</span>
-            </span>
-          </div>
-        </footer>
       </div>
 
       {showCreate && (
