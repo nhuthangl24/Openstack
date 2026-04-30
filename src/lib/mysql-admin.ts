@@ -635,7 +635,7 @@ async function revokeDatabasePrivileges(
 ) {
   const principal = formatPrincipal(connection, mysqlUsername, hostAllow);
   await connection.query(
-    `REVOKE ALL PRIVILEGES, GRANT OPTION ON ${escapeIdentifier(databaseName)}.* FROM ${principal}`,
+    `REVOKE ${MYSQL_PRIVILEGES} ON ${escapeIdentifier(databaseName)}.* FROM ${principal}`,
   );
 }
 
