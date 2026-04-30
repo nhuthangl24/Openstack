@@ -91,6 +91,21 @@
     @apply border-border outline-ring/50;
   }
 
+  button:not(:disabled),
+  [role="button"]:not([aria-disabled="true"]),
+  a[href],
+  summary,
+  select,
+  input[type="checkbox"]:not(:disabled),
+  input[type="radio"]:not(:disabled) {
+    cursor: pointer;
+  }
+
+  button:disabled,
+  [aria-disabled="true"] {
+    cursor: not-allowed;
+  }
+
   html {
     @apply font-sans;
     scroll-behavior: smooth;
@@ -230,4 +245,12 @@
 .cn-toast {
   border-radius: calc(var(--radius) + 4px);
   box-shadow: 0 20px 60px -35px rgba(15, 23, 42, 0.45);
+}
+
+.terminal-shell .xterm {
+  height: 100%;
+}
+
+.terminal-shell .xterm-viewport {
+  scrollbar-gutter: stable;
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Bot,
   Clipboard,
@@ -285,6 +285,24 @@ export default function TerminalWorkbench({
   const credentialTarget = resolveCredentialTarget(selectedVm, resolvedHost);
   const activeReadyVm = vms.filter((vm) => vm.ip && vm.status === "ACTIVE");
 
+  const syncTerminalViewport = useCallback(() => {
+    if (!fitRef.current || !xtermRef.current) {
+      return;
+    }
+
+    fitRef.current.fit();
+
+    if (wsRef.current?.readyState === WebSocket.OPEN) {
+      wsRef.current.send(
+        JSON.stringify({
+          type: "resize",
+          cols: xtermRef.current.cols,
+          rows: xtermRef.current.rows,
+        }),
+      );
+    }
+  }, []);
+
   useEffect(() => {
     if (typeof window === "undefined") {
       return;
@@ -350,6 +368,10 @@ export default function TerminalWorkbench({
     term.writeln("\x1b[90mChon VM, nhap credential va ket noi de bat dau.\x1b[0m");
     term.writeln("");
 
+    window.requestAnimationFrame(() => syncTerminalViewport());
+    window.setTimeout(() => syncTerminalViewport(), 160);
+    window.setTimeout(() => syncTerminalViewport(), 420);
+
     term.onData((data) => {
       if (wsRef.current?.readyState === WebSocket.OPEN) {
         wsRef.current.send(data);
@@ -362,7 +384,7 @@ export default function TerminalWorkbench({
       xtermRef.current = null;
       fitRef.current = null;
     };
-  }, [resolvedTheme]);
+  }, [resolvedTheme, syncTerminalViewport]);
 
   useEffect(() => {
     if (!xtermRef.current) {
@@ -370,30 +392,30 @@ export default function TerminalWorkbench({
     }
 
     xtermRef.current.options.theme = terminalTheme(resolvedTheme);
-  }, [resolvedTheme]);
+    window.requestAnimationFrame(() => syncTerminalViewport());
+  }, [resolvedTheme, syncTerminalViewport]);
 
   useEffect(() => {
     function handleResize() {
-      if (!fitRef.current || !xtermRef.current) {
-        return;
-      }
-
-      fitRef.current.fit();
-
-      if (wsRef.current?.readyState === WebSocket.OPEN) {
-        wsRef.current.send(
-          JSON.stringify({
-            type: "resize",
-            cols: xtermRef.current.cols,
-            rows: xtermRef.current.rows,
-          }),
-        );
-      }
+      syncTerminalViewport();
     }
 
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
-  }, []);
+  }, [syncTerminalViewport]);
+
+  useEffect(() => {
+    if (!terminalRef.current || typeof ResizeObserver === "undefined") {
+      return;
+    }
+
+    const observer = new ResizeObserver(() => {
+      window.requestAnimationFrame(() => syncTerminalViewport());
+    });
+
+    observer.observe(terminalRef.current);
+    return () => observer.disconnect();
+  }, [syncTerminalViewport]);
 
   useEffect(() => {
     if (!connected || !xtermRef.current) {
@@ -403,7 +425,12 @@ export default function TerminalWorkbench({
     xtermRef.current.writeln(
       `\r\n\x1b[90m# Target refreshed: ${selectedVm?.name || resolvedHost || "manual host"}\x1b[0m`,
     );
-  }, [connected, resolvedHost, selectedVm]);
+    window.requestAnimationFrame(() => syncTerminalViewport());
+  }, [connected, resolvedHost, selectedVm, syncTerminalViewport]);
+
+  useEffect(() => {
+    window.requestAnimationFrame(() => syncTerminalViewport());
+  }, [pendingWorkflow, commandDraft, syncTerminalViewport]);
 
   function addActivity(label: string, detail: string) {
     setActivityFeed((current) =>
@@ -607,7 +634,7 @@ export default function TerminalWorkbench({
     : resolvedHost || "Manual target";
 
   return (
-    <section className="mt-6 space-y-4">
+    <section className="mt-6 space-y-4 pb-4">
       <div className="surface-panel surface-noise overflow-hidden rounded-[1.8rem] p-5 sm:p-6">
         <div className="flex flex-col gap-6 xl:flex-row xl:items-start xl:justify-between">
           <div className="max-w-4xl">
@@ -642,7 +669,7 @@ export default function TerminalWorkbench({
         </div>
       </div>
 
-      <div className="grid gap-4 xl:grid-cols-[320px_minmax(0,1fr)_360px] xl:items-start">
+      <div className="grid gap-4 xl:grid-cols-[300px_minmax(0,1fr)_340px] xl:items-start">
         <aside className="space-y-4">
           <div className="surface-panel rounded-[1.5rem] p-5">
             <SectionLabel
@@ -908,13 +935,15 @@ export default function TerminalWorkbench({
               </div>
             </div>
 
-            <div
-              ref={terminalRef}
-              className="h-[56vh] min-h-[460px] w-full overflow-hidden bg-[#07111f] px-3 py-3"
-            />
+            <div className="bg-[#07111f] p-3">
+              <div
+                ref={terminalRef}
+                className="terminal-shell h-[clamp(24rem,58vh,44rem)] min-h-[420px] w-full overflow-hidden rounded-[1rem] border border-slate-800/90 bg-[#07111f]"
+              />
+            </div>
           </div>
 
-          <div className="surface-panel rounded-[1.6rem] p-5 sm:p-6">
+          <div className="surface-panel rounded-[1.6rem] p-5 sm:p-6 xl:pb-7">
             <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
               <SectionLabel
                 title="Command Composer"

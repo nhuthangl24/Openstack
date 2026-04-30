@@ -1995,7 +1995,7 @@ export default function Dashboard({
             : missionPage;
 
   return (
-    <div className="relative min-h-screen overflow-hidden">
+    <div className="relative min-h-screen overflow-x-hidden">
       <div className="pointer-events-none absolute inset-0">
         <div className="absolute inset-y-0 left-[4%] w-px bg-gradient-to-b from-transparent via-border/60 to-transparent" />
         <div className="absolute inset-y-0 right-[4%] w-px bg-gradient-to-b from-transparent via-border/40 to-transparent" />
