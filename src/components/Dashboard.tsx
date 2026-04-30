@@ -908,10 +908,10 @@ function NavbarLink({
     <Link
       href={href}
       aria-current={active ? "page" : undefined}
-      className={`rounded-[0.8rem] border px-3 py-2 text-sm font-medium transition ${
+      className={`rounded-full border px-4 py-2.5 text-sm font-semibold transition ${
         active
-          ? "border-border/70 bg-background/80 text-foreground"
-          : "border-transparent text-muted-foreground hover:border-border/70 hover:bg-background/70 hover:text-foreground"
+          ? "border-primary/25 bg-primary/10 text-primary shadow-[0_10px_30px_-20px_rgba(251,191,36,0.8)]"
+          : "border-border/40 bg-background/45 text-muted-foreground hover:border-border/70 hover:bg-background/75 hover:text-foreground"
       }`}
     >
       {label}
@@ -1255,6 +1255,52 @@ export default function Dashboard({
     { href: "/command", key: "command", label: "Command Deck" },
     { href: "/terminal", key: "terminal", label: "Terminal Lab" },
   ];
+  const shellMeta: Record<
+    ConsoleTab,
+    {
+      eyebrow: string;
+      title: string;
+      description: string;
+    }
+  > = {
+    mission: {
+      eyebrow: "Mission Board",
+      title: "Trung tam dieu phoi OrbitStack",
+      description:
+        "Theo doi control plane, session GitHub va nhung VM dang duoc focus ngay tu shell chinh.",
+    },
+    fleet: {
+      eyebrow: "Fleet Matrix",
+      title: "Dieu phoi may ao theo dang bang van hanh",
+      description:
+        "Loc, sap xep va thao tac tren tung VM thay vi luot qua mot landing page dai.",
+    },
+    launch: {
+      eyebrow: "Launch Kits",
+      title: "Ban VM moi nhanh hon bang preset",
+      description:
+        "Mo preset, tao VM va day tiep workflow deploy ma khong phai di qua nhieu lop UI.",
+    },
+    inspect: {
+      eyebrow: "Inspector",
+      title: "Khoa mot VM va mo toan bo chi tiet van hanh",
+      description:
+        "IP, flavor, image, SSH va repo pipeline duoc gom vao mot workspace giam thao tac lap.",
+    },
+    command: {
+      eyebrow: "Command Deck",
+      title: "Khu dieu phoi deploy va runtime hooks",
+      description:
+        "Tap trung cac thong tin can thiet cho deploy repo, terminal va van hanh OpenStack.",
+    },
+    terminal: {
+      eyebrow: "Terminal Lab",
+      title: "SSH workspace tach rieng de thao tac that",
+      description:
+        "Ket noi SSH, review workflow deploy va gui lenh ngay trong mot mat phang gon gang hon.",
+    },
+  };
+  const currentShell = shellMeta[tab];
 
   const sessionCard = (
     <GitHubSessionCard
@@ -1994,6 +2040,177 @@ export default function Dashboard({
               ? terminalPage
             : missionPage;
 
+  const shellHeader = (
+    <header className="surface-panel sticky top-4 z-40 overflow-hidden rounded-[1.6rem] px-4 py-4 sm:px-5 sm:py-5">
+      <div className="flex flex-col gap-5">
+        <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+          <div className="flex min-w-0 items-start gap-3">
+            <Link
+              href="/"
+              className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-[1rem] bg-foreground text-background shadow-[0_18px_44px_-28px_rgba(15,23,42,0.78)]"
+            >
+              <Activity className="h-4 w-4" />
+            </Link>
+            <div className="min-w-0">
+              <div className="inline-flex items-center gap-2 rounded-full border border-border/70 bg-background/75 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.22em] text-muted-foreground">
+                <span className={`h-2 w-2 rounded-full ${error ? "bg-rose-400" : "bg-emerald-400 status-pulse"}`} />
+                OrbitStack // Workbench
+              </div>
+              <h1 className="mt-3 text-xl font-semibold tracking-tight text-foreground sm:text-2xl">
+                {currentShell.title}
+              </h1>
+              <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
+                {currentShell.description}
+              </p>
+            </div>
+          </div>
+
+          <div className="flex flex-col items-stretch gap-3 xl:min-w-[24rem] xl:items-end">
+            <div className="flex flex-wrap items-center gap-3 xl:justify-end">
+              <div className="inline-flex items-center gap-2 rounded-[1rem] border border-border/70 bg-background/75 px-3 py-2 text-sm text-muted-foreground">
+                <span className={`h-2.5 w-2.5 rounded-full ${refreshing ? "bg-amber-400 status-pulse" : error ? "bg-rose-400" : "bg-emerald-400"}`} />
+                Sync {formatLastUpdated(lastUpdated)}
+              </div>
+              <div className="inline-flex items-center gap-2 rounded-[1rem] border border-border/70 bg-background/75 px-3 py-2 text-sm text-muted-foreground">
+                <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                  Route
+                </span>
+                <span className="font-semibold text-foreground">
+                  {currentShell.eyebrow}
+                </span>
+              </div>
+              <ThemeToggle />
+            </div>
+
+            <div className="flex flex-wrap gap-2 xl:justify-end">
+              <Link
+                href="/dashboard/databases"
+                className="inline-flex items-center gap-2 rounded-full border border-border/70 bg-background/75 px-4 py-2.5 text-sm font-semibold text-foreground transition hover:border-primary/35 hover:text-primary"
+              >
+                <Database className="h-4 w-4" />
+                Database Hosting
+              </Link>
+              <button
+                type="button"
+                onClick={() => {
+                  setCreatePresetKey(null);
+                  setShowCreate(true);
+                }}
+                className="inline-flex items-center gap-2 rounded-full bg-foreground px-4 py-2.5 text-sm font-semibold text-background transition hover:opacity-90"
+              >
+                <Plus className="h-4 w-4" />
+                Tao VM moi
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex flex-wrap items-center gap-2">
+            {navigationItems.map((item) => (
+              <NavbarLink
+                key={item.key}
+                href={item.href}
+                label={item.label}
+                active={tab === item.key}
+              />
+            ))}
+          </div>
+
+          <div className="grid gap-2 sm:grid-cols-3 lg:min-w-[32rem]">
+            <FooterStatus
+              label="Fleet Live"
+              value={`${visibleVMs.length}/${total} VM`}
+            />
+            <FooterStatus
+              label="VM Focus"
+              value={selectedVm?.name || "Chua chon"}
+            />
+            <FooterStatus
+              label="GitHub"
+              value={githubUser ? `@${githubUser.login}` : "Dang khoa"}
+            />
+          </div>
+        </div>
+      </div>
+    </header>
+  );
+
+  const shellFooter = (
+    <footer className="surface-panel mt-5 rounded-[1.6rem] px-5 py-5 sm:px-6">
+      <div className="grid gap-4 xl:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)_minmax(0,1fr)]">
+        <div className="rounded-[1.2rem] border border-border/70 bg-background/72 p-4">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-muted-foreground">
+            OrbitStack Footer Dock
+          </p>
+          <p className="mt-3 text-lg font-semibold tracking-tight text-foreground">
+            Shell da doi sang multi-page workspace, footer nay la dock thong tin va shortcut that.
+          </p>
+          <p className="mt-2 text-sm leading-6 text-muted-foreground">
+            Ban co the nhay nhanh sang Database Hosting, Terminal Lab hoac Fleet Matrix ma khong phai quay ve mot trang landing.
+          </p>
+        </div>
+
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
+          <FooterStatus
+            label="Route hien tai"
+            value={currentShell.eyebrow}
+          />
+          <FooterStatus
+            label="Lan sync"
+            value={formatLastUpdated(lastUpdated)}
+          />
+          <FooterStatus
+            label="SSH ready"
+            value={`${readyCount}/${total || 0} VM`}
+          />
+          <FooterStatus
+            label="Auto refresh"
+            value={autoRefresh ? "Dang bat" : "Dang tat"}
+          />
+        </div>
+
+        <div className="rounded-[1.2rem] border border-border/70 bg-background/72 p-4">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-muted-foreground">
+            Quick Jump
+          </p>
+          <div className="mt-4 grid gap-2">
+            <Link
+              href="/dashboard/databases"
+              className="inline-flex items-center justify-between rounded-[0.95rem] border border-border/70 bg-background/75 px-4 py-3 text-sm font-semibold text-foreground transition hover:border-primary/35 hover:text-primary"
+            >
+              <span className="inline-flex items-center gap-2">
+                <Database className="h-4 w-4" />
+                Database Hosting
+              </span>
+              <ArrowUpRight className="h-4 w-4" />
+            </Link>
+            <Link
+              href="/terminal"
+              className="inline-flex items-center justify-between rounded-[0.95rem] border border-border/70 bg-background/75 px-4 py-3 text-sm font-semibold text-foreground transition hover:border-primary/35 hover:text-primary"
+            >
+              <span className="inline-flex items-center gap-2">
+                <Terminal className="h-4 w-4" />
+                Terminal Lab
+              </span>
+              <ArrowUpRight className="h-4 w-4" />
+            </Link>
+            <Link
+              href="/fleet"
+              className="inline-flex items-center justify-between rounded-[0.95rem] border border-border/70 bg-background/75 px-4 py-3 text-sm font-semibold text-foreground transition hover:border-primary/35 hover:text-primary"
+            >
+              <span className="inline-flex items-center gap-2">
+                <Server className="h-4 w-4" />
+                Fleet Matrix
+              </span>
+              <ArrowUpRight className="h-4 w-4" />
+            </Link>
+          </div>
+        </div>
+      </div>
+    </footer>
+  );
+
   return (
     <div className="relative min-h-screen overflow-x-hidden">
       <div className="pointer-events-none absolute inset-0">
@@ -2005,7 +2222,9 @@ export default function Dashboard({
       </div>
 
       <div className="relative z-10 mx-auto max-w-[1640px] px-4 pb-8 pt-4 sm:px-6 lg:px-8">
-        <nav className="surface-panel sticky top-4 z-40 rounded-[1.4rem] px-4 py-3 sm:px-5">
+        {shellHeader}
+
+        <nav className="hidden surface-panel sticky top-4 z-40 rounded-[1.4rem] px-4 py-3 sm:px-5">
           <div className="grid gap-3 xl:grid-cols-[auto_minmax(0,1fr)_auto] xl:items-center">
             <div className="flex items-center gap-3">
               <div className="flex h-11 w-11 items-center justify-center rounded-[1rem] bg-foreground text-background shadow-[0_16px_40px_-26px_rgba(15,23,42,0.7)]">
@@ -2043,7 +2262,9 @@ export default function Dashboard({
 
         {pageContent}
 
-        <footer className="mt-4 rounded-[1.2rem] border border-border/70 bg-background/60 px-4 py-3 text-sm text-muted-foreground">
+        {shellFooter}
+
+        <footer className="hidden mt-4 rounded-[1.2rem] border border-border/70 bg-background/60 px-4 py-3 text-sm text-muted-foreground">
           <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
             <span>OrbitStack đang chạy theo dạng multi-page workspace, không còn one-page landing shell.</span>
             <span>
