@@ -465,31 +465,41 @@ async function getPlanById(connection: PoolConnection, id: number) {
 
 async function getEffectiveQuotaForUser(connection: PoolConnection, user: AppUserRow) {
   const plan = await getPlanById(connection, user.plan_id);
-  const [rows] = await connection.execute<QuotaRow[]>(
-    `
-      SELECT max_databases, max_storage_mb, max_connections
-      FROM quotas
-      WHERE user_id = ?
-      LIMIT 1
-    `,
-    [user.id],
-  );
+  const loadQuotaRows = () =>
+    connection.execute<QuotaRow[]>(
+      `
+        SELECT max_databases, max_storage_mb, max_connections
+        FROM quotas
+        WHERE user_id = ?
+        LIMIT 1
+      `,
+      [user.id],
+    );
+
+  const [rows] = await loadQuotaRows();
 
   if (!rows.length) {
     await connection.execute(
       `
         INSERT INTO quotas (user_id, max_databases, max_storage_mb, max_connections)
         VALUES (?, ?, ?, ?)
+        ON DUPLICATE KEY UPDATE user_id = user_id
       `,
       [user.id, plan.max_databases, plan.max_total_storage_mb, plan.max_connections],
     );
 
+    const [persistedRows] = await loadQuotaRows();
+
+    if (!persistedRows.length) {
+      throw new DatabaseHostingError("Khong the khoi tao quota cho user.", 500, true);
+    }
+
     return {
       planCode: plan.code,
       planName: plan.name,
-      maxDatabases: plan.max_databases,
-      maxStorageMb: plan.max_total_storage_mb,
-      maxConnections: plan.max_connections,
+      maxDatabases: persistedRows[0].max_databases,
+      maxStorageMb: persistedRows[0].max_storage_mb,
+      maxConnections: persistedRows[0].max_connections,
     } satisfies EffectiveQuota;
   }
 
