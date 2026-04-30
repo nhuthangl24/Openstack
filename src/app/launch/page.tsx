@@ -2,9 +2,9 @@ import type { Metadata } from "next";
 import DashboardClientShell from "@/components/DashboardClientShell";
 
 export const metadata: Metadata = {
-  title: "OrbitStack Launch Kits",
+  title: "OrbitStack Tạo máy",
   description:
-    "Launch Kits cho OrbitStack: chọn preset, khởi tạo VM nhanh và kết nối sang pipeline deploy.",
+    "Trang tạo máy của OrbitStack: chọn preset, khởi tạo VM nhanh và nối tiếp sang triển khai.",
 };
 
 export default function LaunchPage() {

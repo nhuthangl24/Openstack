@@ -241,7 +241,7 @@ export default function GitHubDeployModal({
     setValidationError("");
 
     if (!selectedVm) {
-      setValidationError("Hãy chọn VM đích trước khi mở Terminal Lab.");
+      setValidationError("Hãy chọn VM đích trước khi mở terminal.");
       return;
     }
 
@@ -278,14 +278,14 @@ export default function GitHubDeployModal({
               </div>
               <div>
                 <div className="inline-flex items-center gap-2 rounded-full border border-border/70 bg-background/70 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.24em] text-muted-foreground">
-                  Repo Pipeline
+                  Triển khai repo
                 </div>
                 <h2 className="mt-3 text-2xl font-semibold tracking-tight text-foreground">
                   Deploy repo theo workflow của bạn
                 </h2>
                 <p className="mt-2 max-w-3xl text-sm leading-6 text-muted-foreground">
                   Chọn repo từ GitHub đã liên kết hoặc dán repo ngoài, thêm file môi
-                  trường, lệnh cài đặt và bước sau deploy để Terminal Lab mở ra là có thể
+                  trường, lệnh cài đặt và bước sau deploy để terminal mở ra là có thể
                   chạy tiếp ngay.
                 </p>
 
@@ -619,7 +619,7 @@ export default function GitHubDeployModal({
                   <div className="flex items-start gap-3">
                     <ShieldCheck className="mt-0.5 h-4 w-4 flex-shrink-0" />
                     <p>
-                      Terminal Lab sẽ mở vào đúng VM, sau đó tự chạy workflow bạn vừa cấu hình:
+                      Terminal sẽ mở vào đúng VM, sau đó tự chạy workflow bạn vừa cấu hình:
                       clone hoặc pull source, ghi file môi trường, rồi chạy lệnh cài và
                       lệnh sau deploy nếu có.
                     </p>
@@ -655,13 +655,13 @@ export default function GitHubDeployModal({
                   </select>
 
                   <div className="mt-4 space-y-3">
-                    <SummaryRow label="Nguồn repo" value={repoSource === "linked" ? "GitHub linked" : "External repo"} />
+                    <SummaryRow label="Nguồn repo" value={repoSource === "linked" ? "GitHub đã liên kết" : "Repo ngoài"} />
                     <SummaryRow label="Repository" value={activeRepo?.label || "Chưa chọn"} />
                     <SummaryRow label="Clone URL" value={activeRepo?.cloneUrl || "Chưa có"} />
-                    <SummaryRow label="Target VM" value={selectedVmObj?.name || "Chưa chọn"} />
-                    <SummaryRow label="Branch" value={branchName || "Mặc định của repo"} />
-                    <SummaryRow label="Recipe" value={activeRecipe.label} />
-                    <SummaryRow label="Env vars" value={envCount ? `${envCount} biến` : "Không tạo file env"} />
+                    <SummaryRow label="VM đích" value={selectedVmObj?.name || "Chưa chọn"} />
+                    <SummaryRow label="Nhánh" value={branchName || "Mặc định của repo"} />
+                    <SummaryRow label="Cách triển khai" value={activeRecipe.label} />
+                    <SummaryRow label="Biến môi trường" value={envCount ? `${envCount} biến` : "Không tạo file env"} />
                   </div>
 
                   {activeRepo?.htmlUrl && (
@@ -672,7 +672,7 @@ export default function GitHubDeployModal({
                       className="mt-4 inline-flex items-center gap-2 rounded-full border border-border/70 bg-card px-4 py-2 text-sm font-semibold text-foreground transition hover:border-primary/35 hover:text-primary"
                     >
                       <ExternalLink className="h-4 w-4" />
-                      Mở repository trên GitHub
+                      Mở repo trên GitHub
                     </a>
                   )}
                 </div>
@@ -681,15 +681,15 @@ export default function GitHubDeployModal({
                   <div className="flex items-center gap-2">
                     <Terminal className="h-4 w-4 text-primary" />
                     <p className="text-xs font-semibold uppercase tracking-[0.22em] text-muted-foreground">
-                      5. Script preview
+                      5. Xem trước script
                     </p>
                   </div>
                   <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                    Đây là workflow sẽ được bơm sẵn vào Terminal Lab ngay sau khi SSH kết nối.
+                    Đây là script sẽ được nạp sẵn vào terminal ngay sau khi SSH kết nối.
                   </p>
 
                   <pre className="mt-4 max-h-[20rem] overflow-auto rounded-[1.2rem] border border-border/70 bg-slate-950 px-4 py-4 text-xs leading-6 text-slate-100">
-                    <code>{commandPreview || "Chọn repo để xem trước workflow deploy."}</code>
+                    <code>{commandPreview || "Chọn repo để xem trước script triển khai."}</code>
                   </pre>
                 </div>
               </div>
@@ -723,7 +723,7 @@ export default function GitHubDeployModal({
                 className="inline-flex items-center justify-center gap-2 rounded-full bg-foreground px-5 py-3 text-sm font-semibold text-background transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
               >
                 <GitBranch className="h-4 w-4" />
-                Mở Terminal Lab và chạy workflow
+                Mở terminal và chạy script
               </button>
             </div>
           </div>

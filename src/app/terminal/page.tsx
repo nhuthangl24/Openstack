@@ -2,9 +2,9 @@ import type { Metadata } from "next";
 import DashboardClientShell from "@/components/DashboardClientShell";
 
 export const metadata: Metadata = {
-  title: "OrbitStack Terminal Lab",
+  title: "OrbitStack Terminal",
   description:
-    "Terminal Lab cho OrbitStack: SSH workspace rieng, workflow dock, command composer va transcript control tren mot trang doc lap.",
+    "Trang terminal của OrbitStack: kết nối SSH, xem kịch bản triển khai và gửi lệnh trên một màn riêng.",
 };
 
 export default function TerminalPage() {

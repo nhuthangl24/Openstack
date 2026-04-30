@@ -123,14 +123,14 @@ export default function GitHubAccessGate({
         <div className="grid gap-5 xl:grid-cols-[280px_minmax(0,1fr)_360px]">
           <aside className="surface-panel rounded-[1.6rem] p-5">
             <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-muted-foreground">
-              Access Rules
+              Quy tắc truy cập
             </p>
             <div className="mt-5 space-y-3">
               {[
                 "Muốn tạo VM hay deploy repo thì phải qua GitHub gate trước.",
                 "Repo linked được kéo tự động từ tài khoản đã xác thực.",
                 "Repo ngoài vẫn có thể dán thủ công ở bước deploy pipeline.",
-                "Terminal Lab sẽ nhận workflow deploy sau khi bạn chọn VM đích.",
+                "Terminal sẽ nhận script triển khai sau khi bạn chọn đúng VM đích.",
               ].map((item) => (
                 <div
                   key={item}
@@ -145,7 +145,7 @@ export default function GitHubAccessGate({
           <main className="surface-panel surface-noise overflow-hidden rounded-[1.8rem] p-6 sm:p-7">
             <div className="inline-flex items-center gap-2 rounded-full border border-border/70 bg-background/72 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.22em] text-muted-foreground">
               <ShieldCheck className="h-3.5 w-3.5 text-primary" />
-              Identity Check
+              Xác thực
             </div>
 
             <h1 className="mt-5 max-w-4xl text-4xl font-semibold leading-[1.04] tracking-tight text-foreground sm:text-5xl">
@@ -159,7 +159,7 @@ export default function GitHubAccessGate({
             <div className="mt-8 grid gap-3 md:grid-cols-2">
               <div className="rounded-[1.2rem] border border-border/70 bg-background/70 p-4">
                 <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                  Linked Repos
+                  Repo đã liên kết
                 </p>
                 <p className="mt-3 text-lg font-semibold text-foreground">
                   Đồng bộ repo trực tiếp từ GitHub
@@ -172,7 +172,7 @@ export default function GitHubAccessGate({
 
               <div className="rounded-[1.2rem] border border-border/70 bg-background/70 p-4">
                 <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                  Deploy Pipeline
+                  Luồng triển khai
                 </p>
                 <p className="mt-3 text-lg font-semibold text-foreground">
                   Clone, env, install và post-deploy command
@@ -187,10 +187,10 @@ export default function GitHubAccessGate({
 
           <aside className="surface-panel rounded-[1.6rem] p-5">
             <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-muted-foreground">
-              GitHub Login
+              Đăng nhập GitHub
             </p>
             <h2 className="mt-2 text-2xl font-semibold tracking-tight text-foreground">
-              OAuth Callback Flow
+              Luồng callback OAuth
             </h2>
             <p className="mt-2 text-sm leading-6 text-muted-foreground">
               Nhấn để chuyển sang GitHub. Khi authorize xong, app sẽ quay về bằng

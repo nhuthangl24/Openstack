@@ -2,9 +2,9 @@ import type { Metadata } from "next";
 import DashboardClientShell from "@/components/DashboardClientShell";
 
 export const metadata: Metadata = {
-  title: "OrbitStack Inspector",
+  title: "OrbitStack Theo dõi",
   description:
-    "Inspector cho OrbitStack: khoa mot VM, xem chi tiet, mo Terminal Lab va dieu phoi repo pipeline.",
+    "Trang theo dõi của OrbitStack: khóa một VM, xem chi tiết, mở terminal và điều phối triển khai repo.",
 };
 
 export default function InspectPage() {

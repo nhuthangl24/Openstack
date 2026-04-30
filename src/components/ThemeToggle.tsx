@@ -8,17 +8,17 @@ import { cn } from "@/lib/utils";
 const THEMES = [
   {
     value: "light" as const,
-    label: "Light",
+    label: "Sáng",
     icon: SunMedium,
   },
   {
     value: "dark" as const,
-    label: "Dark",
+    label: "Tối",
     icon: MoonStar,
   },
   {
     value: "system" as const,
-    label: "System",
+    label: "Hệ thống",
     icon: LaptopMinimal,
   },
 ];
@@ -38,7 +38,7 @@ export default function ThemeToggle() {
       {THEMES.map(({ value, label, icon: Icon }) => {
         const isActive = activeTheme === value;
         const buttonTitle =
-          value === "system" && mounted ? "System" : label;
+          value === "system" && mounted ? "Hệ thống" : label;
 
         return (
           <button

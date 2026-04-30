@@ -63,11 +63,13 @@ function DatabaseHostingContent() {
       const usageData = await usageResponse.json();
 
       if (!databasesResponse.ok) {
-        throw new Error(databasesData.error_message || "Khong tai duoc danh sach database.");
+        throw new Error(
+          databasesData.error_message || "Không tải được danh sách cơ sở dữ liệu.",
+        );
       }
 
       if (!usageResponse.ok) {
-        throw new Error(usageData.error_message || "Khong tai duoc quota usage.");
+        throw new Error(usageData.error_message || "Không tải được dữ liệu quota.");
       }
 
       setDatabases(databasesData.databases || []);
@@ -81,7 +83,7 @@ function DatabaseHostingContent() {
       const message =
         fetchError instanceof Error
           ? fetchError.message
-          : "Khong tai duoc module Database Hosting.";
+          : "Không tải được module cơ sở dữ liệu.";
       setError(message);
     } finally {
       setLoading(false);
@@ -95,14 +97,14 @@ function DatabaseHostingContent() {
 
   const upgradeMessage = useMemo(() => {
     if (!usage) {
-      return "Database Hosting module chua co du lieu quota.";
+      return "Chưa có dữ liệu quota để hiển thị.";
     }
 
     if (usage.remaining.remainingDatabases > 0) {
-      return `Ban con ${usage.remaining.remainingDatabases} database truoc khi can nang cap plan.`;
+      return `Bạn còn ${usage.remaining.remainingDatabases} cơ sở dữ liệu trước khi cần nâng cấp gói.`;
     }
 
-    return "Quota database da het, day la luc hop ly de nang cap plan.";
+    return "Quota cơ sở dữ liệu đã hết, bạn nên nâng cấp gói để tạo thêm.";
   }, [usage]);
 
   async function handleCreate(name: string) {
@@ -120,14 +122,14 @@ function DatabaseHostingContent() {
       const data = await response.json();
 
       if (!response.ok || !data.success) {
-        throw new Error(data.error_message || "Khong tao duoc database.");
+        throw new Error(data.error_message || "Không tạo được cơ sở dữ liệu.");
       }
 
-      toast.success(`Da tao database ${data.database.realDatabaseName}.`);
+      toast.success(`Đã tạo ${data.database.realDatabaseName}.`);
       setCreateOpen(false);
-      setConnectionTitle(`Connection cho ${data.database.displayName}`);
+      setConnectionTitle(`Kết nối của ${data.database.displayName}`);
       setConnectionSubtitle(
-        "Password nay se duoc hien thi ngay luc create thanh cong. Ban co the copy sang VM client.",
+        "Mật khẩu này chỉ hiện ở thời điểm tạo thành công. Hãy sao chép sang ứng dụng hoặc VM của bạn.",
       );
       setSelectedConnection(data.connection);
       setConnectionOpen(true);
@@ -136,7 +138,7 @@ function DatabaseHostingContent() {
       toast.error(
         createError instanceof Error
           ? createError.message
-          : "Khong tao duoc database.",
+          : "Không tạo được cơ sở dữ liệu.",
       );
     } finally {
       setCreating(false);
@@ -154,20 +156,20 @@ function DatabaseHostingContent() {
       const data = await response.json();
 
       if (!response.ok || !data.success) {
-        throw new Error(data.error_message || "Khong tai duoc connection.");
+        throw new Error(data.error_message || "Không tải được thông tin kết nối.");
       }
 
       setSelectedConnection(data.connection);
-      setConnectionTitle(`Connection cho ${database.displayName}`);
+      setConnectionTitle(`Kết nối của ${database.displayName}`);
       setConnectionSubtitle(
-        `Scoped credentials cua ${database.realDatabaseName}. User khong co quyen root hay cross-database.`,
+        `Tài khoản ${database.mysqlUsername} chỉ có quyền trong ${database.realDatabaseName}, không có quyền quản trị toàn hệ thống.`,
       );
       setConnectionOpen(true);
     } catch (viewError) {
       toast.error(
         viewError instanceof Error
           ? viewError.message
-          : "Khong tai duoc connection.",
+          : "Không tải được thông tin kết nối.",
       );
     } finally {
       setActiveActionId("");
@@ -188,7 +190,7 @@ function DatabaseHostingContent() {
       const resetData = await resetResponse.json();
 
       if (!resetResponse.ok || !resetData.success) {
-        throw new Error(resetData.error_message || "Khong reset duoc password.");
+        throw new Error(resetData.error_message || "Không đổi được mật khẩu.");
       }
 
       const connectionResponse = await fetch(
@@ -202,22 +204,23 @@ function DatabaseHostingContent() {
 
       if (!connectionResponse.ok || !connectionData.success) {
         throw new Error(
-          connectionData.error_message || "Password da reset nhung khong tai duoc connection.",
+          connectionData.error_message ||
+            "Đã đổi mật khẩu nhưng chưa tải được thông tin kết nối mới.",
         );
       }
 
       setSelectedConnection(connectionData.connection);
-      setConnectionTitle(`Password moi cho ${database.displayName}`);
+      setConnectionTitle(`Mật khẩu mới của ${database.displayName}`);
       setConnectionSubtitle(
-        "Reset password se quay vong cho toan bo MySQL account cua user nay. Hay cap nhat lai tat ca app dang dung account do.",
+        "Đổi mật khẩu sẽ xoay vòng cho toàn bộ tài khoản MySQL của người dùng này. Hãy cập nhật lại mọi ứng dụng đang dùng tài khoản đó.",
       );
       setConnectionOpen(true);
-      toast.success(`Da rotate password cho ${database.mysqlUsername}.`);
+      toast.success(`Đã đổi mật khẩu cho ${database.mysqlUsername}.`);
     } catch (resetError) {
       toast.error(
         resetError instanceof Error
           ? resetError.message
-          : "Khong reset duoc password.",
+          : "Không đổi được mật khẩu.",
       );
     } finally {
       setActiveActionId("");
@@ -227,7 +230,7 @@ function DatabaseHostingContent() {
 
   async function handleDelete(database: HostedDatabaseItem) {
     const ok = window.confirm(
-      `Ban chac chan muon xoa database ${database.realDatabaseName}? Hanh dong nay se drop toan bo data va khong the phuc hoi tu UI.`,
+      `Bạn chắc chắn muốn xóa ${database.realDatabaseName}? Hành động này sẽ xóa toàn bộ dữ liệu và không thể khôi phục từ giao diện.`,
     );
 
     if (!ok) {
@@ -244,16 +247,16 @@ function DatabaseHostingContent() {
       const data = await response.json();
 
       if (!response.ok || !data.success) {
-        throw new Error(data.error_message || "Khong xoa duoc database.");
+        throw new Error(data.error_message || "Không xóa được cơ sở dữ liệu.");
       }
 
-      toast.success(`Da xoa ${database.realDatabaseName}.`);
+      toast.success(`Đã xóa ${database.realDatabaseName}.`);
       await fetchAll({ silent: true });
     } catch (deleteError) {
       toast.error(
         deleteError instanceof Error
           ? deleteError.message
-          : "Khong xoa duoc database.",
+          : "Không xóa được cơ sở dữ liệu.",
       );
     } finally {
       setActiveActionId("");
@@ -276,10 +279,10 @@ function DatabaseHostingContent() {
             </div>
             <div>
               <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-muted-foreground">
-                OrbitStack // Database Hosting
+                OrbitStack // Cơ sở dữ liệu
               </p>
               <p className="text-sm font-semibold text-foreground">
-                Shared managed MySQL platform cho OpenStack user
+                MySQL dùng chung cho từng người dùng OpenStack
               </p>
             </div>
           </div>
@@ -290,7 +293,7 @@ function DatabaseHostingContent() {
               className="inline-flex items-center gap-2 rounded-full border border-border/70 bg-background/70 px-4 py-2.5 text-sm font-semibold text-foreground transition hover:border-primary/35 hover:text-primary"
             >
               <ArrowLeft className="h-4 w-4" />
-              Quay lại control plane
+              Quay lại bảng điều khiển
             </Link>
             <button
               type="button"
@@ -309,15 +312,15 @@ function DatabaseHostingContent() {
             <div className="surface-panel surface-noise rounded-[1.8rem] p-6">
               <div className="inline-flex items-center gap-2 rounded-full border border-border/70 bg-background/72 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.22em] text-muted-foreground">
                 <ShieldCheck className="h-3.5 w-3.5 text-primary" />
-                Production-grade DBaaS mini
+                Cơ sở dữ liệu dùng chung
               </div>
               <h1 className="mt-5 max-w-5xl text-4xl font-semibold leading-[1.04] tracking-tight text-foreground sm:text-5xl">
-                User tạo database qua UI, còn MySQL root/admin chỉ tồn tại ở control plane nội bộ.
+                Tạo và quản lý cơ sở dữ liệu qua giao diện, không lộ tài khoản quản trị MySQL.
               </h1>
               <p className="mt-5 max-w-3xl text-sm leading-7 text-muted-foreground sm:text-base">
-                Module này đi theo mô hình shared managed database: một DB server riêng trong
-                private network, app giữ admin quyền nội bộ, user chỉ nhìn thấy database của
-                họ và chỉ thao tác create/delete/reset thông qua API dashboard.
+                Mỗi người dùng có một tài khoản MySQL riêng và nhiều cơ sở dữ liệu riêng.
+                Hệ thống giữ quyền quản trị nội bộ, tự cấp quyền đúng phạm vi và chỉ mở
+                cổng từ mạng private của VM sang máy chủ cơ sở dữ liệu.
               </p>
 
               <div className="mt-6 flex flex-wrap gap-3">
@@ -327,11 +330,11 @@ function DatabaseHostingContent() {
                   className="inline-flex items-center gap-2 rounded-full bg-foreground px-5 py-3 text-sm font-semibold text-background transition hover:opacity-90"
                 >
                   <Plus className="h-4 w-4" />
-                  Create Database
+                  Tạo cơ sở dữ liệu
                 </button>
                 <div className="inline-flex items-center gap-2 rounded-full border border-border/70 bg-background/72 px-4 py-3 text-sm font-medium text-muted-foreground">
                   <Server className="h-4 w-4 text-primary" />
-                  Shared private DB server • root password never leaves backend
+                  Máy chủ MySQL riêng trong mạng private
                 </div>
               </div>
             </div>
@@ -357,14 +360,14 @@ function DatabaseHostingContent() {
           <aside className="space-y-4">
             <div className="surface-panel rounded-[1.5rem] p-5">
               <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-muted-foreground">
-                What this module does
+                Module này làm gì
               </p>
               <div className="mt-5 space-y-3">
                 {[
-                  "Validate và sanitize tên DB trước khi đụng MySQL.",
-                  "Tự tạo MySQL account riêng cho từng user nếu chưa có.",
-                  "GRANT scoped quyền đúng trên database của user.",
-                  "Lưu metadata, quota, usage stats và audit logs nội bộ.",
+                  "Kiểm tra và chuẩn hóa tên cơ sở dữ liệu trước khi gửi lệnh tới MySQL.",
+                  "Tự tạo tài khoản MySQL riêng cho từng người dùng nếu chưa có.",
+                  "Chỉ cấp quyền đúng trên cơ sở dữ liệu của người dùng đó.",
+                  "Lưu metadata, quota, thống kê sử dụng và nhật ký audit nội bộ.",
                 ].map((item) => (
                   <div
                     key={item}
@@ -378,27 +381,27 @@ function DatabaseHostingContent() {
 
             <div className="surface-panel rounded-[1.5rem] p-5">
               <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-muted-foreground">
-                Billing / Quota
+                Gói và quota
               </p>
               <div className="mt-4 grid gap-3">
                 <div className="rounded-[1rem] border border-border/70 bg-background/70 px-4 py-4">
                   <p className="text-sm font-semibold text-foreground">
-                    {usage ? usage.plan.name : "Loading plan..."}
+                    {usage ? usage.plan.name : "Đang tải gói"}
                   </p>
                   <p className="mt-2 text-sm leading-6 text-muted-foreground">
                     {upgradeMessage}
                   </p>
                 </div>
                 <div className="rounded-[1rem] border border-border/70 bg-background/70 px-4 py-4">
-                  <p className="text-sm font-semibold text-foreground">Current storage</p>
+                  <p className="text-sm font-semibold text-foreground">Dung lượng hiện dùng</p>
                   <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                    {usage ? usage.usage.totalStorageLabel : "Dang tinh toan..."}
+                    {usage ? usage.usage.totalStorageLabel : "Đang tính toán..."}
                   </p>
                 </div>
                 <div className="rounded-[1rem] border border-border/70 bg-background/70 px-4 py-4">
-                  <p className="text-sm font-semibold text-foreground">Upgrade CTA</p>
+                  <p className="text-sm font-semibold text-foreground">Gợi ý nâng cấp</p>
                   <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                    Bạn có thể nối widget này vào billing page hoặc Telegram admin alert khi quota sắp hết.
+                    Bạn có thể nối phần này với trang thanh toán hoặc cảnh báo quản trị khi quota sắp hết.
                   </p>
                 </div>
               </div>
@@ -406,14 +409,14 @@ function DatabaseHostingContent() {
 
             <div className="surface-panel rounded-[1.5rem] p-5">
               <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-muted-foreground">
-                Security notes
+                Ghi chú bảo mật
               </p>
               <div className="mt-4 space-y-3">
                 {[
-                  "Không GRANT ALL ON *.* và không trao SUPER/FILE/PROCESS/GRANT OPTION.",
-                  "Mật khẩu app encrypt reference ở backend, UI chỉ hiện khi user chủ động xem.",
-                  "DB server nên chỉ mở 3306 cho private VM subnet và chặn public internet.",
-                  "Reset password hiện áp dụng cho toàn bộ MySQL account của user vì một user dùng chung nhiều DB.",
+                  "Không cấp GRANT ALL ON *.* và không trao SUPER, FILE, PROCESS hay GRANT OPTION.",
+                  "Mật khẩu chỉ được lưu dưới dạng tham chiếu mã hóa ở backend, không ghi log dạng rõ.",
+                  "Máy chủ cơ sở dữ liệu chỉ nên mở cổng 3306 cho subnet private của VM, không mở public internet.",
+                  "Đổi mật khẩu hiện áp dụng cho toàn bộ tài khoản MySQL của người dùng đó vì một tài khoản dùng chung cho nhiều cơ sở dữ liệu.",
                 ].map((item) => (
                   <div
                     key={item}

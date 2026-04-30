@@ -58,30 +58,30 @@ export default function QuotaWidget({
     <div className="grid gap-4 lg:grid-cols-4">
       <Metric
         icon={Database}
-        label="Plan"
+        label="Gói"
         value={usage.plan.name}
-        helper={`${usage.usage.totalDatabases}/${usage.quota.maxDatabases} database da dung`}
+        helper={`${usage.usage.totalDatabases}/${usage.quota.maxDatabases} cơ sở dữ liệu đã dùng`}
       />
       <Metric
         icon={HardDrive}
-        label="Storage"
+        label="Dung lượng"
         value={usage.usage.totalStorageLabel}
-        helper={`${usage.remaining.remainingStorageLabel} con lai trong quota`}
+        helper={`${usage.remaining.remainingStorageLabel} còn lại trong quota`}
       />
       <Metric
         icon={Signal}
-        label="Connections"
+        label="Kết nối"
         value={String(usage.usage.activeConnections)}
-        helper={`${usage.remaining.remainingConnections} ket noi con lai`}
+        helper={`${usage.remaining.remainingConnections} kết nối còn lại`}
       />
       <Metric
         icon={Sparkles}
-        label="Upgrade"
-        value={usage.plan.code === "business" ? "On top" : "Go higher"}
+        label="Nâng cấp"
+        value={usage.plan.code === "business" ? "Cao nhất" : "Có thể nâng"}
         helper={
           usage.plan.code === "business"
-            ? "Plan Business da mo muc quota cao nhat hien tai."
-            : "Nang cap plan de mo them database, dung luong va ket noi."
+            ? "Gói Business đang là mức quota cao nhất hiện tại."
+            : "Nâng cấp gói để mở thêm database, dung lượng và số kết nối."
         }
       />
     </div>

@@ -30,7 +30,7 @@ export default function CreateDatabaseDialog({
       .replace(/_{2,}/g, "_");
 
     if (!/^[a-z0-9_]{3,32}$/.test(normalized)) {
-      setError("Ten database phai dai 3-32 ky tu, chi gom chu thuong, so va dau _.");
+      setError("Tên cơ sở dữ liệu phải dài 3-32 ký tự, chỉ gồm chữ thường, số và dấu _.");
       return;
     }
 
@@ -57,14 +57,14 @@ export default function CreateDatabaseDialog({
             </div>
             <div>
               <div className="inline-flex items-center gap-2 rounded-full border border-border/70 bg-background/70 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.24em] text-muted-foreground">
-                Database Hosting
+                Cơ sở dữ liệu
               </div>
               <h2 className="mt-3 text-2xl font-semibold tracking-tight text-foreground">
-                Tạo database managed mới
+                Tạo cơ sở dữ liệu mới
               </h2>
               <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                Database sẽ được tạo trên shared MySQL server, rồi app tự grant đúng
-                quota và mysql user của bạn.
+                Cơ sở dữ liệu sẽ được tạo trên máy chủ MySQL dùng chung. Hệ thống tự cấp
+                quyền đúng quota và đúng tài khoản MySQL của bạn.
               </p>
             </div>
           </div>
@@ -81,14 +81,14 @@ export default function CreateDatabaseDialog({
         <div className="space-y-5 px-5 py-5 sm:px-6">
           <div className="rounded-[1.3rem] border border-border/70 bg-background/70 p-5">
             <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">
-              Naming policy
+              Quy tắc đặt tên
             </p>
             <div className="mt-4 grid gap-3 md:grid-cols-2">
               {[
-                "Chi nhap ten hien thi, app tu ghep prefix user vao real DB name.",
-                "Chi chap nhan chu thuong, so va dau _. Regex: /^[a-z0-9_]{3,32}$/",
-                "MySQL user cua ban se duoc tai su dung cho nhieu database.",
-                "Root/admin password khong bao gio lo ra UI user.",
+                "Bạn chỉ nhập tên ngắn, hệ thống sẽ tự ghép prefix người dùng vào tên DB thật.",
+                "Chỉ chấp nhận chữ thường, số và dấu _. Regex: /^[a-z0-9_]{3,32}$/",
+                "Tài khoản MySQL của bạn sẽ được dùng lại cho nhiều cơ sở dữ liệu.",
+                "Mật khẩu quản trị MySQL không bao giờ lộ ra ở giao diện người dùng.",
               ].map((item) => (
                 <div
                   key={item}
@@ -102,7 +102,7 @@ export default function CreateDatabaseDialog({
 
           <div className="rounded-[1.3rem] border border-border/70 bg-background/70 px-4 py-4">
             <label className="text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">
-              Database name
+              Tên cơ sở dữ liệu
             </label>
             <input
               value={name}
@@ -111,7 +111,8 @@ export default function CreateDatabaseDialog({
               className="mt-3 h-12 w-full rounded-[1rem] border border-border/70 bg-card px-4 text-sm text-foreground outline-none transition focus:border-primary/35"
             />
             <p className="mt-3 text-sm leading-6 text-muted-foreground">
-              Ví dụ: bạn nhập `blog`, app sẽ sinh real DB name kiểu `gh_username_blog`.
+              Ví dụ: bạn nhập <code>blog</code>, hệ thống sẽ sinh tên DB thật theo kiểu
+              <code> gh_username_blog</code>.
             </p>
           </div>
 
@@ -125,7 +126,7 @@ export default function CreateDatabaseDialog({
         <div className="flex flex-col gap-3 border-t border-border/70 bg-background/92 px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
           <div className="inline-flex items-center gap-2 text-sm text-muted-foreground">
             <Sparkles className="h-4 w-4 text-primary" />
-            App sẽ tự log audit, kiểm tra quota và rollback nếu create lỗi.
+            Hệ thống sẽ ghi log, kiểm tra quota và tự rollback nếu tạo lỗi.
           </div>
 
           <div className="flex flex-col gap-3 sm:flex-row">
@@ -147,7 +148,7 @@ export default function CreateDatabaseDialog({
               ) : (
                 <Database className="h-4 w-4" />
               )}
-              Tạo database
+              Tạo cơ sở dữ liệu
             </button>
           </div>
         </div>

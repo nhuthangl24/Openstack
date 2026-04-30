@@ -277,7 +277,7 @@ export default function WebSSHModal({
             </div>
             <div>
               <div className="inline-flex items-center gap-2 rounded-full border border-border/70 bg-background/70 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.24em] text-muted-foreground">
-                Live Terminal
+                Terminal
               </div>
               <h2 className="mt-3 text-2xl font-semibold tracking-tight text-foreground">
                 Web SSH cho {vmName}
@@ -304,13 +304,13 @@ export default function WebSSHModal({
         <div className="grid gap-0 lg:grid-cols-[18rem_minmax(0,1fr)]">
           <aside className="space-y-4 border-b border-border/70 bg-background/45 px-5 py-5 lg:border-b-0 lg:border-r lg:px-6">
             <Field
-              label="Username"
+              label="Tài khoản"
               value={username}
               onChange={setUsername}
               placeholder="ubuntu"
             />
             <Field
-              label="Password"
+              label="Mật khẩu"
               value={password}
               onChange={setPassword}
               placeholder="••••••••"
@@ -359,7 +359,7 @@ export default function WebSSHModal({
                 className="inline-flex items-center justify-center gap-2 rounded-full border border-rose-500/20 bg-rose-500/10 px-5 py-3 text-sm font-semibold text-rose-300 transition hover:border-rose-500/35 hover:bg-rose-500/15"
               >
                 <Trash2 className="h-4 w-4" />
-                Quên credential đã lưu
+                Xóa thông tin đã lưu
               </button>
             </div>
 
@@ -383,14 +383,14 @@ export default function WebSSHModal({
           <section className="px-5 py-5 sm:px-6">
             <div className="rounded-[1.8rem] border border-border/70 bg-card p-3">
               <div className="flex items-center justify-between border-b border-border/70 px-2 pb-3 text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">
-                <span>Terminal Output</span>
+                <span>Màn hình lệnh</span>
                 <span className="inline-flex items-center gap-2 rounded-full border border-border/70 bg-background/70 px-3 py-1">
                   <span
                     className={`h-2 w-2 rounded-full ${
                       connected ? "bg-emerald-400" : "bg-rose-400"
                     }`}
                   />
-                  {connected ? "Connected" : "Disconnected"}
+                  {connected ? "Đã kết nối" : "Chưa kết nối"}
                 </span>
               </div>
 

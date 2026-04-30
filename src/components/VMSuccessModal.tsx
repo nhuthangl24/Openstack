@@ -152,13 +152,13 @@ export default function VMSuccessModal({
             </div>
             <div>
               <div className="inline-flex items-center gap-2 rounded-full border border-emerald-500/20 bg-emerald-500/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.24em] text-emerald-300">
-                Deploy Success
+                Tạo máy thành công
               </div>
               <h2 className="mt-3 text-2xl font-semibold tracking-tight text-foreground">
                 VM đã được tạo thành công
               </h2>
               <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                Cloud-init đang chạy trong nền. Bạn có thể theo dõi IP và mở Terminal Lab
+                Cloud-init đang chạy trong nền. Bạn có thể theo dõi IP và mở terminal
                 ngay khi máy sẵn sàng.
               </p>
             </div>
@@ -223,7 +223,7 @@ export default function VMSuccessModal({
                   className="mt-4 inline-flex items-center gap-2 rounded-full border border-border/70 bg-card px-4 py-3 text-sm font-semibold text-foreground transition hover:border-primary/35 hover:text-primary"
                 >
                   <Terminal className="h-4 w-4" />
-                  Mở Terminal Lab ngay
+                  Mở terminal ngay
                 </button>
               )}
             </div>

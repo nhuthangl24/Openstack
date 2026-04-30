@@ -38,7 +38,7 @@ function ConnectionRow({
           type="button"
           onClick={() => void handleCopy()}
           className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-border/70 bg-card text-muted-foreground transition hover:border-primary/35 hover:text-primary"
-          title={`Copy ${label}`}
+          title={`Sao chép ${label}`}
         >
           {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
         </button>
@@ -83,7 +83,7 @@ export default function ConnectionModal({
             </div>
             <div>
               <div className="inline-flex items-center gap-2 rounded-full border border-border/70 bg-background/70 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.24em] text-muted-foreground">
-                Connection Secret
+                Thông tin kết nối
               </div>
               <h2 className="mt-3 text-2xl font-semibold tracking-tight text-foreground">
                 {title}
@@ -116,8 +116,8 @@ export default function ConnectionModal({
             <div className="flex items-start gap-3">
               <ShieldCheck className="mt-0.5 h-4 w-4 flex-shrink-0" />
               <p>
-                Mật khẩu được app giữ dưới dạng encrypted reference nội bộ. UI chỉ hiển thị
-                khi bạn chủ động xem connection hoặc vừa reset password.
+                Mật khẩu được ứng dụng giữ dưới dạng tham chiếu mã hóa nội bộ. Giao diện
+                chỉ hiển thị khi bạn chủ động xem kết nối hoặc vừa đổi mật khẩu.
               </p>
             </div>
           </div>
@@ -126,8 +126,9 @@ export default function ConnectionModal({
             <div className="flex items-start gap-3">
               <Link2 className="mt-0.5 h-4 w-4 flex-shrink-0 text-primary" />
               <p>
-                Từ VM client trong private network, bạn chỉ cần export các biến trên hoặc
-                dùng trực tiếp `DATABASE_URL` để kết nối tới shared managed MySQL server.
+                Từ VM client trong private network, bạn chỉ cần export các biến trên
+                hoặc dùng trực tiếp <code>DATABASE_URL</code> để kết nối tới máy chủ
+                MySQL dùng chung.
               </p>
             </div>
           </div>

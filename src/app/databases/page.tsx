@@ -2,9 +2,9 @@ import type { Metadata } from "next";
 import DatabaseHostingConsole from "@/components/database/DatabaseHostingConsole";
 
 export const metadata: Metadata = {
-  title: "OrbitStack Database Hosting",
+  title: "OrbitStack Cơ sở dữ liệu",
   description:
-    "Shared managed MySQL hosting module cho OrbitStack: create/delete/reset password va quota theo plan qua UI.",
+    "Module cơ sở dữ liệu dùng chung của OrbitStack: tạo, xóa, đổi mật khẩu và quản lý quota qua giao diện.",
 };
 
 export default function DatabasesPage() {

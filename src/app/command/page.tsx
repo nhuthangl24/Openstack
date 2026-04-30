@@ -2,9 +2,9 @@ import type { Metadata } from "next";
 import DashboardClientShell from "@/components/DashboardClientShell";
 
 export const metadata: Metadata = {
-  title: "OrbitStack Command Deck",
+  title: "OrbitStack Điều phối",
   description:
-    "Command Deck cho OrbitStack: xem trạng thái runtime, GitHub session, deploy workflow và command summary.",
+    "Trang điều phối của OrbitStack: xem trạng thái runtime, phiên GitHub, kịch bản triển khai và thông tin vận hành.",
 };
 
 export default function CommandPage() {

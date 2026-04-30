@@ -63,22 +63,22 @@ interface TerminalWorkbenchProps {
 const QUICK_COMMANDS: QuickCommand[] = [
   {
     key: "health",
-    label: "System health",
+    label: "Kiểm tra hệ thống",
     command: "whoami && hostname && uptime && df -h && free -h",
   },
   {
     key: "docker",
-    label: "Docker stack",
+    label: "Kiểm tra Docker",
     command: "docker ps -a && echo '---' && docker compose ls && echo '---' && docker images | head -n 20",
   },
   {
     key: "network",
-    label: "Network check",
+    label: "Kiểm tra mạng",
     command: "ip addr show && echo '---' && ip route && echo '---' && ss -tulpn | head -n 40",
   },
   {
     key: "logs",
-    label: "Recent logs",
+    label: "Nhật ký gần đây",
     command: "journalctl -n 120 --no-pager",
   },
 ];
@@ -297,7 +297,7 @@ export default function TerminalWorkbench({
     xtermRef.current = term;
     fitRef.current = fitAddon;
 
-    term.writeln("\x1b[36mOrbitStack Terminal Lab\x1b[0m");
+    term.writeln("\x1b[36mOrbitStack Terminal\x1b[0m");
     term.writeln("\x1b[90mChon VM, nhap credential va ket noi de bat dau.\x1b[0m");
     term.writeln("");
 
@@ -354,7 +354,7 @@ export default function TerminalWorkbench({
     }
 
     xtermRef.current.writeln(
-      `\r\n\x1b[90m# Target refreshed: ${selectedVm?.name || resolvedHost || "manual host"}\x1b[0m`,
+      `\r\n\x1b[90m# Đã cập nhật đích: ${selectedVm?.name || resolvedHost || "nhập thủ công"}\x1b[0m`,
     );
     scheduleViewportSync();
   }, [connected, resolvedHost, scheduleViewportSync, selectedVm]);
@@ -447,7 +447,7 @@ export default function TerminalWorkbench({
           if (ws.readyState === WebSocket.OPEN) {
             ws.send(`${commandToRun}\n`);
             setWorkflowArmed(false);
-            toast.success("Workflow da duoc day vao terminal.");
+            toast.success("Đã nạp script vào terminal.");
           }
         }, 400);
       }
@@ -525,12 +525,12 @@ export default function TerminalWorkbench({
 
     runAfterConnectRef.current = pendingWorkflow;
     setWorkflowArmed(true);
-    toast.success("Workflow se tu chay o lan ket noi tiep theo.");
+    toast.success("Script sẽ tự chạy ở lần kết nối tiếp theo.");
   }
 
   const targetSummary = selectedVm
-    ? `${selectedVm.name} • ${selectedVm.ip || "No IP"}`
-    : resolvedHost || "Manual target";
+    ? `${selectedVm.name} • ${selectedVm.ip || "Chưa có IP"}`
+    : resolvedHost || "Nhập thủ công";
 
   return (
     <section className="mt-6 space-y-4 pb-6">
@@ -539,31 +539,31 @@ export default function TerminalWorkbench({
           <div className="max-w-3xl">
             <div className="inline-flex items-center gap-2 rounded-full border border-border/70 bg-background/72 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.22em] text-muted-foreground">
               <TerminalSquare className="h-3.5 w-3.5" />
-              Terminal Lab
+              Terminal
             </div>
             <h1 className="mt-4 text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
-              SSH workspace gon, de doc va de thao tac hon.
+              Làm việc với SSH gọn và dễ thao tác hơn.
             </h1>
             <p className="mt-3 max-w-2xl text-sm leading-7 text-muted-foreground">
-              Trang nay chi giu lai phan can thiet: ket noi SSH, terminal that,
-              workflow deploy va command composer.
+              Trang này chỉ giữ lại phần cần thiết: kết nối SSH, màn hình lệnh,
+              script triển khai và vùng soạn lệnh.
             </p>
           </div>
 
           <div className="grid gap-3 sm:grid-cols-3 xl:min-w-[28rem]">
-            <StatChip label="Target" value={targetSummary} />
+            <StatChip label="Đích" value={targetSummary} />
             <StatChip
-              label="Session"
+              label="Phiên"
               value={
                 connected
-                  ? "Connected"
+                  ? "Đã kết nối"
                   : workflowArmed
-                    ? "Armed on connect"
-                    : "Disconnected"
+                    ? "Chờ chạy sau khi kết nối"
+                    : "Chưa kết nối"
               }
             />
             <StatChip
-              label="Ready VM"
+              label="VM sẵn sàng"
               value={`${activeReadyVm.length}/${vms.length} co IP`}
             />
           </div>
@@ -574,14 +574,14 @@ export default function TerminalWorkbench({
         <aside className="space-y-4">
           <div className="surface-panel rounded-[1.5rem] p-5">
             <SectionLabel
-              title="Connection"
-              description="Chon VM, nhap credential va mo SSH session tu ngay trang nay."
+              title="Kết nối"
+              description="Chọn VM, nhập tài khoản rồi mở phiên SSH ngay trên trang này."
             />
 
             <div className="mt-5 space-y-4">
               <label className="block">
                 <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                  VM target
+                  Máy đích
                 </span>
                 <select
                   value={selectedVmId}
@@ -600,7 +600,7 @@ export default function TerminalWorkbench({
                   }}
                   className="mt-2 w-full rounded-[1rem] border border-border/70 bg-background/75 px-4 py-3 text-sm text-foreground outline-none transition focus:border-primary/35"
                 >
-                  <option value="">Chon VM de bind host</option>
+                  <option value="">Chọn VM để điền host</option>
                   {vms.map((vm) => (
                     <option key={vm.id} value={vm.id}>
                       {vm.name} {vm.ip ? `(${vm.ip})` : "(chua co IP)"}
@@ -636,12 +636,12 @@ export default function TerminalWorkbench({
 
                 <label className="block">
                   <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                    Password
+                    Mật khẩu
                   </span>
                   <input
                     value={password}
                     onChange={(event) => setPassword(event.target.value)}
-                    placeholder="Nhap mat khau SSH"
+                    placeholder="Nhập mật khẩu SSH"
                     type="password"
                     className="mt-2 w-full rounded-[1rem] border border-border/70 bg-background/75 px-4 py-3 text-sm text-foreground outline-none transition focus:border-primary/35"
                   />
@@ -655,7 +655,7 @@ export default function TerminalWorkbench({
                   onChange={(event) => setRemember(event.target.checked)}
                   className="h-4 w-4 accent-current"
                 />
-                Ghi nho credential trong session browser hien tai
+                Ghi nhớ thông tin trong phiên trình duyệt hiện tại
               </label>
 
               <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
@@ -665,7 +665,7 @@ export default function TerminalWorkbench({
                   className="inline-flex items-center justify-center gap-2 rounded-[1rem] bg-foreground px-4 py-3 text-sm font-semibold text-background transition hover:opacity-90"
                 >
                   <PlugZap className="h-4 w-4" />
-                  {connected ? "Ket noi lai" : "Mo session SSH"}
+                  {connected ? "Kết nối lại" : "Mở phiên SSH"}
                 </button>
 
                 <button
@@ -677,7 +677,7 @@ export default function TerminalWorkbench({
                   className="inline-flex items-center justify-center gap-2 rounded-[1rem] border border-border/70 bg-background/75 px-4 py-3 text-sm font-semibold text-foreground transition hover:border-primary/35 hover:text-primary"
                 >
                   <Plug className="h-4 w-4" />
-                  Ngat session
+                  Ngắt phiên
                 </button>
               </div>
 
@@ -688,7 +688,7 @@ export default function TerminalWorkbench({
                   className="inline-flex items-center justify-center gap-2 rounded-[1rem] border border-border/70 bg-background/75 px-4 py-3 text-sm font-semibold text-foreground transition hover:border-primary/35 hover:text-primary"
                 >
                   <RefreshCw className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />
-                  Lam moi fleet
+                  Làm mới danh sách máy
                 </button>
 
                 <button
@@ -697,7 +697,7 @@ export default function TerminalWorkbench({
                   className="inline-flex items-center justify-center gap-2 rounded-[1rem] border border-border/70 bg-background/75 px-4 py-3 text-sm font-semibold text-foreground transition hover:border-primary/35 hover:text-primary"
                 >
                   <GitBranch className="h-4 w-4" />
-                  Mo repo pipeline
+                  Mở cấu hình deploy
                 </button>
               </div>
             </div>
@@ -712,8 +712,8 @@ export default function TerminalWorkbench({
               <div className="flex items-start gap-3">
                 <ShieldCheck className="mt-0.5 h-4 w-4 flex-shrink-0" />
                 <p>
-                  Credential chi duoc luu trong browser neu ban bat ghi nho, khong
-                  duoc dua vao Next.js server.
+                  Thông tin chỉ được lưu trong trình duyệt nếu bạn bật ghi nhớ,
+                  không được gửi lên máy chủ Next.js.
                 </p>
               </div>
             </div>
@@ -730,14 +730,14 @@ export default function TerminalWorkbench({
               className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-[1rem] border border-rose-500/20 bg-rose-500/10 px-4 py-3 text-sm font-semibold text-rose-300 transition hover:border-rose-500/35 hover:bg-rose-500/15"
             >
               <Trash2 className="h-4 w-4" />
-              Xoa credential da luu
+              Xóa thông tin đã lưu
             </button>
           </div>
 
           <div className="surface-panel rounded-[1.5rem] p-5">
             <SectionLabel
-              title="Workflow"
-              description="Script deploy tu repo pipeline se vao day de ban review va chay."
+              title="Kịch bản"
+              description="Script triển khai từ phần deploy sẽ hiện ở đây để bạn xem và chạy."
             />
 
             {pendingWorkflow ? (
@@ -745,12 +745,12 @@ export default function TerminalWorkbench({
                 <div className="flex items-start justify-between gap-3">
                   <div>
                     <p className="text-sm font-semibold text-foreground">
-                      Workflow dang cho
+                      Kịch bản đang chờ
                     </p>
                     <p className="mt-2 text-sm leading-6 text-muted-foreground">
                       {workspacePayload?.vmName
                         ? `Nguon moi nhat: ${workspacePayload.vmName}`
-                        : "Script nay den tu repo pipeline vua cau hinh."}
+                        : "Script này đến từ phần deploy bạn vừa cấu hình."}
                     </p>
                   </div>
 
@@ -785,7 +785,7 @@ export default function TerminalWorkbench({
                     className="inline-flex items-center gap-2 rounded-full bg-foreground px-4 py-2.5 text-sm font-semibold text-background transition hover:opacity-90"
                   >
                     <Play className="h-4 w-4" />
-                    Chay ngay
+                    Chạy ngay
                   </button>
 
                   <button
@@ -794,7 +794,7 @@ export default function TerminalWorkbench({
                     className="inline-flex items-center gap-2 rounded-full border border-border/70 bg-background/75 px-4 py-2.5 text-sm font-semibold text-foreground transition hover:border-primary/35 hover:text-primary"
                   >
                     <Waypoints className="h-4 w-4" />
-                    Arm on connect
+                    Chờ chạy khi kết nối
                   </button>
 
                   <button
@@ -803,20 +803,20 @@ export default function TerminalWorkbench({
                     className="inline-flex items-center gap-2 rounded-full border border-border/70 bg-background/75 px-4 py-2.5 text-sm font-semibold text-foreground transition hover:border-primary/35 hover:text-primary"
                   >
                     <Upload className="h-4 w-4" />
-                    Nap vao composer
+                    Nạp vào ô soạn lệnh
                   </button>
                 </div>
 
                 {workflowArmed && (
                   <div className="mt-4 rounded-[1rem] border border-amber-500/25 bg-amber-500/10 px-4 py-3 text-sm text-amber-200">
-                    Workflow da duoc arm. Session SSH tiep theo se tu nhan script nay.
+                    Kịch bản đã được chờ sẵn. Lần kết nối SSH tiếp theo sẽ tự nhận script này.
                   </div>
                 )}
               </div>
             ) : (
               <div className="mt-5 rounded-[1rem] border border-dashed border-border/70 bg-background/60 px-4 py-5 text-sm leading-6 text-muted-foreground">
-                Chua co workflow nao dang cho. Ban co the mo repo pipeline de tao
-                script deploy roi day sang terminal page nay.
+                Chưa có kịch bản nào đang chờ. Bạn có thể mở phần deploy repo để tạo
+                script rồi đẩy sang trang terminal này.
               </div>
             )}
           </div>
@@ -827,15 +827,15 @@ export default function TerminalWorkbench({
             <div className="flex flex-col gap-4 border-b border-border/70 px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
               <div>
                 <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-muted-foreground">
-                  Live Terminal
+                  Màn hình lệnh
                 </p>
                 <h2 className="mt-2 text-2xl font-semibold tracking-tight text-foreground">
-                  {selectedVm?.name || resolvedHost || "Manual target"}
+                  {selectedVm?.name || resolvedHost || "Nhập thủ công"}
                 </h2>
                 <p className="mt-1 text-sm text-muted-foreground">
                   {resolvedHost
                     ? `Host ${resolvedHost}`
-                    : "Chon VM co IP hoac nhap host thu cong de bat dau."}
+                    : "Chọn VM có IP hoặc nhập host thủ công để bắt đầu."}
                 </p>
               </div>
 
@@ -846,7 +846,7 @@ export default function TerminalWorkbench({
                   className="inline-flex items-center gap-2 rounded-full border border-border/70 bg-background/75 px-4 py-2.5 text-sm font-semibold text-foreground transition hover:border-primary/35 hover:text-primary"
                 >
                   <Clipboard className="h-4 w-4" />
-                  Copy transcript
+                  Sao chép nội dung
                 </button>
                 <button
                   type="button"
@@ -854,7 +854,7 @@ export default function TerminalWorkbench({
                   className="inline-flex items-center gap-2 rounded-full border border-border/70 bg-background/75 px-4 py-2.5 text-sm font-semibold text-foreground transition hover:border-primary/35 hover:text-primary"
                 >
                   <Eraser className="h-4 w-4" />
-                  Clear view
+                  Xóa màn hình
                 </button>
                 <div className="inline-flex items-center gap-2 rounded-full border border-border/70 bg-background/75 px-4 py-2.5 text-sm font-semibold text-foreground">
                   <span
@@ -867,10 +867,10 @@ export default function TerminalWorkbench({
                     }`}
                   />
                   {connected
-                    ? "Connected"
+                    ? "Đã kết nối"
                     : workflowArmed
-                      ? "Armed on connect"
-                      : "Disconnected"}
+                      ? "Chờ chạy khi kết nối"
+                      : "Chưa kết nối"}
                 </div>
               </div>
             </div>
@@ -891,8 +891,8 @@ export default function TerminalWorkbench({
           <div className="surface-panel rounded-[1.6rem] p-5 sm:p-6">
             <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
               <SectionLabel
-                title="Composer"
-                description="Viet lenh, nap workflow hoac dung quick command roi day thang vao terminal."
+                title="Soạn lệnh"
+                description="Viết lệnh, nạp script có sẵn hoặc dùng mẫu nhanh rồi gửi thẳng vào terminal."
               />
 
               <button
@@ -905,7 +905,7 @@ export default function TerminalWorkbench({
                 className="inline-flex items-center gap-2 rounded-full bg-foreground px-4 py-2.5 text-sm font-semibold text-background transition hover:opacity-90"
               >
                 <Play className="h-4 w-4" />
-                Gui vao terminal
+                Gửi vào terminal
               </button>
             </div>
 
@@ -921,7 +921,7 @@ export default function TerminalWorkbench({
                   }
                 }
               }}
-              placeholder="Viet lenh shell o day. Ctrl/Cmd + Enter de gui ngay."
+              placeholder="Viết lệnh shell ở đây. Ctrl/Cmd + Enter để gửi ngay."
               className="mt-5 min-h-[9rem] w-full rounded-[1.2rem] border border-border/70 bg-background/75 px-4 py-4 text-sm leading-7 text-foreground outline-none transition focus:border-primary/35"
             />
 

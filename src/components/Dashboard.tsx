@@ -226,7 +226,7 @@ function buildInventoryText(vms: VM[]) {
     "",
     ...vms.map(
       (vm, index) =>
-        `${index + 1}. ${vm.name} | ${vm.status} | ${vm.ip || "No IP"} | ${vm.flavor || "Unknown flavor"} | ${vm.image || "Unknown image"}`,
+        `${index + 1}. ${vm.name} | ${vm.status} | ${vm.ip || "Chưa có IP"} | ${vm.flavor || "Chưa rõ flavor"} | ${vm.image || "Chưa rõ image"}`,
     ),
   ].join("\n");
 }
@@ -509,7 +509,7 @@ function ServerCard({
 
       <div className="mt-5 flex flex-wrap gap-2">
         <ActionButton
-          label="Terminal Lab"
+          label="Terminal"
           icon={Terminal}
           disabled={!vm.ip}
           onClick={(event) => {
@@ -518,7 +518,7 @@ function ServerCard({
           }}
         />
         <ActionButton
-          label="Deploy Repo"
+          label="Triển khai repo"
           icon={GitBranch}
           onClick={(event) => {
             event.stopPropagation();
@@ -729,7 +729,7 @@ function GitHubSessionCard({
 
         <div className="min-w-0 flex-1">
           <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">
-            GitHub Access
+            GitHub
           </p>
           {loading ? (
             <div className="mt-2 flex items-center gap-2 text-sm text-muted-foreground">
@@ -773,7 +773,7 @@ function GitHubSessionCard({
             Deploy repo
           </p>
           <p className="mt-2 text-sm font-medium text-foreground">
-            {deployReady ? "Sẵn sàng Terminal Lab" : "Cần VM có IP"}
+            {deployReady ? "Sẵn sàng triển khai" : "Cần VM có IP"}
           </p>
         </div>
       </div>
@@ -847,7 +847,7 @@ function ControlPlaneCard({
       <div className="flex items-center justify-between gap-3">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.24em] text-muted-foreground">
-            Control Plane
+            Điều phối
           </p>
           <h2 className="mt-2 text-2xl font-semibold tracking-tight text-foreground">
             Nhịp vận hành OpenStack
@@ -1248,12 +1248,12 @@ export default function Dashboard({
     key: ConsoleTab;
     label: string;
   }> = [
-    { href: "/", key: "mission", label: "Mission Board" },
-    { href: "/fleet", key: "fleet", label: "Fleet Matrix" },
-    { href: "/launch", key: "launch", label: "Launch Kits" },
-    { href: "/inspect", key: "inspect", label: "Inspector" },
-    { href: "/command", key: "command", label: "Command Deck" },
-    { href: "/terminal", key: "terminal", label: "Terminal Lab" },
+    { href: "/", key: "mission", label: "Tổng quan" },
+    { href: "/fleet", key: "fleet", label: "Máy ảo" },
+    { href: "/launch", key: "launch", label: "Tạo máy" },
+    { href: "/inspect", key: "inspect", label: "Theo dõi" },
+    { href: "/command", key: "command", label: "Điều phối" },
+    { href: "/terminal", key: "terminal", label: "Terminal" },
   ];
   const shellMeta: Record<
     ConsoleTab,
@@ -1264,40 +1264,40 @@ export default function Dashboard({
     }
   > = {
     mission: {
-      eyebrow: "Mission Board",
-      title: "Trung tam dieu phoi OrbitStack",
+      eyebrow: "Tổng quan",
+      title: "Trung tâm điều hành",
       description:
-        "Theo doi control plane, session GitHub va nhung VM dang duoc focus ngay tu shell chinh.",
+        "Xem nhanh trạng thái OpenStack, GitHub và máy ảo đang được chọn ngay trên màn chính.",
     },
     fleet: {
-      eyebrow: "Fleet Matrix",
-      title: "Dieu phoi may ao theo dang bang van hanh",
+      eyebrow: "Máy ảo",
+      title: "Quản lý toàn bộ máy ảo",
       description:
-        "Loc, sap xep va thao tac tren tung VM thay vi luot qua mot landing page dai.",
+        "Lọc, sắp xếp và thao tác trực tiếp trên từng VM trong một màn riêng.",
     },
     launch: {
-      eyebrow: "Launch Kits",
-      title: "Ban VM moi nhanh hon bang preset",
+      eyebrow: "Tạo máy",
+      title: "Tạo máy ảo bằng mẫu có sẵn",
       description:
-        "Mo preset, tao VM va day tiep workflow deploy ma khong phai di qua nhieu lop UI.",
+        "Chọn preset phù hợp, tạo VM nhanh rồi nối tiếp sang luồng triển khai.",
     },
     inspect: {
-      eyebrow: "Inspector",
-      title: "Khoa mot VM va mo toan bo chi tiet van hanh",
+      eyebrow: "Theo dõi",
+      title: "Theo dõi chi tiết một máy ảo",
       description:
-        "IP, flavor, image, SSH va repo pipeline duoc gom vao mot workspace giam thao tac lap.",
+        "Gom IP, flavor, image, SSH và thao tác chính của đúng máy đang chọn.",
     },
     command: {
-      eyebrow: "Command Deck",
-      title: "Khu dieu phoi deploy va runtime hooks",
+      eyebrow: "Điều phối",
+      title: "Điều phối triển khai và vận hành",
       description:
-        "Tap trung cac thong tin can thiet cho deploy repo, terminal va van hanh OpenStack.",
+        "Tập trung các thông tin quan trọng cho deploy repo, terminal và trạng thái hệ thống.",
     },
     terminal: {
-      eyebrow: "Terminal Lab",
-      title: "SSH workspace tach rieng de thao tac that",
+      eyebrow: "Terminal",
+      title: "Làm việc với SSH",
       description:
-        "Ket noi SSH, review workflow deploy va gui lenh ngay trong mot mat phang gon gang hon.",
+        "Kết nối SSH, xem script triển khai và gửi lệnh trong một màn riêng.",
     },
   };
   const currentShell = shellMeta[tab];
@@ -1342,7 +1342,7 @@ export default function Dashboard({
         <div className="flex items-start justify-between gap-3">
           <div>
             <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-muted-foreground">
-              Ops Rail
+            Thao tác nhanh
             </p>
             <h2 className="mt-2 text-2xl font-semibold tracking-tight text-foreground">
               Dock thao tác nhanh
@@ -1398,14 +1398,14 @@ export default function Dashboard({
             onClick={() =>
               void tryCopy(
                 buildInventoryText(visibleVMs),
-                "Đã copy snapshot fleet.",
+                "Đã sao chép snapshot máy ảo.",
               )
             }
             className="inline-flex w-full items-center justify-between rounded-[1rem] border border-border/70 bg-background/75 px-4 py-3.5 text-left text-sm font-semibold text-foreground transition hover:border-primary/35 hover:text-primary"
           >
             <span className="inline-flex items-center gap-2">
               <Copy className="h-4 w-4" />
-              Copy fleet snapshot
+              Sao chép snapshot
             </span>
             <ArrowUpRight className="h-4 w-4" />
           </button>
@@ -1414,28 +1414,28 @@ export default function Dashboard({
         <div className="mt-5 grid gap-3">
           <InfoMiniCard
             icon={Network}
-            label="Gateway"
+            label="Đích đang chọn"
             value={selectedVm?.ip || "Chưa chọn VM có IP"}
             accent
           />
           <InfoMiniCard
             icon={Cpu}
-            label="SSH Ready"
-            value={`${total ? Math.round((readyCount / total) * 100) : 0}% VM có thể vào Terminal Lab`}
+            label="SSH sẵn sàng"
+            value={`${total ? Math.round((readyCount / total) * 100) : 0}% VM có thể mở terminal`}
           />
         </div>
       </div>
 
       <div className="surface-panel rounded-[1.5rem] p-5">
         <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-muted-foreground">
-          Deploy Stack
+          Triển khai repo
         </p>
         <div className="mt-4 space-y-3">
           {[
-            "Repo từ GitHub đã link hoặc repo ngoài",
-            "Sinh file .env theo biến môi trường",
-            "Install command và after deploy command",
-            "Terminal Lab nhận sẵn workflow để chạy tiếp",
+            "Chọn repo từ GitHub đã liên kết hoặc repo ngoài",
+            "Tạo file .env từ biến môi trường ngay trong giao diện",
+            "Hỗ trợ lệnh cài đặt và lệnh chạy sau triển khai",
+            "Terminal nhận sẵn script để chạy tiếp sau khi kết nối",
           ].map((item) => (
             <div
               key={item}
@@ -1452,7 +1452,7 @@ export default function Dashboard({
   const buildModesPanel = (
     <div className="surface-panel rounded-[1.5rem] p-5">
       <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-muted-foreground">
-        Build Modes
+        Kiểu triển khai
       </p>
       <div className="mt-4 grid gap-3">
         <InfoMiniCard
@@ -1479,7 +1479,7 @@ export default function Dashboard({
       <div className="flex items-center justify-between gap-3">
         <div>
           <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-muted-foreground">
-            VM Inspector
+            Chi tiết máy ảo
           </p>
           <h2 className="mt-2 text-2xl font-semibold tracking-tight text-foreground">
             {selectedVm ? selectedVm.name : "Chọn một VM"}
@@ -1503,7 +1503,7 @@ export default function Dashboard({
 
           <div className="mt-5 rounded-[1.2rem] border border-border/70 bg-background/75 p-4">
             <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">
-              Action Dock
+              Thao tác nhanh
             </p>
             <div className="mt-4 flex flex-wrap gap-2">
               {selectedVm.ip && (
@@ -1518,7 +1518,7 @@ export default function Dashboard({
                     className="inline-flex items-center gap-2 rounded-[0.85rem] border border-border/70 bg-background/70 px-3 py-2 text-xs font-semibold text-foreground transition hover:border-primary/35 hover:text-primary"
                   >
                     <Terminal className="h-3.5 w-3.5" />
-                    Mở Terminal Lab
+                    Mở terminal
                   </button>
                 </>
               )}
@@ -1529,7 +1529,7 @@ export default function Dashboard({
                 className="inline-flex items-center gap-2 rounded-[0.85rem] border border-border/70 bg-background/70 px-3 py-2 text-xs font-semibold text-foreground transition hover:border-primary/35 hover:text-primary"
               >
                 <GitBranch className="h-3.5 w-3.5" />
-                Repo pipeline
+                Triển khai repo
               </button>
 
               <button
@@ -1550,8 +1550,8 @@ export default function Dashboard({
         </>
       ) : (
         <div className="mt-5 rounded-[1.25rem] border border-dashed border-border/70 bg-background/60 p-6 text-sm leading-6 text-muted-foreground">
-          Chọn một VM trong fleet để inspector hiển thị IP, SSH, trạng thái và các
-          nút thao tác nhanh theo đúng máy đang focus.
+            Chọn một VM trong danh sách để xem IP, SSH, trạng thái và các nút thao tác
+            nhanh của đúng máy đó.
         </div>
       )}
     </div>
@@ -1562,17 +1562,17 @@ export default function Dashboard({
       <div className="flex items-center justify-between gap-3">
         <div>
           <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-muted-foreground">
-            Launch Kits
+            Mẫu tạo máy
           </p>
           <h2 className="mt-2 text-3xl font-semibold tracking-tight text-foreground">
-            Preset để bắn VM nhanh hơn nhiều
+            Chọn mẫu để tạo máy ảo nhanh
           </h2>
         </div>
         <Sparkles className="h-5 w-5 text-primary" />
       </div>
       <p className="mt-3 max-w-3xl text-sm leading-7 text-muted-foreground">
-        Chọn thẳng preset thay vì lướt một landing page dài. Mỗi kit sẽ mở modal
-        tạo VM với cấu hình gợi ý riêng cho stack của bạn.
+        Chọn thẳng mẫu phù hợp. Mỗi mẫu sẽ mở form tạo VM với cấu hình gợi ý đúng
+        theo stack bạn đang cần.
       </p>
 
       <div className="mt-6 grid gap-4 lg:grid-cols-2">
@@ -1662,10 +1662,10 @@ export default function Dashboard({
       <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
         <div className="min-w-0 flex-1 pr-0 xl:pr-6">
           <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-muted-foreground">
-            Fleet Matrix
+            Danh sách máy ảo
           </p>
           <h2 className="mt-2 max-w-3xl text-3xl font-semibold leading-tight tracking-tight text-foreground">
-            Điều phối máy ảo như một bảng vận hành, không còn kiểu landing block.
+            Xem, lọc và thao tác trực tiếp trên toàn bộ máy ảo.
           </h2>
         </div>
 
@@ -1675,13 +1675,13 @@ export default function Dashboard({
             onClick={() =>
               void tryCopy(
                 buildInventoryText(visibleVMs),
-                "Đã copy snapshot fleet.",
+                "Đã sao chép snapshot máy ảo.",
               )
             }
             className="inline-flex items-center gap-2 rounded-[0.95rem] border border-border/70 bg-background/75 px-4 py-2.5 text-sm font-semibold text-foreground transition hover:border-primary/35 hover:text-primary"
           >
             <Copy className="h-4 w-4" />
-            Snapshot
+            Sao chép nhanh
           </button>
 
           <button
@@ -1694,7 +1694,7 @@ export default function Dashboard({
             }`}
           >
             <RefreshCw className={`h-4 w-4 ${autoRefresh ? "animate-spin" : ""}`} />
-            {autoRefresh ? "Auto refresh bật" : "Auto refresh tắt"}
+            {autoRefresh ? "Tự làm mới đang bật" : "Tự làm mới đang tắt"}
           </button>
         </div>
       </div>
@@ -1754,7 +1754,7 @@ export default function Dashboard({
           {[
             { key: "all" as const, label: "Tất cả", count: total },
             { key: "ready" as const, label: "Sẵn sàng", count: readyCount },
-            { key: "building" as const, label: "Provisioning", count: buildingCount },
+            { key: "building" as const, label: "Đang tạo", count: buildingCount },
             { key: "attention" as const, label: "Cần chú ý", count: attentionCount },
           ].map((item) => (
             <button
@@ -1794,56 +1794,56 @@ export default function Dashboard({
                 error ? "bg-rose-400" : "bg-emerald-400"
               }`}
             />
-            {error ? "Control plane cần kiểm tra" : "Mission board đang hoạt động"}
+            {error ? "Hệ thống cần kiểm tra" : "Hệ thống đang hoạt động"}
           </div>
 
           <h1 className="mt-5 max-w-4xl text-3xl font-semibold leading-tight tracking-tight text-foreground sm:text-4xl xl:text-[3.7rem]">
-            Mỗi tab là một workspace riêng, không còn là một landing page kéo dài.
+            Mỗi tab là một màn làm việc riêng cho đúng tác vụ.
           </h1>
           <p className="mt-5 max-w-3xl text-sm leading-7 text-muted-foreground sm:text-base">
-            Mission Board giờ chỉ tập trung vào bức tranh tổng thể: trạng thái
-            OpenStack, nhịp cập nhật, phiên GitHub và VM đang được khóa làm mục tiêu.
+            Màn tổng quan này chỉ giữ lại thứ cần xem nhanh: trạng thái OpenStack,
+            nhịp cập nhật, phiên GitHub và máy ảo đang được chọn để thao tác.
           </p>
 
           <div className="mt-6 grid gap-3 lg:grid-cols-3">
             <MetricCard
               icon={Server}
-              label="Fleet Live"
+              label="Máy ảo"
               value={total}
               helper={headerTitle}
             />
             <MetricCard
               icon={ShieldCheck}
-              label="SSH Ready"
+              label="SSH sẵn sàng"
               value={readyCount}
               helper={`${activeCount} VM đang ACTIVE`}
             />
             <MetricCard
               icon={CircleAlert}
-              label="Attention"
+              label="Cần chú ý"
               value={attentionCount}
-              helper={error || "Theo dõi VM lỗi, tắt hoặc chưa cấp IP"}
+              helper={error || "Theo dõi máy lỗi, đã tắt hoặc chưa có IP"}
             />
           </div>
 
           <div className="mt-6 grid gap-3 lg:grid-cols-3">
             <HeroFeatureCard
               icon={RefreshCw}
-              label="Provisioning"
-              value={`${buildingCount} workflow`}
+              label="Đang tạo"
+              value={`${buildingCount} máy`}
               helper={`Cập nhật lần cuối ${formatLastUpdated(lastUpdated)}`}
             />
             <HeroFeatureCard
               icon={GitBranch}
-              label="Repo Relay"
-              value={githubUser ? `@${githubUser.login}` : "GitHub gate đang chờ"}
-              helper="Repo linked và repo ngoài được gom vào cùng một flow deploy."
+              label="GitHub"
+              value={githubUser ? `@${githubUser.login}` : "Chưa đăng nhập"}
+              helper="Repo đã liên kết và repo ngoài cùng đi qua một luồng triển khai."
             />
             <HeroFeatureCard
               icon={Terminal}
-              label="VM Focus"
-              value={selectedVm?.name || "Chưa khóa VM"}
-              helper="Inspector và Terminal Lab sẽ dùng máy đang focus làm mục tiêu mặc định."
+              label="Máy đang chọn"
+              value={selectedVm?.name || "Chưa chọn máy"}
+              helper="Phần theo dõi và terminal sẽ dùng máy này làm mục tiêu mặc định."
             />
           </div>
         </div>
@@ -1878,26 +1878,26 @@ export default function Dashboard({
         {launchKitsPanel}
         <div className="surface-panel rounded-[1.5rem] p-5 sm:p-6">
           <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-muted-foreground">
-            Launch Notes
+            Ghi chú tạo máy
           </p>
           <div className="mt-4 grid gap-3 lg:grid-cols-3">
             <HeroFeatureCard
               icon={Boxes}
-              label="Preset Speed"
-              value="1 click"
-              helper="Mỗi launch kit đẩy thẳng sang modal tạo VM với gợi ý đúng stack."
+              label="Tốc độ"
+              value="1 bước"
+              helper="Mỗi mẫu mở thẳng form tạo VM với gợi ý đúng theo stack."
             />
             <HeroFeatureCard
               icon={Database}
-              label="Env Setup"
+              label="Biến môi trường"
               value="Đã tích hợp"
               helper="Có thể sinh file .env từ bước deploy sau khi máy khởi tạo xong."
             />
             <HeroFeatureCard
               icon={Terminal}
-              label="Post Deploy"
+              label="Sau triển khai"
               value="Hook sẵn"
-              helper="Sau khi tạo máy xong có thể nối thẳng sang Terminal Lab để cài tiếp."
+              helper="Sau khi tạo máy xong có thể mở terminal để cài tiếp ngay."
             />
           </div>
         </div>
@@ -1916,17 +1916,17 @@ export default function Dashboard({
         {fleetAlert}
         <div className="surface-panel rounded-[1.5rem] p-5 sm:p-6">
           <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-muted-foreground">
-            VM Selector
+            Chọn máy
           </p>
           <h2 className="mt-2 text-3xl font-semibold tracking-tight text-foreground">
-            Chọn máy ở đây để khoá inspector bên phải
+            Chọn máy ở đây để xem chi tiết ở cột bên phải
           </h2>
           <div className="mt-5 space-y-3">
             {loading ? (
               <FleetSkeleton />
             ) : visibleVMs.length === 0 ? (
               <div className="rounded-[1.2rem] border border-dashed border-border/70 bg-background/60 p-6 text-sm text-muted-foreground">
-                Không có máy nào khả dụng để inspect trong bộ lọc hiện tại.
+                Không có máy nào phù hợp với bộ lọc hiện tại để theo dõi.
               </div>
             ) : (
               visibleVMs.map((vm) => (
@@ -1960,7 +1960,7 @@ export default function Dashboard({
       <div className="space-y-4">
         <div className="surface-panel surface-noise rounded-[1.5rem] p-5 sm:p-6">
           <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-muted-foreground">
-            Command Deck
+            Điều phối
           </p>
           <h2 className="mt-2 text-3xl font-semibold tracking-tight text-foreground">
             Trung tâm điều phối deploy, runtime và phiên điều khiển
@@ -1974,25 +1974,25 @@ export default function Dashboard({
           <div className="mt-6 grid gap-4 lg:grid-cols-3">
             <FooterStatus label="Fleet hiển thị" value={`${visibleVMs.length}/${total} VM`} />
             <FooterStatus
-              label="GitHub session"
+              label="Phiên GitHub"
               value={githubUser ? `@${githubUser.login}` : "Chưa đồng bộ"}
             />
             <FooterStatus
-              label="Auto refresh"
+              label="Tự làm mới"
               value={autoRefresh ? "Bật mỗi 15 giây" : "Đang tắt"}
             />
-            <FooterStatus label="VM focus" value={selectedVm?.name || "Chưa chọn VM"} />
+            <FooterStatus label="Máy đang chọn" value={selectedVm?.name || "Chưa chọn VM"} />
             <FooterStatus label="SSH user" value={SSH_USER} />
             <FooterStatus
-              label="Repo workflow"
-              value="Clone, env, install, post deploy"
+              label="Luồng repo"
+              value="Clone, env, cài đặt, sau triển khai"
             />
           </div>
         </div>
 
         <div className="surface-panel rounded-[1.5rem] p-5 sm:p-6">
           <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-muted-foreground">
-            Runtime Notes
+            Ghi chú vận hành
           </p>
           <div className="mt-4 space-y-3">
             <div className="rounded-[1rem] border border-border/70 bg-background/70 px-4 py-3 text-sm text-foreground">
@@ -2054,7 +2054,7 @@ export default function Dashboard({
             <div className="min-w-0">
               <div className="inline-flex items-center gap-2 rounded-full border border-border/70 bg-background/75 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.22em] text-muted-foreground">
                 <span className={`h-2 w-2 rounded-full ${error ? "bg-rose-400" : "bg-emerald-400 status-pulse"}`} />
-                OrbitStack // Workbench
+                OrbitStack // Bảng điều khiển
               </div>
               <h1 className="mt-3 text-xl font-semibold tracking-tight text-foreground sm:text-2xl">
                 {currentShell.title}
@@ -2073,7 +2073,7 @@ export default function Dashboard({
               </div>
               <div className="inline-flex items-center gap-2 rounded-[1rem] border border-border/70 bg-background/75 px-3 py-2 text-sm text-muted-foreground">
                 <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                  Route
+                  Trang
                 </span>
                 <span className="font-semibold text-foreground">
                   {currentShell.eyebrow}
@@ -2088,7 +2088,7 @@ export default function Dashboard({
                 className="inline-flex items-center gap-2 rounded-full border border-border/70 bg-background/75 px-4 py-2.5 text-sm font-semibold text-foreground transition hover:border-primary/35 hover:text-primary"
               >
                 <Database className="h-4 w-4" />
-                Database Hosting
+                Cơ sở dữ liệu
               </Link>
               <button
                 type="button"
@@ -2119,16 +2119,16 @@ export default function Dashboard({
 
           <div className="grid gap-2 sm:grid-cols-3 lg:min-w-[32rem]">
             <FooterStatus
-              label="Fleet Live"
+              label="Máy hiển thị"
               value={`${visibleVMs.length}/${total} VM`}
             />
             <FooterStatus
-              label="VM Focus"
-              value={selectedVm?.name || "Chua chon"}
+              label="Máy đang chọn"
+              value={selectedVm?.name || "Chưa chọn"}
             />
             <FooterStatus
               label="GitHub"
-              value={githubUser ? `@${githubUser.login}` : "Dang khoa"}
+              value={githubUser ? `@${githubUser.login}` : "Đang khóa"}
             />
           </div>
         </div>
@@ -2141,38 +2141,38 @@ export default function Dashboard({
       <div className="grid gap-4 xl:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)_minmax(0,1fr)]">
         <div className="rounded-[1.2rem] border border-border/70 bg-background/72 p-4">
           <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-muted-foreground">
-            OrbitStack Footer Dock
+            Tóm tắt nhanh
           </p>
           <p className="mt-3 text-lg font-semibold tracking-tight text-foreground">
-            Shell da doi sang multi-page workspace, footer nay la dock thong tin va shortcut that.
+            Xem nhanh trạng thái hiện tại và đi tới các màn bạn dùng nhiều nhất.
           </p>
           <p className="mt-2 text-sm leading-6 text-muted-foreground">
-            Ban co the nhay nhanh sang Database Hosting, Terminal Lab hoac Fleet Matrix ma khong phai quay ve mot trang landing.
+            Dùng các lối tắt bên dưới để chuyển nhanh sang cơ sở dữ liệu, terminal hoặc danh sách máy ảo.
           </p>
         </div>
 
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
           <FooterStatus
-            label="Route hien tai"
+            label="Trang hiện tại"
             value={currentShell.eyebrow}
           />
           <FooterStatus
-            label="Lan sync"
+            label="Lần đồng bộ"
             value={formatLastUpdated(lastUpdated)}
           />
           <FooterStatus
-            label="SSH ready"
+            label="SSH sẵn sàng"
             value={`${readyCount}/${total || 0} VM`}
           />
           <FooterStatus
-            label="Auto refresh"
-            value={autoRefresh ? "Dang bat" : "Dang tat"}
+            label="Tự làm mới"
+            value={autoRefresh ? "Đang bật" : "Đang tắt"}
           />
         </div>
 
         <div className="rounded-[1.2rem] border border-border/70 bg-background/72 p-4">
           <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-muted-foreground">
-            Quick Jump
+            Đi nhanh
           </p>
           <div className="mt-4 grid gap-2">
             <Link
@@ -2181,7 +2181,7 @@ export default function Dashboard({
             >
               <span className="inline-flex items-center gap-2">
                 <Database className="h-4 w-4" />
-                Database Hosting
+                Cơ sở dữ liệu
               </span>
               <ArrowUpRight className="h-4 w-4" />
             </Link>
@@ -2191,7 +2191,7 @@ export default function Dashboard({
             >
               <span className="inline-flex items-center gap-2">
                 <Terminal className="h-4 w-4" />
-                Terminal Lab
+                Terminal
               </span>
               <ArrowUpRight className="h-4 w-4" />
             </Link>
@@ -2201,7 +2201,7 @@ export default function Dashboard({
             >
               <span className="inline-flex items-center gap-2">
                 <Server className="h-4 w-4" />
-                Fleet Matrix
+                Máy ảo
               </span>
               <ArrowUpRight className="h-4 w-4" />
             </Link>
@@ -2232,7 +2232,7 @@ export default function Dashboard({
               </div>
               <div>
                 <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-muted-foreground">
-                  OrbitStack // Workbench
+                  OrbitStack // Bảng điều khiển
                 </p>
                 <p className="text-sm font-semibold text-foreground">
                   OpenStack control shell cho vận hành thật
@@ -2266,9 +2266,9 @@ export default function Dashboard({
 
         <footer className="hidden mt-4 rounded-[1.2rem] border border-border/70 bg-background/60 px-4 py-3 text-sm text-muted-foreground">
           <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
-            <span>OrbitStack đang chạy theo dạng multi-page workspace, không còn one-page landing shell.</span>
+            <span>Giao diện được tách thành nhiều màn riêng để thao tác nhanh và gọn hơn.</span>
             <span>
-              Route hiện tại: <span className="font-semibold text-foreground">{tab}</span>
+              Trang hiện tại: <span className="font-semibold text-foreground">{tab}</span>
             </span>
           </div>
         </footer>
