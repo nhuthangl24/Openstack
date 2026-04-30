@@ -44,6 +44,7 @@ const createRateLimit = new Map<
     windowStart: number;
   }
 >();
+const HOSTED_DATABASES_TABLE = escapeIdentifier("databases");
 
 export class DatabaseHostingError extends Error {
   status: number;
@@ -276,7 +277,7 @@ async function ensureBootstrap() {
         `);
 
         await connection.query(`
-          CREATE TABLE IF NOT EXISTS databases (
+          CREATE TABLE IF NOT EXISTS ${HOSTED_DATABASES_TABLE} (
             id CHAR(36) NOT NULL PRIMARY KEY,
             user_id BIGINT UNSIGNED NOT NULL,
             db_name VARCHAR(64) NOT NULL,
@@ -358,7 +359,10 @@ async function ensureBootstrap() {
       } finally {
         connection.release();
       }
-    })();
+    })().catch((error) => {
+      bootstrapPromise = null;
+      throw error;
+    });
   }
 
   return bootstrapPromise;
@@ -657,7 +661,7 @@ async function getUserDatabaseCount(connection: PoolConnection, userId: number) 
   const [rows] = await connection.execute<RowDataPacket[]>(
     `
       SELECT COUNT(*) AS total
-      FROM databases
+      FROM ${HOSTED_DATABASES_TABLE}
       WHERE user_id = ? AND deleted_at IS NULL AND status <> 'deleted'
     `,
     [userId],
@@ -689,7 +693,7 @@ async function listHostedDatabaseRows(
   const [rows] = await connection.execute<HostedDatabaseRow[]>(
     `
       SELECT id, user_id, db_name, real_db_name, mysql_username, host, port, status, current_size_mb, created_at, deleted_at
-      FROM databases
+      FROM ${HOSTED_DATABASES_TABLE}
       WHERE user_id = ? AND deleted_at IS NULL
       ORDER BY created_at DESC
     `,
@@ -712,7 +716,7 @@ async function refreshUsageStats(
     totalStorageMb += sizeMb;
     await connection.execute(
       `
-        UPDATE databases
+        UPDATE ${HOSTED_DATABASES_TABLE}
         SET current_size_mb = ?
         WHERE id = ?
       `,
@@ -767,7 +771,7 @@ async function getHostedDatabaseById(
   const [rows] = await connection.execute<HostedDatabaseRow[]>(
     `
       SELECT id, user_id, db_name, real_db_name, mysql_username, host, port, status, current_size_mb, created_at, deleted_at
-      FROM databases
+      FROM ${HOSTED_DATABASES_TABLE}
       WHERE id = ? AND user_id = ? AND deleted_at IS NULL
       LIMIT 1
     `,
@@ -863,7 +867,7 @@ export async function createHostedDatabaseForRequest(
     const [duplicates] = await connection.execute<RowDataPacket[]>(
       `
         SELECT id
-        FROM databases
+        FROM ${HOSTED_DATABASES_TABLE}
         WHERE real_db_name = ? AND deleted_at IS NULL
         LIMIT 1
       `,
@@ -914,7 +918,7 @@ export async function createHostedDatabaseForRequest(
 
       await connection.execute(
         `
-          INSERT INTO databases (
+          INSERT INTO ${HOSTED_DATABASES_TABLE} (
             id,
             user_id,
             db_name,
@@ -1144,7 +1148,7 @@ export async function deleteHostedDatabaseForRequest(
     await dropDatabase(connection, database.real_db_name);
     await connection.execute(
       `
-        UPDATE databases
+        UPDATE ${HOSTED_DATABASES_TABLE}
         SET status = 'deleted', deleted_at = CURRENT_TIMESTAMP
         WHERE id = ?
       `,
@@ -1215,7 +1219,7 @@ export async function suspendUserDatabases(userId: number) {
       );
       await connection.execute(
         `
-          UPDATE databases
+          UPDATE ${HOSTED_DATABASES_TABLE}
           SET status = 'suspended'
           WHERE id = ?
         `,
