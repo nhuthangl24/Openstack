@@ -1,4 +1,4 @@
-import { createCipheriv, createDecipheriv, randomBytes } from "node:crypto";
+import { createCipheriv, createDecipheriv, createHash, randomBytes } from "node:crypto";
 
 const PASSWORD_CHARSET =
   "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$%^&*()-_=+?";
@@ -33,13 +33,14 @@ function getEncryptionKey() {
 
   const utf8 = Buffer.from(raw, "utf8");
 
-  if (utf8.length !== 32) {
-    throw new Error(
-      "DATABASE_HOSTING_ENCRYPTION_KEY phai la 32 bytes raw, 64 hex hoac base64 cua 32 bytes.",
-    );
+  if (utf8.length === 32) {
+    return utf8;
   }
 
-  return utf8;
+  return createHash("sha256")
+    .update("database-hosting-encryption-key:")
+    .update(raw, "utf8")
+    .digest();
 }
 
 export function generateStrongPassword(length = 24) {

@@ -177,7 +177,9 @@ DATABASE_HOSTING_DEFAULT_PLAN=free
 DATABASE_HOSTING_CREATE_LIMIT_PER_HOUR=8
 
 # Secret encryption for password reference
-DATABASE_HOSTING_ENCRYPTION_KEY=<32-byte-base64-or-hex>
+# Preferred: 32-byte raw, 64-char hex, or base64 of 32 bytes.
+# Fallback: any passphrase is deterministically derived to 32 bytes via SHA-256.
+DATABASE_HOSTING_ENCRYPTION_KEY=<strong-secret-passphrase-or-32-byte-key>
 ```
 
 ## 7. Package install
