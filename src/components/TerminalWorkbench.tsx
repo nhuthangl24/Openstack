@@ -2,17 +2,13 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  Bot,
   Clipboard,
-  Command,
   Eraser,
-  ExternalLink,
   GitBranch,
   Play,
   Plug,
   PlugZap,
   RefreshCw,
-  Save,
   ShieldCheck,
   TerminalSquare,
   Trash2,
@@ -49,22 +45,9 @@ interface VMOption {
   image: string;
 }
 
-interface SavedSnippet {
-  id: string;
-  title: string;
-  command: string;
-}
-
-interface ActivityEntry {
-  id: string;
-  label: string;
-  detail: string;
-}
-
 interface QuickCommand {
   key: string;
   label: string;
-  description: string;
   command: string;
 }
 
@@ -77,64 +60,28 @@ interface TerminalWorkbenchProps {
   onOpenDeploy: (vmId?: string) => void;
 }
 
-const STASH_KEY = "orbitstack:terminal-stash";
-
 const QUICK_COMMANDS: QuickCommand[] = [
   {
     key: "health",
     label: "System health",
-    description: "Nhanh để xem uptime, RAM, disk và user hiện tại.",
     command: "whoami && hostname && uptime && df -h && free -h",
   },
   {
     key: "docker",
     label: "Docker stack",
-    description: "Kiểm tra container, compose và image đang có.",
     command: "docker ps -a && echo '---' && docker compose ls && echo '---' && docker images | head -n 20",
   },
   {
     key: "network",
     label: "Network check",
-    description: "Xem IP, route và cổng đang lắng nghe.",
     command: "ip addr show && echo '---' && ip route && echo '---' && ss -tulpn | head -n 40",
   },
   {
     key: "logs",
     label: "Recent logs",
-    description: "Lấy nhanh nhật ký hệ thống gần nhất.",
     command: "journalctl -n 120 --no-pager",
   },
-  {
-    key: "repos",
-    label: "OrbitStack apps",
-    description: "Liệt kê các repo đã được đồng bộ trên VM.",
-    command: "cd ~/orbitstack-apps 2>/dev/null && pwd && find . -maxdepth 2 -type d -name .git || echo 'No orbitstack-apps workspace yet'",
-  },
-  {
-    key: "python",
-    label: "Python env",
-    description: "Xem nhanh Python, pip và virtualenv nếu có.",
-    command: "python3 --version && pip --version && ls -la .venv 2>/dev/null || echo '.venv not found'",
-  },
 ];
-
-function readSavedSnippets() {
-  if (typeof window === "undefined") {
-    return [] as SavedSnippet[];
-  }
-
-  const raw = window.localStorage.getItem(STASH_KEY);
-
-  if (!raw) {
-    return [] as SavedSnippet[];
-  }
-
-  try {
-    return JSON.parse(raw) as SavedSnippet[];
-  } catch {
-    return [] as SavedSnippet[];
-  }
-}
 
 function readInitialWorkspace() {
   return readTerminalWorkspace();
@@ -154,27 +101,19 @@ function readInitialCredentialState() {
 function terminalTheme(mode: string | undefined) {
   if (mode === "light") {
     return {
-      background: "#f8fafc",
-      foreground: "#0f172a",
-      cursor: "#2563eb",
-      selectionBackground: "#cbd5e1",
+      background: "#081120",
+      foreground: "#f8fafc",
+      cursor: "#f8fafc",
+      selectionBackground: "#1e3a5f",
     };
   }
 
   return {
-    background: "#07111f",
+    background: "#081120",
     foreground: "#e5eefc",
     cursor: "#f8fafc",
     selectionBackground: "#22324d",
   };
-}
-
-function buildActivity(label: string, detail: string) {
-  return {
-    id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
-    label,
-    detail,
-  } satisfies ActivityEntry;
 }
 
 function extractTranscript(term: XTerm) {
@@ -239,7 +178,8 @@ export default function TerminalWorkbench({
   onOpenDeploy,
 }: TerminalWorkbenchProps) {
   const { resolvedTheme } = useTheme();
-  const terminalRef = useRef<HTMLDivElement | null>(null);
+  const terminalShellRef = useRef<HTMLDivElement | null>(null);
+  const terminalMountRef = useRef<HTMLDivElement | null>(null);
   const xtermRef = useRef<XTerm | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
   const fitRef = useRef<FitAddon | null>(null);
@@ -261,16 +201,11 @@ export default function TerminalWorkbench({
   const [connected, setConnected] = useState(false);
   const [error, setError] = useState("");
   const [commandDraft, setCommandDraft] = useState("");
-  const [savedSnippets, setSavedSnippets] = useState<SavedSnippet[]>(() =>
-    readSavedSnippets(),
-  );
-  const [activityFeed, setActivityFeed] = useState<ActivityEntry[]>([]);
   const [pendingWorkflow, setPendingWorkflow] = useState(
     () => readInitialWorkspace()?.initialCommand || "",
   );
-  const [workspacePayload, setWorkspacePayload] = useState<TerminalWorkspacePayload | null>(
-    () => readInitialWorkspace(),
-  );
+  const [workspacePayload, setWorkspacePayload] =
+    useState<TerminalWorkspacePayload | null>(() => readInitialWorkspace());
   const [workflowArmed, setWorkflowArmed] = useState(false);
 
   const wsUrl = useMemo(() => {
@@ -303,13 +238,11 @@ export default function TerminalWorkbench({
     }
   }, []);
 
-  useEffect(() => {
-    if (typeof window === "undefined") {
-      return;
-    }
-
-    window.localStorage.setItem(STASH_KEY, JSON.stringify(savedSnippets));
-  }, [savedSnippets]);
+  const scheduleViewportSync = useCallback(() => {
+    window.requestAnimationFrame(() => syncTerminalViewport());
+    window.setTimeout(() => syncTerminalViewport(), 120);
+    window.setTimeout(() => syncTerminalViewport(), 360);
+  }, [syncTerminalViewport]);
 
   useEffect(() => {
     function syncWorkspaceState() {
@@ -342,23 +275,23 @@ export default function TerminalWorkbench({
   }, [onSelectVm, selectedVmId]);
 
   useEffect(() => {
-    if (!terminalRef.current || xtermRef.current) {
+    if (!terminalMountRef.current || xtermRef.current) {
       return;
     }
 
     const term = new XTerm({
       fontFamily: "var(--font-mono), Consolas, monospace",
       fontSize: 14,
-      lineHeight: 1.3,
+      lineHeight: 1.35,
       cursorBlink: true,
-      scrollback: 4000,
+      scrollback: 5000,
       theme: terminalTheme(resolvedTheme),
     });
     const fitAddon = new FitAddon();
 
     term.loadAddon(fitAddon);
     term.loadAddon(new WebLinksAddon());
-    term.open(terminalRef.current);
+    term.open(terminalMountRef.current);
     fitAddon.fit();
 
     xtermRef.current = term;
@@ -368,9 +301,7 @@ export default function TerminalWorkbench({
     term.writeln("\x1b[90mChon VM, nhap credential va ket noi de bat dau.\x1b[0m");
     term.writeln("");
 
-    window.requestAnimationFrame(() => syncTerminalViewport());
-    window.setTimeout(() => syncTerminalViewport(), 160);
-    window.setTimeout(() => syncTerminalViewport(), 420);
+    scheduleViewportSync();
 
     term.onData((data) => {
       if (wsRef.current?.readyState === WebSocket.OPEN) {
@@ -384,7 +315,7 @@ export default function TerminalWorkbench({
       xtermRef.current = null;
       fitRef.current = null;
     };
-  }, [resolvedTheme, syncTerminalViewport]);
+  }, [resolvedTheme, scheduleViewportSync]);
 
   useEffect(() => {
     if (!xtermRef.current) {
@@ -392,30 +323,30 @@ export default function TerminalWorkbench({
     }
 
     xtermRef.current.options.theme = terminalTheme(resolvedTheme);
-    window.requestAnimationFrame(() => syncTerminalViewport());
-  }, [resolvedTheme, syncTerminalViewport]);
+    scheduleViewportSync();
+  }, [resolvedTheme, scheduleViewportSync]);
 
   useEffect(() => {
     function handleResize() {
-      syncTerminalViewport();
+      scheduleViewportSync();
     }
 
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
-  }, [syncTerminalViewport]);
+  }, [scheduleViewportSync]);
 
   useEffect(() => {
-    if (!terminalRef.current || typeof ResizeObserver === "undefined") {
+    if (!terminalShellRef.current || typeof ResizeObserver === "undefined") {
       return;
     }
 
     const observer = new ResizeObserver(() => {
-      window.requestAnimationFrame(() => syncTerminalViewport());
+      scheduleViewportSync();
     });
 
-    observer.observe(terminalRef.current);
+    observer.observe(terminalShellRef.current);
     return () => observer.disconnect();
-  }, [syncTerminalViewport]);
+  }, [scheduleViewportSync]);
 
   useEffect(() => {
     if (!connected || !xtermRef.current) {
@@ -425,18 +356,12 @@ export default function TerminalWorkbench({
     xtermRef.current.writeln(
       `\r\n\x1b[90m# Target refreshed: ${selectedVm?.name || resolvedHost || "manual host"}\x1b[0m`,
     );
-    window.requestAnimationFrame(() => syncTerminalViewport());
-  }, [connected, resolvedHost, selectedVm, syncTerminalViewport]);
+    scheduleViewportSync();
+  }, [connected, resolvedHost, scheduleViewportSync, selectedVm]);
 
   useEffect(() => {
-    window.requestAnimationFrame(() => syncTerminalViewport());
-  }, [pendingWorkflow, commandDraft, syncTerminalViewport]);
-
-  function addActivity(label: string, detail: string) {
-    setActivityFeed((current) =>
-      [buildActivity(label, detail), ...current].slice(0, 8),
-    );
-  }
+    scheduleViewportSync();
+  }, [pendingWorkflow, scheduleViewportSync]);
 
   function disconnectSocket() {
     wsRef.current?.close();
@@ -444,7 +369,7 @@ export default function TerminalWorkbench({
     setConnected(false);
   }
 
-  function sendCommand(command: string, label: string) {
+  function sendCommand(command: string) {
     if (!command.trim()) {
       toast.error("Chua co lenh nao de gui vao terminal.");
       return false;
@@ -456,7 +381,6 @@ export default function TerminalWorkbench({
     }
 
     wsRef.current.send(command.endsWith("\n") ? command : `${command}\n`);
-    addActivity(label, "Da day lenh vao terminal.");
     return true;
   }
 
@@ -464,7 +388,7 @@ export default function TerminalWorkbench({
     setError("");
 
     if (!resolvedHost.trim()) {
-      setError("Hay chon VM co IP hoac nhap host/IP de mo Terminal Lab.");
+      setError("Hay chon VM co IP hoac nhap host/IP truoc khi mo terminal.");
       return;
     }
 
@@ -474,7 +398,7 @@ export default function TerminalWorkbench({
     }
 
     if (!username.trim() || !password.trim()) {
-      setError("Hay nhap username va mat khau truoc khi ket noi.");
+      setError("Hay nhap username va mat khau SSH.");
       return;
     }
 
@@ -501,7 +425,6 @@ export default function TerminalWorkbench({
 
     ws.onopen = () => {
       setConnected(true);
-      addActivity("Ket noi da mo", `${username}@${resolvedHost}`);
 
       ws.send(
         JSON.stringify({
@@ -514,16 +437,17 @@ export default function TerminalWorkbench({
       );
 
       term.focus();
-      window.setTimeout(() => fitRef.current?.fit(), 100);
+      scheduleViewportSync();
 
       if (runAfterConnectRef.current) {
         const commandToRun = runAfterConnectRef.current;
         runAfterConnectRef.current = "";
+
         window.setTimeout(() => {
           if (ws.readyState === WebSocket.OPEN) {
             ws.send(`${commandToRun}\n`);
-            addActivity("Workflow da chay", "Script cho repo pipeline da duoc thuc thi.");
             setWorkflowArmed(false);
+            toast.success("Workflow da duoc day vao terminal.");
           }
         }, 400);
       }
@@ -549,13 +473,11 @@ export default function TerminalWorkbench({
 
     ws.onerror = () => {
       setError("Ket noi SSH that bai.");
-      addActivity("Ket noi that bai", "WebSocket khong mo duoc session SSH.");
       setConnected(false);
     };
 
     ws.onclose = () => {
       setConnected(false);
-      addActivity("Session da dong", "Terminal da ngat ket noi.");
     };
   }
 
@@ -593,7 +515,6 @@ export default function TerminalWorkbench({
 
     term.clear();
     term.writeln("\x1b[90m# Transcript da duoc lam sach o phia client.\x1b[0m");
-    addActivity("Da clear transcript", "Khung terminal da duoc don dep.");
   }
 
   function queueWorkflowForConnect() {
@@ -604,29 +525,7 @@ export default function TerminalWorkbench({
 
     runAfterConnectRef.current = pendingWorkflow;
     setWorkflowArmed(true);
-    addActivity("Workflow dang armed", "Se tu chay sau khi SSH ket noi.");
     toast.success("Workflow se tu chay o lan ket noi tiep theo.");
-  }
-
-  function saveDraftAsSnippet() {
-    const command = commandDraft.trim();
-
-    if (!command) {
-      toast.error("Hay nhap command truoc khi luu.");
-      return;
-    }
-
-    const title = command.split("\n")[0].slice(0, 44) || "Snippet moi";
-    setSavedSnippets((current) => [
-      {
-        id: `${Date.now()}`,
-        title,
-        command,
-      },
-      ...current,
-    ]);
-    addActivity("Da luu snippet", title);
-    toast.success("Da luu command vao command stash.");
   }
 
   const targetSummary = selectedVm
@@ -634,32 +533,34 @@ export default function TerminalWorkbench({
     : resolvedHost || "Manual target";
 
   return (
-    <section className="mt-6 space-y-4 pb-4">
-      <div className="surface-panel surface-noise overflow-hidden rounded-[1.8rem] p-5 sm:p-6">
-        <div className="flex flex-col gap-6 xl:flex-row xl:items-start xl:justify-between">
-          <div className="max-w-4xl">
+    <section className="mt-6 space-y-4 pb-6">
+      <div className="surface-panel rounded-[1.6rem] p-5 sm:p-6">
+        <div className="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
+          <div className="max-w-3xl">
             <div className="inline-flex items-center gap-2 rounded-full border border-border/70 bg-background/72 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.22em] text-muted-foreground">
               <TerminalSquare className="h-3.5 w-3.5" />
               Terminal Lab
             </div>
-            <h1 className="mt-5 text-3xl font-semibold leading-tight tracking-tight text-foreground sm:text-4xl xl:text-[3.4rem]">
-              SSH da duoc tach thanh workspace rieng, khong con la modal cham chat nua.
+            <h1 className="mt-4 text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
+              SSH workspace gon, de doc va de thao tac hon.
             </h1>
-            <p className="mt-4 max-w-3xl text-sm leading-7 text-muted-foreground sm:text-base">
-              Chon VM, giu credential tren browser, dieu khien terminal, day workflow
-              deploy, luu snippet va copy transcript ngay tren mot mat phang lam viec
-              rieng.
+            <p className="mt-3 max-w-2xl text-sm leading-7 text-muted-foreground">
+              Trang nay chi giu lai phan can thiet: ket noi SSH, terminal that,
+              workflow deploy va command composer.
             </p>
           </div>
 
           <div className="grid gap-3 sm:grid-cols-3 xl:min-w-[28rem]">
-            <StatChip
-              label="Target"
-              value={targetSummary}
-            />
+            <StatChip label="Target" value={targetSummary} />
             <StatChip
               label="Session"
-              value={connected ? "Connected" : workflowArmed ? "Armed for connect" : "Idle"}
+              value={
+                connected
+                  ? "Connected"
+                  : workflowArmed
+                    ? "Armed on connect"
+                    : "Disconnected"
+              }
             />
             <StatChip
               label="Ready VM"
@@ -669,12 +570,12 @@ export default function TerminalWorkbench({
         </div>
       </div>
 
-      <div className="grid gap-4 xl:grid-cols-[300px_minmax(0,1fr)_340px] xl:items-start">
+      <div className="grid gap-4 xl:grid-cols-[320px_minmax(0,1fr)] xl:items-start">
         <aside className="space-y-4">
           <div className="surface-panel rounded-[1.5rem] p-5">
             <SectionLabel
-              title="Connection Dock"
-              description="Giu host, credential va session theo tung VM de vao terminal nhanh hon."
+              title="Connection"
+              description="Chon VM, nhap credential va mo SSH session tu ngay trang nay."
             />
 
             <div className="mt-5 space-y-4">
@@ -689,6 +590,7 @@ export default function TerminalWorkbench({
                     onSelectVm(nextId);
                     const nextVm = vms.find((vm) => vm.id === nextId) ?? null;
                     setHost(nextVm?.ip || "");
+
                     const nextTarget = nextVm?.name || nextVm?.ip || "";
                     const stored = nextTarget
                       ? readStoredSshSession(nextTarget)
@@ -770,7 +672,7 @@ export default function TerminalWorkbench({
                   type="button"
                   onClick={() => {
                     disconnectSocket();
-                    addActivity("Da ngat ket noi", "Session SSH da duoc dong thu cong.");
+                    toast.success("Da dong session SSH.");
                   }}
                   className="inline-flex items-center justify-center gap-2 rounded-[1rem] border border-border/70 bg-background/75 px-4 py-3 text-sm font-semibold text-foreground transition hover:border-primary/35 hover:text-primary"
                 >
@@ -782,20 +684,20 @@ export default function TerminalWorkbench({
               <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
                 <button
                   type="button"
-                  onClick={() => onOpenDeploy(selectedVm?.id)}
-                  className="inline-flex items-center justify-center gap-2 rounded-[1rem] border border-border/70 bg-background/75 px-4 py-3 text-sm font-semibold text-foreground transition hover:border-primary/35 hover:text-primary"
-                >
-                  <GitBranch className="h-4 w-4" />
-                  Mo repo pipeline
-                </button>
-
-                <button
-                  type="button"
                   onClick={onRefreshFleet}
                   className="inline-flex items-center justify-center gap-2 rounded-[1rem] border border-border/70 bg-background/75 px-4 py-3 text-sm font-semibold text-foreground transition hover:border-primary/35 hover:text-primary"
                 >
                   <RefreshCw className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />
                   Lam moi fleet
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => onOpenDeploy(selectedVm?.id)}
+                  className="inline-flex items-center justify-center gap-2 rounded-[1rem] border border-border/70 bg-background/75 px-4 py-3 text-sm font-semibold text-foreground transition hover:border-primary/35 hover:text-primary"
+                >
+                  <GitBranch className="h-4 w-4" />
+                  Mo repo pipeline
                 </button>
               </div>
             </div>
@@ -810,7 +712,7 @@ export default function TerminalWorkbench({
               <div className="flex items-start gap-3">
                 <ShieldCheck className="mt-0.5 h-4 w-4 flex-shrink-0" />
                 <p>
-                  Credential chi duoc luu o session browser neu ban bat ghi nho, khong
+                  Credential chi duoc luu trong browser neu ban bat ghi nho, khong
                   duoc dua vao Next.js server.
                 </p>
               </div>
@@ -834,59 +736,89 @@ export default function TerminalWorkbench({
 
           <div className="surface-panel rounded-[1.5rem] p-5">
             <SectionLabel
-              title="Command Stash"
-              description="Luu nhanh nhung lenh hay dung de bat lai sau."
+              title="Workflow"
+              description="Script deploy tu repo pipeline se vao day de ban review va chay."
             />
 
-            <div className="mt-5 space-y-3">
-              {savedSnippets.length === 0 ? (
-                <div className="rounded-[1rem] border border-dashed border-border/70 bg-background/60 px-4 py-5 text-sm leading-6 text-muted-foreground">
-                  Chua co snippet nao. Ban co the viet lenh o command composer roi luu lai.
-                </div>
-              ) : (
-                savedSnippets.map((snippet) => (
-                  <div
-                    key={snippet.id}
-                    className="rounded-[1rem] border border-border/70 bg-background/75 p-4"
-                  >
-                    <p className="text-sm font-semibold text-foreground">{snippet.title}</p>
-                    <pre className="mt-2 max-h-24 overflow-auto whitespace-pre-wrap text-xs leading-6 text-muted-foreground">
-                      <code>{snippet.command}</code>
-                    </pre>
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      <button
-                        type="button"
-                        onClick={() => setCommandDraft(snippet.command)}
-                        className="inline-flex items-center gap-2 rounded-full border border-border/70 bg-background/70 px-3 py-1.5 text-xs font-semibold text-foreground transition hover:border-primary/35 hover:text-primary"
-                      >
-                        <Upload className="h-3.5 w-3.5" />
-                        Nap vao composer
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => void sendCommand(snippet.command, snippet.title)}
-                        className="inline-flex items-center gap-2 rounded-full border border-border/70 bg-background/70 px-3 py-1.5 text-xs font-semibold text-foreground transition hover:border-primary/35 hover:text-primary"
-                      >
-                        <Play className="h-3.5 w-3.5" />
-                        Chay
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setSavedSnippets((current) =>
-                            current.filter((item) => item.id !== snippet.id),
-                          )
-                        }
-                        className="inline-flex items-center gap-2 rounded-full border border-rose-500/20 bg-rose-500/10 px-3 py-1.5 text-xs font-semibold text-rose-300 transition hover:border-rose-500/35 hover:bg-rose-500/15"
-                      >
-                        <X className="h-3.5 w-3.5" />
-                        Bo
-                      </button>
-                    </div>
+            {pendingWorkflow ? (
+              <div className="mt-5 rounded-[1rem] border border-border/70 bg-background/75 px-4 py-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-semibold text-foreground">
+                      Workflow dang cho
+                    </p>
+                    <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                      {workspacePayload?.vmName
+                        ? `Nguon moi nhat: ${workspacePayload.vmName}`
+                        : "Script nay den tu repo pipeline vua cau hinh."}
+                    </p>
                   </div>
-                ))
-              )}
-            </div>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPendingWorkflow("");
+                      setWorkflowArmed(false);
+                      runAfterConnectRef.current = "";
+                      clearTerminalWorkspace();
+                    }}
+                    className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-border/70 bg-background/70 text-muted-foreground transition hover:border-primary/35 hover:text-foreground"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+
+                <pre className="mt-4 max-h-[16rem] overflow-auto whitespace-pre-wrap rounded-[1rem] border border-border/70 bg-[#081120] px-4 py-4 text-xs leading-6 text-slate-100">
+                  <code>{pendingWorkflow}</code>
+                </pre>
+
+                <div className="mt-4 flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (sendCommand(pendingWorkflow)) {
+                        setWorkflowArmed(false);
+                        runAfterConnectRef.current = "";
+                        toast.success("Da day workflow vao terminal.");
+                      }
+                    }}
+                    className="inline-flex items-center gap-2 rounded-full bg-foreground px-4 py-2.5 text-sm font-semibold text-background transition hover:opacity-90"
+                  >
+                    <Play className="h-4 w-4" />
+                    Chay ngay
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={queueWorkflowForConnect}
+                    className="inline-flex items-center gap-2 rounded-full border border-border/70 bg-background/75 px-4 py-2.5 text-sm font-semibold text-foreground transition hover:border-primary/35 hover:text-primary"
+                  >
+                    <Waypoints className="h-4 w-4" />
+                    Arm on connect
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setCommandDraft(pendingWorkflow)}
+                    className="inline-flex items-center gap-2 rounded-full border border-border/70 bg-background/75 px-4 py-2.5 text-sm font-semibold text-foreground transition hover:border-primary/35 hover:text-primary"
+                  >
+                    <Upload className="h-4 w-4" />
+                    Nap vao composer
+                  </button>
+                </div>
+
+                {workflowArmed && (
+                  <div className="mt-4 rounded-[1rem] border border-amber-500/25 bg-amber-500/10 px-4 py-3 text-sm text-amber-200">
+                    Workflow da duoc arm. Session SSH tiep theo se tu nhan script nay.
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="mt-5 rounded-[1rem] border border-dashed border-border/70 bg-background/60 px-4 py-5 text-sm leading-6 text-muted-foreground">
+                Chua co workflow nao dang cho. Ban co the mo repo pipeline de tao
+                script deploy roi day sang terminal page nay.
+              </div>
+            )}
           </div>
         </aside>
 
@@ -927,51 +859,54 @@ export default function TerminalWorkbench({
                 <div className="inline-flex items-center gap-2 rounded-full border border-border/70 bg-background/75 px-4 py-2.5 text-sm font-semibold text-foreground">
                   <span
                     className={`h-2.5 w-2.5 rounded-full ${
-                      connected ? "bg-emerald-400" : workflowArmed ? "bg-amber-400" : "bg-slate-400"
+                      connected
+                        ? "bg-emerald-400"
+                        : workflowArmed
+                          ? "bg-amber-400"
+                          : "bg-slate-400"
                     }`}
                   />
-                  {connected ? "Connected" : workflowArmed ? "Armed on connect" : "Disconnected"}
+                  {connected
+                    ? "Connected"
+                    : workflowArmed
+                      ? "Armed on connect"
+                      : "Disconnected"}
                 </div>
               </div>
             </div>
 
-            <div className="bg-[#07111f] p-3">
+            <div className="bg-[#081120] p-3">
               <div
-                ref={terminalRef}
-                className="terminal-shell h-[clamp(24rem,58vh,44rem)] min-h-[420px] w-full overflow-hidden rounded-[1rem] border border-slate-800/90 bg-[#07111f]"
-              />
+                ref={terminalShellRef}
+                className="terminal-shell h-[clamp(28rem,64vh,50rem)] min-h-[460px] w-full overflow-hidden rounded-[1rem] border border-slate-800/90 bg-[#081120] p-4"
+              >
+                <div
+                  ref={terminalMountRef}
+                  className="h-full w-full overflow-hidden rounded-[0.75rem]"
+                />
+              </div>
             </div>
           </div>
 
-          <div className="surface-panel rounded-[1.6rem] p-5 sm:p-6 xl:pb-7">
+          <div className="surface-panel rounded-[1.6rem] p-5 sm:p-6">
             <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
               <SectionLabel
-                title="Command Composer"
-                description="Viet lenh thu cong, nap snippet, hoac nhan nhanh mot quick action roi day vao terminal."
+                title="Composer"
+                description="Viet lenh, nap workflow hoac dung quick command roi day thang vao terminal."
               />
 
-              <div className="flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (sendCommand(commandDraft, "Composer command")) {
-                      setCommandDraft("");
-                    }
-                  }}
-                  className="inline-flex items-center gap-2 rounded-full bg-foreground px-4 py-2.5 text-sm font-semibold text-background transition hover:opacity-90"
-                >
-                  <Play className="h-4 w-4" />
-                  Gui vao terminal
-                </button>
-                <button
-                  type="button"
-                  onClick={saveDraftAsSnippet}
-                  className="inline-flex items-center gap-2 rounded-full border border-border/70 bg-background/75 px-4 py-2.5 text-sm font-semibold text-foreground transition hover:border-primary/35 hover:text-primary"
-                >
-                  <Save className="h-4 w-4" />
-                  Luu snippet
-                </button>
-              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  if (sendCommand(commandDraft)) {
+                    setCommandDraft("");
+                  }
+                }}
+                className="inline-flex items-center gap-2 rounded-full bg-foreground px-4 py-2.5 text-sm font-semibold text-background transition hover:opacity-90"
+              >
+                <Play className="h-4 w-4" />
+                Gui vao terminal
+              </button>
             </div>
 
             <textarea
@@ -981,235 +916,29 @@ export default function TerminalWorkbench({
                 if ((event.metaKey || event.ctrlKey) && event.key === "Enter") {
                   event.preventDefault();
 
-                  if (sendCommand(commandDraft, "Composer command")) {
+                  if (sendCommand(commandDraft)) {
                     setCommandDraft("");
                   }
                 }
               }}
-              placeholder="Viet script hoac lenh shell tai day. Ctrl/Cmd + Enter de gui ngay."
-              className="mt-5 min-h-[10rem] w-full rounded-[1.2rem] border border-border/70 bg-background/75 px-4 py-4 text-sm leading-7 text-foreground outline-none transition focus:border-primary/35"
+              placeholder="Viet lenh shell o day. Ctrl/Cmd + Enter de gui ngay."
+              className="mt-5 min-h-[9rem] w-full rounded-[1.2rem] border border-border/70 bg-background/75 px-4 py-4 text-sm leading-7 text-foreground outline-none transition focus:border-primary/35"
             />
 
-            <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+            <div className="mt-5 flex flex-wrap gap-2">
               {QUICK_COMMANDS.map((item) => (
                 <button
                   key={item.key}
                   type="button"
                   onClick={() => setCommandDraft(item.command)}
-                  className="rounded-[1.1rem] border border-border/70 bg-background/75 p-4 text-left transition hover:-translate-y-0.5 hover:border-primary/35"
+                  className="inline-flex items-center gap-2 rounded-full border border-border/70 bg-background/75 px-4 py-2.5 text-sm font-semibold text-foreground transition hover:border-primary/35 hover:text-primary"
                 >
-                  <p className="text-sm font-semibold text-foreground">{item.label}</p>
-                  <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                    {item.description}
-                  </p>
-                  <div className="mt-4 inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.18em] text-primary">
-                    Nap vao composer
-                    <Upload className="h-3.5 w-3.5" />
-                  </div>
+                  {item.label}
                 </button>
               ))}
             </div>
           </div>
         </div>
-
-        <aside className="space-y-4">
-          <div className="surface-panel rounded-[1.5rem] p-5">
-            <SectionLabel
-              title="Workflow Dock"
-              description="Nhan script tu repo pipeline, review lai, roi tu quyet dinh khi nao cho chay."
-            />
-
-            {pendingWorkflow ? (
-              <>
-                <div className="mt-5 rounded-[1rem] border border-border/70 bg-background/75 px-4 py-4">
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <p className="text-sm font-semibold text-foreground">
-                        Workflow dang cho
-                      </p>
-                      <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                        {workspacePayload?.vmName
-                          ? `Nguon moi nhat: ${workspacePayload.vmName}`
-                          : "Script nay den tu repo pipeline vua cau hinh."}
-                      </p>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setPendingWorkflow("");
-                        setWorkflowArmed(false);
-                        runAfterConnectRef.current = "";
-                        clearTerminalWorkspace();
-                      }}
-                      className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-border/70 bg-background/70 text-muted-foreground transition hover:border-primary/35 hover:text-foreground"
-                    >
-                      <X className="h-4 w-4" />
-                    </button>
-                  </div>
-
-                  <pre className="mt-4 max-h-[18rem] overflow-auto whitespace-pre-wrap rounded-[1rem] border border-border/70 bg-[#07111f] px-4 py-4 text-xs leading-6 text-slate-100">
-                    <code>{pendingWorkflow}</code>
-                  </pre>
-
-                  <div className="mt-4 flex flex-wrap gap-2">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        if (sendCommand(pendingWorkflow, "Deploy workflow")) {
-                          setWorkflowArmed(false);
-                          runAfterConnectRef.current = "";
-                        }
-                      }}
-                      className="inline-flex items-center gap-2 rounded-full bg-foreground px-4 py-2.5 text-sm font-semibold text-background transition hover:opacity-90"
-                    >
-                      <Play className="h-4 w-4" />
-                      Chay ngay
-                    </button>
-                    <button
-                      type="button"
-                      onClick={queueWorkflowForConnect}
-                      className="inline-flex items-center gap-2 rounded-full border border-border/70 bg-background/75 px-4 py-2.5 text-sm font-semibold text-foreground transition hover:border-primary/35 hover:text-primary"
-                    >
-                      <Waypoints className="h-4 w-4" />
-                      Arm on connect
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setCommandDraft(pendingWorkflow)}
-                      className="inline-flex items-center gap-2 rounded-full border border-border/70 bg-background/75 px-4 py-2.5 text-sm font-semibold text-foreground transition hover:border-primary/35 hover:text-primary"
-                    >
-                      <Upload className="h-4 w-4" />
-                      Nap vao composer
-                    </button>
-                    <button
-                      type="button"
-                      onClick={async () => {
-                        const ok = await copyToClipboard(pendingWorkflow);
-
-                        if (!ok) {
-                          toast.error("Khong the sao chep workflow.");
-                          return;
-                        }
-
-                        toast.success("Da copy workflow deploy.");
-                      }}
-                      className="inline-flex items-center gap-2 rounded-full border border-border/70 bg-background/75 px-4 py-2.5 text-sm font-semibold text-foreground transition hover:border-primary/35 hover:text-primary"
-                    >
-                      <Clipboard className="h-4 w-4" />
-                      Copy script
-                    </button>
-                  </div>
-                </div>
-
-                {workflowArmed && (
-                  <div className="mt-4 rounded-[1rem] border border-amber-500/25 bg-amber-500/10 px-4 py-3 text-sm text-amber-200">
-                    Workflow da duoc arm. Ngay khi session SSH mo, script se duoc day vao terminal.
-                  </div>
-                )}
-              </>
-            ) : (
-              <div className="mt-5 rounded-[1rem] border border-dashed border-border/70 bg-background/60 px-4 py-5 text-sm leading-6 text-muted-foreground">
-                Chua co workflow nao dang cho. Ban co the mo repo pipeline tu day de tao
-                script deploy moi, hoac dung Terminal Lab nhu mot SSH workspace thuan.
-              </div>
-            )}
-          </div>
-
-          <div className="surface-panel rounded-[1.5rem] p-5">
-            <SectionLabel
-              title="Web Controls"
-              description="Mot vai nut thao tac them de terminal page thuc su la mot workspace."
-            />
-
-            <div className="mt-5 grid gap-3">
-              <button
-                type="button"
-                onClick={() => onOpenDeploy(selectedVm?.id)}
-                className="inline-flex items-center justify-between rounded-[1rem] border border-border/70 bg-background/75 px-4 py-3.5 text-left text-sm font-semibold text-foreground transition hover:border-primary/35 hover:text-primary"
-              >
-                <span className="inline-flex items-center gap-2">
-                  <GitBranch className="h-4 w-4" />
-                  Tao repo workflow moi
-                </span>
-                <ExternalLink className="h-4 w-4" />
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setCommandDraft(QUICK_COMMANDS[0].command)}
-                className="inline-flex items-center justify-between rounded-[1rem] border border-border/70 bg-background/75 px-4 py-3.5 text-left text-sm font-semibold text-foreground transition hover:border-primary/35 hover:text-primary"
-              >
-                <span className="inline-flex items-center gap-2">
-                  <Bot className="h-4 w-4" />
-                  Nap runbook system health
-                </span>
-                <Upload className="h-4 w-4" />
-              </button>
-
-              <button
-                type="button"
-                onClick={() => {
-                  setPendingWorkflow("");
-                  clearTerminalWorkspace();
-                  toast.success("Da clear workflow dang cho.");
-                }}
-                className="inline-flex items-center justify-between rounded-[1rem] border border-border/70 bg-background/75 px-4 py-3.5 text-left text-sm font-semibold text-foreground transition hover:border-primary/35 hover:text-primary"
-              >
-                <span className="inline-flex items-center gap-2">
-                  <Command className="h-4 w-4" />
-                  Reset workflow dock
-                </span>
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-
-            <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
-              <StatChip
-                label="SSH user"
-                value={username || "ubuntu"}
-              />
-              <StatChip
-                label="Focus VM"
-                value={selectedVm?.name || "Manual host"}
-              />
-              <StatChip
-                label="Flavor"
-                value={selectedVm?.flavor || "N/A"}
-              />
-              <StatChip
-                label="Image"
-                value={selectedVm?.image || "N/A"}
-              />
-            </div>
-          </div>
-
-          <div className="surface-panel rounded-[1.5rem] p-5">
-            <SectionLabel
-              title="Activity Feed"
-              description="Theo doi mot vai su kien chinh cua workspace ma khong can mo console browser."
-            />
-
-            <div className="mt-5 space-y-3">
-              {activityFeed.length === 0 ? (
-                <div className="rounded-[1rem] border border-dashed border-border/70 bg-background/60 px-4 py-5 text-sm leading-6 text-muted-foreground">
-                  Chua co su kien nao. Sau khi ket noi, gui lenh hoac arm workflow thi feed se bat dau chay.
-                </div>
-              ) : (
-                activityFeed.map((item) => (
-                  <div
-                    key={item.id}
-                    className="rounded-[1rem] border border-border/70 bg-background/75 px-4 py-4"
-                  >
-                    <p className="text-sm font-semibold text-foreground">{item.label}</p>
-                    <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                      {item.detail}
-                    </p>
-                  </div>
-                ))
-              )}
-            </div>
-          </div>
-        </aside>
       </div>
     </section>
   );
