@@ -7,6 +7,7 @@ import { FitAddon } from "@xterm/addon-fit";
 import { WebLinksAddon } from "@xterm/addon-web-links";
 import { Terminal as XTerm } from "@xterm/xterm";
 import "@xterm/xterm/css/xterm.css";
+import { resolveSshWsUrl } from "@/lib/terminal-workspace";
 
 interface WebSSHModalProps {
   vmName: string;
@@ -22,16 +23,6 @@ interface SessionSnapshot {
 
 function getSessionKey(vmName: string) {
   return `ssh-session:${vmName}`;
-}
-
-function getDefaultWsUrl() {
-  if (typeof window === "undefined") {
-    return "";
-  }
-
-  const host = window.location.hostname;
-  const secure = window.location.protocol === "https:";
-  return `${secure ? "wss" : "ws"}://${host}:3001`;
 }
 
 function readStoredSession(vmName: string): SessionSnapshot {
@@ -81,7 +72,7 @@ export default function WebSSHModal({
       return "";
     }
 
-    return process.env.NEXT_PUBLIC_SSH_WS_URL || getDefaultWsUrl();
+    return resolveSshWsUrl();
   }, []);
 
   useEffect(() => {

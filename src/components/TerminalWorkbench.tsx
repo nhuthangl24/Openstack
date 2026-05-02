@@ -28,10 +28,10 @@ import {
   clearStoredSshSession,
   clearTerminalWorkspace,
   getDefaultSshSession,
-  getDefaultWsUrl,
   persistStoredSshSession,
   readStoredSshSession,
   readTerminalWorkspace,
+  resolveSshWsUrl,
   type SessionSnapshot,
   type TerminalWorkspacePayload,
 } from "@/lib/terminal-workspace";
@@ -213,7 +213,7 @@ export default function TerminalWorkbench({
       return "";
     }
 
-    return process.env.NEXT_PUBLIC_SSH_WS_URL || getDefaultWsUrl();
+    return resolveSshWsUrl();
   }, []);
 
   const resolvedHost = host || selectedVm?.ip || "";

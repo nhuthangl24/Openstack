@@ -140,3 +140,35 @@ export function getDefaultWsUrl() {
 
   return `${secure ? "wss" : "ws"}://${host}:3001`;
 }
+
+export function normalizeSshWsUrl(value: string) {
+  const trimmed = value.trim();
+
+  if (!trimmed) {
+    return "";
+  }
+
+  try {
+    const url = new URL(trimmed);
+
+    if (!url.pathname || url.pathname === "") {
+      url.pathname = "/";
+    } else if (!url.pathname.endsWith("/")) {
+      url.pathname = `${url.pathname}/`;
+    }
+
+    return url.toString();
+  } catch {
+    return trimmed.endsWith("/") ? trimmed : `${trimmed}/`;
+  }
+}
+
+export function resolveSshWsUrl() {
+  if (typeof window === "undefined") {
+    return "";
+  }
+
+  return normalizeSshWsUrl(
+    process.env.NEXT_PUBLIC_SSH_WS_URL || getDefaultWsUrl(),
+  );
+}
