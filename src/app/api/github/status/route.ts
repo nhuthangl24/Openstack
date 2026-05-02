@@ -1,11 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import {
-  clearGitHubAccessToken,
-  getGitHubAccessToken,
-} from "@/lib/github-session";
 
 export async function GET(request: NextRequest) {
-  const token = request.cookies.get("gh_token")?.value || getGitHubAccessToken();
+  const token = request.cookies.get("gh_token")?.value;
 
   if (!token) {
     return NextResponse.json(
@@ -28,7 +24,6 @@ export async function GET(request: NextRequest) {
       { status: 401, headers: { "Cache-Control": "no-store" } },
     );
 
-    clearGitHubAccessToken();
     reply.cookies.delete("gh_token");
     return reply;
   }

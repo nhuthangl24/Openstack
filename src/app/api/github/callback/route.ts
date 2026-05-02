@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from "next/server";
-import { setGitHubAccessToken } from "@/lib/github-session";
 import {
   getGitHubCallbackUrl,
   getRequestOrigin,
@@ -89,8 +88,6 @@ export async function GET(request: NextRequest) {
     response.cookies.delete("gh_oauth_verifier");
     return response;
   }
-
-  setGitHubAccessToken(tokenData.access_token);
 
   const response = NextResponse.redirect(new URL("/", getRequestOrigin(request)));
   response.cookies.set({

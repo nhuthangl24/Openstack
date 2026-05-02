@@ -1,5 +1,4 @@
 import type { NextRequest } from "next/server";
-import { getGitHubAccessToken } from "@/lib/github-session";
 
 export interface CurrentGitHubUser {
   login: string;
@@ -12,7 +11,7 @@ export interface CurrentGitHubUser {
 export async function getCurrentGitHubUser(
   request: NextRequest,
 ): Promise<CurrentGitHubUser | null> {
-  const token = request.cookies.get("gh_token")?.value || getGitHubAccessToken();
+  const token = request.cookies.get("gh_token")?.value;
 
   if (!token) {
     return null;

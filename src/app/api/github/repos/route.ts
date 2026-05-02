@@ -1,8 +1,4 @@
 import { NextRequest, NextResponse } from "next/server";
-import {
-  clearGitHubAccessToken,
-  getGitHubAccessToken,
-} from "@/lib/github-session";
 
 interface GitHubRepo {
   id: number;
@@ -14,7 +10,7 @@ interface GitHubRepo {
 }
 
 export async function GET(request: NextRequest) {
-  const token = request.cookies.get("gh_token")?.value || getGitHubAccessToken();
+  const token = request.cookies.get("gh_token")?.value;
   if (!token) {
     return NextResponse.json(
       { error: "Not connected" },
@@ -39,7 +35,6 @@ export async function GET(request: NextRequest) {
     );
 
     if (res.status === 401) {
-      clearGitHubAccessToken();
       response.cookies.delete("gh_token");
     }
 
