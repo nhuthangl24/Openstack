@@ -41,6 +41,10 @@ export function extractIPv4(networks: unknown): string {
   return "";
 }
 
+function sleep(delayMs: number) {
+  return new Promise((resolve) => setTimeout(resolve, delayMs));
+}
+
 export async function runCLI(command: string): Promise<string> {
   const fullCommand = `bash -lc 'source ${OPENRC} ${OS_USER} ${OS_PROJECT} && ${command} 2>&1'`;
 
@@ -94,6 +98,77 @@ export async function lookupId(
   }
 
   return item.ID || item.id;
+}
+
+export function normalizeHostnameLabel(value: string) {
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9-]/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "")
+    .slice(0, 63);
+}
+
+export function isValidHostnameLabel(value: string) {
+  return /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/.test(value);
+}
+
+export async function getServerDetails(serverRef: string) {
+  const raw = await runCLI(
+    `openstack server show ${escapeShellArg(serverRef)} -f json`,
+  );
+
+  return JSON.parse(raw) as Record<string, unknown>;
+}
+
+export async function getServerIP(serverRef: string): Promise<string | null> {
+  try {
+    const details = await getServerDetails(serverRef);
+    const ip = extractIPv4(details.addresses || details.Addresses);
+    return ip || null;
+  } catch (error: unknown) {
+    const message =
+      error instanceof Error ? error.message : typeof error === "string" ? error : "";
+
+    if (message.includes("HTTP 401") || message.includes("Unauthorized")) {
+      throw Object.assign(new Error("Xac thuc OpenStack that bai (401)."), {
+        code: 401,
+      });
+    }
+
+    if (message.includes("No server") || message.includes("HTTP 404")) {
+      throw Object.assign(new Error("Khong tim thay server tuong ung (404)."), {
+        code: 404,
+      });
+    }
+
+    throw error;
+  }
+}
+
+export async function waitForServerIP(
+  serverRef: string,
+  options?: {
+    timeoutMs?: number;
+    intervalMs?: number;
+  },
+): Promise<string> {
+  const timeoutMs = options?.timeoutMs ?? 300_000;
+  const intervalMs = options?.intervalMs ?? 5_000;
+  const startedAt = Date.now();
+
+  while (Date.now() - startedAt < timeoutMs) {
+    const ip = await getServerIP(serverRef);
+
+    if (ip) {
+      return ip;
+    }
+
+    await sleep(intervalMs);
+  }
+
+  throw new Error("VM da tao xong nhung chua lay duoc IP trong thoi gian cho.");
 }
 
 export function generatePostCreateScript(

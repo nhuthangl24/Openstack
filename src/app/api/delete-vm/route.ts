@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { runCLI, escapeShellArg } from "@/lib/openstack";
+import { removeVmRoute } from "@/lib/nginx-route-sync";
 
 export const dynamic = "force-dynamic";
 
@@ -15,7 +16,24 @@ export async function DELETE(request: NextRequest) {
     }
 
     await runCLI(`openstack server delete ${escapeShellArg(server_name)} --wait`);
-    return NextResponse.json({ success: true, server_name });
+
+    let routeSyncWarning = "";
+
+    try {
+      await removeVmRoute(server_name);
+    } catch (routeError) {
+      routeSyncWarning =
+        routeError instanceof Error
+          ? routeError.message
+          : "Khong go duoc route Nginx tren server remote.";
+      console.error("[delete-vm] nginx route cleanup error:", routeSyncWarning);
+    }
+
+    return NextResponse.json({
+      success: true,
+      server_name,
+      route_sync_warning: routeSyncWarning || undefined,
+    });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Delete VM failed.";
     console.error("[delete-vm] error:", message);

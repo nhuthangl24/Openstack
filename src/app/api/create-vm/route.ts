@@ -1,12 +1,27 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createOpenStackVM, generatePostCreateScript } from "@/lib/openstack";
+import {
+  createOpenStackVM,
+  generatePostCreateScript,
+  isValidHostnameLabel,
+  normalizeHostnameLabel,
+  waitForServerIP,
+} from "@/lib/openstack";
+import { syncVmRoute } from "@/lib/nginx-route-sync";
 
 export const dynamic = "force-dynamic";
 
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { instance_name, password, flavor, os, network, environments } = body;
+    const {
+      instance_name,
+      hostname,
+      password,
+      flavor,
+      os,
+      network,
+      environments,
+    } = body;
 
     if (!instance_name || !password || !flavor || !os || !network) {
       return NextResponse.json(
@@ -30,6 +45,7 @@ export async function POST(request: NextRequest) {
     }
 
     const nameRegex = /^[a-zA-Z0-9][a-zA-Z0-9._-]*$/;
+    const hostnameLabel = normalizeHostnameLabel(hostname || instance_name);
 
     if (!nameRegex.test(instance_name)) {
       return NextResponse.json(
@@ -42,8 +58,19 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    if (!hostnameLabel || !isValidHostnameLabel(hostnameLabel)) {
+      return NextResponse.json(
+        {
+          success: false,
+          error_message:
+            "Hostname public khong hop le. Chi dung chu thuong, so va dau gach ngang.",
+        },
+        { status: 400 },
+      );
+    }
+
     const startupScript = generatePostCreateScript(
-      instance_name,
+      hostnameLabel,
       password,
       environments || [],
     );
@@ -97,12 +124,32 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const ip = await waitForServerIP(result.vm_id || result.vm_name);
+    let routeSyncWarning = "";
+
+    try {
+      await syncVmRoute({
+        routeKey: instance_name,
+        hostname: hostnameLabel,
+        targetIp: ip,
+      });
+    } catch (routeError) {
+      routeSyncWarning =
+        routeError instanceof Error
+          ? routeError.message
+          : "Khong dong bo duoc route Nginx.";
+      console.error("[create-vm] nginx route sync error:", routeSyncWarning);
+    }
+
     return NextResponse.json({
       success: true,
       vm_name: result.vm_name,
       vm_id: result.vm_id,
       status: result.status,
-      ip: result.ip || "",
+      ip,
+      hostname: hostnameLabel,
+      fqdn: `${hostnameLabel}.${process.env.NGINX_ROUTE_DOMAIN || "orbitstack.app"}`,
+      route_sync_warning: routeSyncWarning || undefined,
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
