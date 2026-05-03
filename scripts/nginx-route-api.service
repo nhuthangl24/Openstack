@@ -1,0 +1,16 @@
+[Unit]
+Description=OrbitStack Nginx Route Manager API
+After=network.target
+
+[Service]
+Type=simple
+User=root
+Group=root
+WorkingDirectory=/opt/orbitstack
+EnvironmentFile=-/etc/orbitstack/nginx-route-api.env
+ExecStart=/usr/bin/python3 /opt/orbitstack/scripts/nginx_route_api.py
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target

@@ -1,15 +1,7 @@
-import { readFile } from "node:fs/promises";
-import { Client, type ConnectConfig } from "ssh2";
-import { escapeShellArg } from "@/lib/openstack";
-
-interface RouteSyncConfig {
-  host: string;
-  port: number;
-  user: string;
-  password?: string;
-  privateKey?: string;
+interface RouteApiConfig {
+  baseUrl: string;
+  token: string;
   domain: string;
-  remoteScriptPath: string;
   defaultTargetPort: number;
 }
 
@@ -30,125 +22,72 @@ function readRequiredEnv(name: string) {
   return value;
 }
 
-async function loadPrivateKey() {
-  const inlineKey = process.env.NGINX_ROUTE_SSH_PRIVATE_KEY?.trim();
-
-  if (inlineKey) {
-    return inlineKey.replace(/\\n/g, "\n");
-  }
-
-  const privateKeyPath = process.env.NGINX_ROUTE_SSH_PRIVATE_KEY_PATH?.trim();
-
-  if (!privateKeyPath) {
-    return undefined;
-  }
-
-  return readFile(privateKeyPath, "utf8");
-}
-
-async function getRouteSyncConfig(): Promise<RouteSyncConfig> {
-  const privateKey = await loadPrivateKey();
-  const password = process.env.NGINX_ROUTE_SSH_PASSWORD?.trim();
-
-  if (!privateKey && !password) {
-    throw new Error(
-      "Can cau hinh NGINX_ROUTE_SSH_PASSWORD hoac NGINX_ROUTE_SSH_PRIVATE_KEY.",
-    );
-  }
-
+function getRouteApiConfig(): RouteApiConfig {
   return {
-    host: readRequiredEnv("NGINX_ROUTE_SSH_HOST"),
-    port: Number(process.env.NGINX_ROUTE_SSH_PORT || 22),
-    user: readRequiredEnv("NGINX_ROUTE_SSH_USER"),
-    password: password || undefined,
-    privateKey,
+    baseUrl: readRequiredEnv("NGINX_ROUTE_API_BASE_URL").replace(/\/+$/, ""),
+    token: readRequiredEnv("NGINX_ROUTE_API_TOKEN"),
     domain: (process.env.NGINX_ROUTE_DOMAIN || "orbitstack.app").trim(),
-    remoteScriptPath: (
-      process.env.NGINX_ROUTE_REMOTE_SCRIPT || "/usr/local/bin/orbitstack-route"
-    ).trim(),
     defaultTargetPort: Number(process.env.NGINX_ROUTE_TARGET_PORT || 80),
   };
 }
 
-function getSshConnectConfig(config: RouteSyncConfig): ConnectConfig {
-  return {
-    host: config.host,
-    port: config.port,
-    username: config.user,
-    password: config.password,
-    privateKey: config.privateKey,
-    readyTimeout: 15_000,
-  };
-}
-
-async function runRemoteCommand(command: string) {
-  const config = await getRouteSyncConfig();
-  const connection = new Client();
-
-  return new Promise<string>((resolve, reject) => {
-    connection
-      .on("ready", () => {
-        connection.exec(command, (execError, stream) => {
-          if (execError) {
-            connection.end();
-            reject(execError);
-            return;
-          }
-
-          let stdout = "";
-          let stderr = "";
-
-          stream.on("close", (code: number | null) => {
-            connection.end();
-
-            if (code === 0) {
-              resolve(stdout.trim());
-              return;
-            }
-
-            reject(new Error(stderr.trim() || stdout.trim() || `Lenh loi voi ma ${code}.`));
-          });
-
-          stream.on("data", (chunk: Buffer | string) => {
-            stdout += chunk.toString();
-          });
-
-          stream.stderr.on("data", (chunk: Buffer | string) => {
-            stderr += chunk.toString();
-          });
-        });
-      })
-      .on("error", (error) => {
-        reject(error);
-      })
-      .connect(getSshConnectConfig(config));
+async function requestRouteApi(
+  path: string,
+  init: {
+    method: string;
+    body?: Record<string, unknown>;
+  },
+) {
+  const config = getRouteApiConfig();
+  const response = await fetch(`${config.baseUrl}${path}`, {
+    method: init.method,
+    headers: {
+      Authorization: `Bearer ${config.token}`,
+      "Content-Type": "application/json",
+    },
+    body: init.body ? JSON.stringify(init.body) : undefined,
+    cache: "no-store",
   });
+
+  if (response.ok) {
+    return response;
+  }
+
+  let detail = response.statusText;
+
+  try {
+    const payload = (await response.json()) as {
+      error?: string;
+      detail?: string;
+    };
+    detail = payload.error || payload.detail || detail;
+  } catch {
+    const text = await response.text();
+    if (text.trim()) {
+      detail = text.trim();
+    }
+  }
+
+  throw new Error(`Nginx route API loi (${response.status}): ${detail}`);
 }
 
 export async function syncVmRoute(input: SyncVmRouteInput) {
-  const config = await getRouteSyncConfig();
-  const command = [
-    "sudo",
-    escapeShellArg(config.remoteScriptPath),
-    "upsert",
-    escapeShellArg(input.routeKey),
-    escapeShellArg(input.hostname),
-    escapeShellArg(input.targetIp),
-    escapeShellArg(String(input.targetPort || config.defaultTargetPort)),
-    escapeShellArg(config.domain),
-  ].join(" ");
+  const config = getRouteApiConfig();
+  const routeKey = encodeURIComponent(input.routeKey);
 
-  return runRemoteCommand(command);
+  await requestRouteApi(`/routes/${routeKey}`, {
+    method: "PUT",
+    body: {
+      hostname: input.hostname,
+      target_ip: input.targetIp,
+      target_port: input.targetPort || config.defaultTargetPort,
+      domain: config.domain,
+    },
+  });
 }
 
 export async function removeVmRoute(routeKey: string) {
-  const config = await getRouteSyncConfig();
-  const command = [
-    "sudo",
-    escapeShellArg(config.remoteScriptPath),
-    "remove",
-    escapeShellArg(routeKey),
-  ].join(" ");
-
-  return runRemoteCommand(command);
+  await requestRouteApi(`/routes/${encodeURIComponent(routeKey)}`, {
+    method: "DELETE",
+  });
 }
