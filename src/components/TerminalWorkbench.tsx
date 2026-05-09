@@ -5,12 +5,15 @@ import {
   Clipboard,
   Eraser,
   GitBranch,
+  Globe,
   Play,
   Plug,
   PlugZap,
   RefreshCw,
+  Save,
   ShieldCheck,
   TerminalSquare,
+  TriangleAlert,
   Trash2,
   Upload,
   Waypoints,
@@ -49,6 +52,13 @@ interface QuickCommand {
   key: string;
   label: string;
   command: string;
+}
+
+interface VmRouteSnapshot {
+  fqdn: string;
+  hostname: string;
+  target_ip: string;
+  target_port: number;
 }
 
 interface TerminalWorkbenchProps {
@@ -165,6 +175,250 @@ function StatChip({
         {label}
       </p>
       <p className="mt-2 text-sm font-semibold text-foreground">{value}</p>
+    </div>
+  );
+}
+
+function TerminalRoutePanel({
+  vm,
+}: {
+  vm: VMOption | null;
+}) {
+  const vmId = vm?.id || "";
+  const vmName = vm?.name || "";
+  const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [route, setRoute] = useState<VmRouteSnapshot | null>(null);
+  const [portInput, setPortInput] = useState("3000");
+  const [message, setMessage] = useState("");
+
+  useEffect(() => {
+    let cancelled = false;
+
+    if (!vm || !vmName) {
+      setRoute(null);
+      setPortInput("3000");
+      setMessage("");
+      return;
+    }
+
+    async function loadRoute() {
+      setLoading(true);
+      setMessage("");
+
+      try {
+        const response = await fetch(
+          `/api/vm-route?vm_name=${encodeURIComponent(vmName)}`,
+          { cache: "no-store" },
+        );
+        const data = await response.json();
+
+        if (cancelled) {
+          return;
+        }
+
+        if (!response.ok || !data.success) {
+          setRoute(null);
+          setPortInput("3000");
+          setMessage(data.error_message || "Chua co public route cho VM nay.");
+          return;
+        }
+
+        const nextRoute = data.route as VmRouteSnapshot;
+        setRoute(nextRoute);
+        setPortInput(String(nextRoute.target_port || 3000));
+      } catch {
+        if (!cancelled) {
+          setRoute(null);
+          setMessage("Khong tai duoc thong tin public route.");
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      }
+    }
+
+    void loadRoute();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [vm, vmId, vmName]);
+
+  async function handleSave() {
+    if (!vm) {
+      toast.error("Hay chon VM truoc khi doi port.");
+      return;
+    }
+
+    const targetPort = Number(portInput);
+
+    if (!Number.isInteger(targetPort) || targetPort < 1 || targetPort > 65535) {
+      const detail = "Port khong hop le. Hay nhap so tu 1 den 65535.";
+      setMessage(detail);
+      toast.error("Khong cap nhat duoc route", { description: detail });
+      return;
+    }
+
+    setSaving(true);
+
+    try {
+      const response = await fetch("/api/update-vm-route", {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          vm_name: vm.name,
+          target_ip: vm.ip || route?.target_ip || undefined,
+          target_port: targetPort,
+        }),
+      });
+      const data = await response.json();
+
+      if (!response.ok || !data.success) {
+        throw new Error(data.error_message || data.error || "Khong cap nhat duoc route.");
+      }
+
+      const nextRoute: VmRouteSnapshot = {
+        fqdn: data.fqdn,
+        hostname: data.hostname,
+        target_ip: data.ip,
+        target_port: data.target_port,
+      };
+
+      setRoute(nextRoute);
+      setPortInput(String(nextRoute.target_port));
+      setMessage("");
+      toast.success("Da cap nhat port public", {
+        description: `${nextRoute.fqdn} -> ${nextRoute.target_port}`,
+      });
+    } catch (error) {
+      const detail =
+        error instanceof Error ? error.message : "Khong cap nhat duoc route public.";
+      setMessage(detail);
+      toast.error("Cap nhat route that bai", { description: detail });
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleCopyUrl() {
+    if (!route?.fqdn) {
+      toast.error("VM nay chua co public route de copy.");
+      return;
+    }
+
+    const copied = await copyToClipboard(`https://${route.fqdn}`);
+
+    if (!copied) {
+      toast.error("Khong the sao chep URL public.");
+      return;
+    }
+
+    toast.success("Da copy URL public.");
+  }
+
+  return (
+    <div className="surface-panel rounded-[1.5rem] p-5">
+      <SectionLabel
+        title="Public Route"
+        description="Doi port public theo tung VM dang chon ngay trong trang terminal."
+      />
+
+      {vm ? (
+        <>
+          <div className="mt-5 rounded-[1rem] border border-border/70 bg-background/75 px-4 py-4">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <div className="inline-flex items-center gap-2 text-sm font-semibold text-foreground">
+                  <Globe className="h-4 w-4 text-primary" />
+                  {route?.fqdn || "Chua co route public"}
+                </div>
+                <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                  Dang route den {(vm.ip || route?.target_ip || "IP cua VM")}:
+                  {route?.target_port || portInput}
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => void handleCopyUrl()}
+                disabled={!route?.fqdn}
+                className="inline-flex items-center gap-2 rounded-full border border-border/70 bg-background/70 px-3 py-2 text-xs font-semibold text-foreground transition hover:border-primary/35 hover:text-primary disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <Clipboard className="h-3.5 w-3.5" />
+                Copy URL
+              </button>
+            </div>
+
+            {message ? (
+              <div className="mt-4 flex items-start gap-3 rounded-[1rem] border border-amber-500/25 bg-amber-500/10 px-3 py-3 text-sm text-amber-200">
+                <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0" />
+                <p>{message}</p>
+              </div>
+            ) : null}
+
+            <div className="mt-4 flex flex-wrap gap-2">
+              {[3000, 8080, 443, 300].map((port) => {
+                const selected = Number(portInput) === port;
+
+                return (
+                  <button
+                    key={port}
+                    type="button"
+                    onClick={() => setPortInput(String(port))}
+                    className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition ${
+                      selected
+                        ? "border-primary/40 bg-primary/10 text-primary"
+                        : "border-border/70 bg-background/70 text-foreground hover:border-primary/30"
+                    }`}
+                  >
+                    {port}
+                  </button>
+                );
+              })}
+            </div>
+
+            <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-end">
+              <label className="block flex-1">
+                <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                  Target port
+                </span>
+                <input
+                  type="number"
+                  min={1}
+                  max={65535}
+                  inputMode="numeric"
+                  value={portInput}
+                  onChange={(event) => setPortInput(event.target.value)}
+                  disabled={loading || saving}
+                  className="mt-2 h-11 w-full rounded-[1rem] border border-border/70 bg-background/75 px-4 py-3 font-mono text-sm text-foreground outline-none transition focus:border-primary/35 disabled:cursor-not-allowed disabled:opacity-60"
+                />
+              </label>
+
+              <button
+                type="button"
+                onClick={() => void handleSave()}
+                disabled={loading || saving}
+                className="inline-flex h-11 items-center justify-center gap-2 rounded-[1rem] bg-foreground px-4 text-sm font-semibold text-background transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {loading || saving ? (
+                  <RefreshCw className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Save className="h-4 w-4" />
+                )}
+                {route ? "Luu port" : "Tao route"}
+              </button>
+            </div>
+          </div>
+        </>
+      ) : (
+        <div className="mt-5 rounded-[1rem] border border-dashed border-border/70 bg-background/60 px-4 py-5 text-sm leading-6 text-muted-foreground">
+          Chon mot VM trong Terminal de doi port public cho dung may do.
+        </div>
+      )}
     </div>
   );
 }
@@ -733,6 +987,8 @@ export default function TerminalWorkbench({
               Xóa thông tin đã lưu
             </button>
           </div>
+
+          <TerminalRoutePanel vm={selectedVm} />
 
           <div className="surface-panel rounded-[1.5rem] p-5">
             <SectionLabel
