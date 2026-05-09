@@ -220,7 +220,7 @@ function TerminalRoutePanel({
         if (!response.ok || !data.success) {
           setRoute(null);
           setPortInput("3000");
-          setMessage(data.error_message || "Chua co public route cho VM nay.");
+          setMessage(data.error_message || "Không tìm thấy route cho VM này.");
           return;
         }
 
@@ -230,7 +230,7 @@ function TerminalRoutePanel({
       } catch {
         if (!cancelled) {
           setRoute(null);
-          setMessage("Khong tai duoc thong tin public route.");
+          setMessage("Không tải được thông tin public route.");
         }
       } finally {
         if (!cancelled) {
@@ -248,16 +248,16 @@ function TerminalRoutePanel({
 
   async function handleSave() {
     if (!vm) {
-      toast.error("Hay chon VM truoc khi doi port.");
+      toast.error("Hãy chọn VM trước khi đổi port.");
       return;
     }
 
     const targetPort = Number(portInput);
 
     if (!Number.isInteger(targetPort) || targetPort < 1 || targetPort > 65535) {
-      const detail = "Port khong hop le. Hay nhap so tu 1 den 65535.";
+      const detail = "Port không hợp lệ. Hãy nhập số từ 1 đến 65535.";
       setMessage(detail);
-      toast.error("Khong cap nhat duoc route", { description: detail });
+      toast.error("Không cập nhật được route", { description: detail });
       return;
     }
 
@@ -278,7 +278,7 @@ function TerminalRoutePanel({
       const data = await response.json();
 
       if (!response.ok || !data.success) {
-        throw new Error(data.error_message || data.error || "Khong cap nhat duoc route.");
+        throw new Error(data.error_message || data.error || "Không cập nhật được route.");
       }
 
       const nextRoute: VmRouteSnapshot = {
@@ -291,14 +291,14 @@ function TerminalRoutePanel({
       setRoute(nextRoute);
       setPortInput(String(nextRoute.target_port));
       setMessage("");
-      toast.success("Da cap nhat port public", {
+      toast.success("Đã cập nhật port public", {
         description: `${nextRoute.fqdn} -> ${nextRoute.target_port}`,
       });
     } catch (error) {
       const detail =
-        error instanceof Error ? error.message : "Khong cap nhat duoc route public.";
+        error instanceof Error ? error.message : "Không cập nhật được route public.";
       setMessage(detail);
-      toast.error("Cap nhat route that bai", { description: detail });
+      toast.error("Cập nhật route thất bại", { description: detail });
     } finally {
       setSaving(false);
     }
@@ -306,39 +306,48 @@ function TerminalRoutePanel({
 
   async function handleCopyUrl() {
     if (!route?.fqdn) {
-      toast.error("VM nay chua co public route de copy.");
+      toast.error("VM này chưa có public route để copy.");
       return;
     }
 
     const copied = await copyToClipboard(`https://${route.fqdn}`);
 
     if (!copied) {
-      toast.error("Khong the sao chep URL public.");
+      toast.error("Không thể sao chép URL public.");
       return;
     }
 
-    toast.success("Da copy URL public.");
+    toast.success("Đã copy URL public.");
   }
 
   return (
-    <div className="surface-panel rounded-[1.5rem] p-5">
+    <div className="surface-panel relative overflow-hidden rounded-[1.5rem] p-5">
+      <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-primary/45 to-transparent" />
       <SectionLabel
         title="Public Route"
-        description="Doi port public theo tung VM dang chon ngay trong trang terminal."
+        description="Đổi port public theo từng VM đang chọn ngay trong trang terminal."
       />
 
       {vm ? (
         <>
-          <div className="mt-5 rounded-[1rem] border border-border/70 bg-background/75 px-4 py-4">
-            <div className="flex items-start justify-between gap-3">
+          <div className="mt-5 rounded-[1.25rem] border border-border/70 bg-gradient-to-br from-background/90 via-background/75 to-background/60 px-4 py-4 shadow-[0_18px_50px_-34px_rgba(15,23,42,0.75)]">
+            <div className="flex items-start justify-between gap-4">
               <div>
-                <div className="inline-flex items-center gap-2 text-sm font-semibold text-foreground">
-                  <Globe className="h-4 w-4 text-primary" />
-                  {route?.fqdn || "Chua co route public"}
+                <div className="inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/10 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.18em] text-primary">
+                  <Globe className="h-3.5 w-3.5" />
+                  Public route
+                </div>
+                <div className="mt-3 text-base font-semibold text-foreground">
+                  {route?.fqdn || "Chưa có route public"}
                 </div>
                 <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                  Dang route den {(vm.ip || route?.target_ip || "IP cua VM")}:
-                  {route?.target_port || portInput}
+                  Đang route đến{" "}
+                  <span className="font-mono text-foreground">
+                    {vm.ip || route?.target_ip || "IP của VM"}:{route?.target_port || portInput}
+                  </span>
+                </p>
+                <p className="mt-1 text-xs uppercase tracking-[0.16em] text-muted-foreground/80">
+                  VM hiện tại: {vm.name}
                 </p>
               </div>
 
@@ -354,13 +363,21 @@ function TerminalRoutePanel({
             </div>
 
             {message ? (
-              <div className="mt-4 flex items-start gap-3 rounded-[1rem] border border-amber-500/25 bg-amber-500/10 px-3 py-3 text-sm text-amber-200">
+              <div className="mt-4 flex items-start gap-3 rounded-[1rem] border border-amber-500/25 bg-amber-500/10 px-3 py-3 text-sm text-amber-100">
                 <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0" />
                 <p>{message}</p>
               </div>
-            ) : null}
+            ) : (
+              <div className="mt-4 rounded-[1rem] border border-emerald-500/20 bg-emerald-500/10 px-3 py-3 text-sm text-emerald-100">
+                Route đang sẵn sàng cho VM đang chọn. Bạn có thể đổi port bất cứ lúc nào.
+              </div>
+            )}
 
-            <div className="mt-4 flex flex-wrap gap-2">
+            <div className="mt-5">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                Port phổ biến
+              </p>
+              <div className="mt-3 flex flex-wrap gap-2">
               {[3000, 8080, 443, 300].map((port) => {
                 const selected = Number(portInput) === port;
 
@@ -371,7 +388,7 @@ function TerminalRoutePanel({
                     onClick={() => setPortInput(String(port))}
                     className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition ${
                       selected
-                        ? "border-primary/40 bg-primary/10 text-primary"
+                        ? "border-primary/40 bg-primary/10 text-primary shadow-[0_0_0_1px_rgba(59,130,246,0.12)]"
                         : "border-border/70 bg-background/70 text-foreground hover:border-primary/30"
                     }`}
                   >
@@ -379,10 +396,11 @@ function TerminalRoutePanel({
                   </button>
                 );
               })}
+              </div>
             </div>
 
-            <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-end">
-              <label className="block flex-1">
+            <div className="mt-5 grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
+              <label className="block">
                 <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
                   Target port
                 </span>
@@ -409,14 +427,14 @@ function TerminalRoutePanel({
                 ) : (
                   <Save className="h-4 w-4" />
                 )}
-                {route ? "Luu port" : "Tao route"}
+                {route ? "Lưu port" : "Tạo route"}
               </button>
             </div>
           </div>
         </>
       ) : (
         <div className="mt-5 rounded-[1rem] border border-dashed border-border/70 bg-background/60 px-4 py-5 text-sm leading-6 text-muted-foreground">
-          Chon mot VM trong Terminal de doi port public cho dung may do.
+          Chọn một VM trong Terminal để đổi port public cho đúng máy đó.
         </div>
       )}
     </div>
