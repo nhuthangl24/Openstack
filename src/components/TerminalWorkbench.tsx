@@ -230,7 +230,7 @@ function TerminalRoutePanel({
       } catch {
         if (!cancelled) {
           setRoute(null);
-          setMessage("Không tải được thông tin public route.");
+          setMessage("Không tải được thông tin route công khai.");
         }
       } finally {
         if (!cancelled) {
@@ -248,14 +248,14 @@ function TerminalRoutePanel({
 
   async function handleSave() {
     if (!vm) {
-      toast.error("Hãy chọn VM trước khi đổi port.");
+      toast.error("Hãy chọn VM trước khi đổi cổng.");
       return;
     }
 
     const targetPort = Number(portInput);
 
     if (!Number.isInteger(targetPort) || targetPort < 1 || targetPort > 65535) {
-      const detail = "Port không hợp lệ. Hãy nhập số từ 1 đến 65535.";
+      const detail = "Cổng không hợp lệ. Hãy nhập số từ 1 đến 65535.";
       setMessage(detail);
       toast.error("Không cập nhật được route", { description: detail });
       return;
@@ -291,12 +291,12 @@ function TerminalRoutePanel({
       setRoute(nextRoute);
       setPortInput(String(nextRoute.target_port));
       setMessage("");
-      toast.success("Đã cập nhật port public", {
+      toast.success("Đã cập nhật cổng công khai", {
         description: `${nextRoute.fqdn} -> ${nextRoute.target_port}`,
       });
     } catch (error) {
       const detail =
-        error instanceof Error ? error.message : "Không cập nhật được route public.";
+        error instanceof Error ? error.message : "Không cập nhật được route công khai.";
       setMessage(detail);
       toast.error("Cập nhật route thất bại", { description: detail });
     } finally {
@@ -306,103 +306,121 @@ function TerminalRoutePanel({
 
   async function handleCopyUrl() {
     if (!route?.fqdn) {
-      toast.error("VM này chưa có public route để copy.");
+      toast.error("VM này chưa có URL công khai để sao chép.");
       return;
     }
 
     const copied = await copyToClipboard(`https://${route.fqdn}`);
 
     if (!copied) {
-      toast.error("Không thể sao chép URL public.");
+      toast.error("Không thể sao chép URL công khai.");
       return;
     }
 
-    toast.success("Đã copy URL public.");
+    toast.success("Đã sao chép URL công khai.");
   }
 
   return (
-    <div className="surface-panel relative overflow-hidden rounded-[1.5rem] p-5">
-      <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-primary/45 to-transparent" />
+    <div className="surface-panel relative overflow-hidden rounded-[1.6rem] border border-border/60 bg-background/75 p-5 shadow-[0_24px_80px_-48px_rgba(15,23,42,0.95)] backdrop-blur">
+      <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-primary/45 to-transparent" />
+      <div className="pointer-events-none absolute -left-16 top-0 h-32 w-32 rounded-full bg-primary/10 blur-3xl" />
+      <div className="pointer-events-none absolute -bottom-20 right-0 h-36 w-36 rounded-full bg-emerald-500/10 blur-3xl" />
       <SectionLabel
-        title="Public Route"
-        description="Đổi port public theo từng VM đang chọn ngay trong trang terminal."
+        title="Truy cập công khai"
+        description="Đổi cổng công khai theo từng VM đang chọn ngay trong trang terminal."
       />
 
       {vm ? (
-        <>
-          <div className="mt-5 rounded-[1.25rem] border border-border/70 bg-gradient-to-br from-background/90 via-background/75 to-background/60 px-4 py-4 shadow-[0_18px_50px_-34px_rgba(15,23,42,0.75)]">
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <div className="inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/10 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.18em] text-primary">
-                  <Globe className="h-3.5 w-3.5" />
-                  Public route
-                </div>
-                <div className="mt-3 text-base font-semibold text-foreground">
-                  {route?.fqdn || "Chưa có route public"}
-                </div>
-                <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                  Đang route đến{" "}
-                  <span className="font-mono text-foreground">
-                    {vm.ip || route?.target_ip || "IP của VM"}:{route?.target_port || portInput}
-                  </span>
-                </p>
-                <p className="mt-1 text-xs uppercase tracking-[0.16em] text-muted-foreground/80">
-                  VM hiện tại: {vm.name}
-                </p>
+        <div className="relative mt-5 overflow-hidden rounded-[1.35rem] border border-border/70 bg-[linear-gradient(160deg,rgba(8,12,20,0.96),rgba(12,20,32,0.92))] p-4 shadow-[0_32px_90px_-56px_rgba(15,23,42,1)]">
+          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(250,204,21,0.12),transparent_36%),radial-gradient(circle_at_bottom_right,rgba(16,185,129,0.14),transparent_40%)]" />
+
+          <div className="relative">
+            <div className="flex flex-col gap-3">
+              <div className="inline-flex w-fit items-center gap-2 rounded-full border border-primary/20 bg-primary/10 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.18em] text-primary">
+                <Globe className="h-3.5 w-3.5" />
+                URL công khai
               </div>
 
-              <button
-                type="button"
-                onClick={() => void handleCopyUrl()}
-                disabled={!route?.fqdn}
-                className="inline-flex items-center gap-2 rounded-full border border-border/70 bg-background/70 px-3 py-2 text-xs font-semibold text-foreground transition hover:border-primary/35 hover:text-primary disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                <Clipboard className="h-3.5 w-3.5" />
-                Copy URL
-              </button>
+              <div className="space-y-3">
+                <div>
+                  <p className="text-lg font-semibold leading-7 text-foreground break-all">
+                    {route?.fqdn || "Chưa có URL công khai"}
+                  </p>
+                  <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                    Dùng route này để trỏ truy cập ngoài vào đúng dịch vụ đang chạy bên trong VM.
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => void handleCopyUrl()}
+                  disabled={!route?.fqdn}
+                  className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-full border border-border/70 bg-background/72 px-4 text-sm font-semibold text-foreground transition hover:border-primary/35 hover:text-primary disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <Clipboard className="h-4 w-4" />
+                  Sao chép URL
+                </button>
+              </div>
+            </div>
+
+            <div className="mt-4 grid gap-3 sm:grid-cols-2">
+              <div className="rounded-[1rem] border border-border/70 bg-background/72 px-4 py-3">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                  Đích hiện tại
+                </p>
+                <p className="mt-2 break-all font-mono text-sm font-semibold text-foreground">
+                  {vm.ip || route?.target_ip || "IP của VM"}:{route?.target_port || portInput}
+                </p>
+              </div>
+              <div className="rounded-[1rem] border border-border/70 bg-background/72 px-4 py-3">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                  VM đang chọn
+                </p>
+                <p className="mt-2 text-sm font-semibold text-foreground">{vm.name}</p>
+              </div>
             </div>
 
             {message ? (
-              <div className="mt-4 flex items-start gap-3 rounded-[1rem] border border-amber-500/25 bg-amber-500/10 px-3 py-3 text-sm text-amber-100">
+              <div className="mt-4 flex items-start gap-3 rounded-[1rem] border border-amber-500/25 bg-amber-500/10 px-4 py-3 text-sm leading-6 text-amber-100">
                 <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0" />
                 <p>{message}</p>
               </div>
             ) : (
-              <div className="mt-4 rounded-[1rem] border border-emerald-500/20 bg-emerald-500/10 px-3 py-3 text-sm text-emerald-100">
-                Route đang sẵn sàng cho VM đang chọn. Bạn có thể đổi port bất cứ lúc nào.
+              <div className="mt-4 rounded-[1rem] border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-sm leading-6 text-emerald-100">
+                Route đã sẵn sàng cho VM này. Bạn có thể đổi cổng và lưu lại bất cứ lúc nào.
               </div>
             )}
 
             <div className="mt-5">
               <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                Port phổ biến
+                Cổng phổ biến
               </p>
               <div className="mt-3 flex flex-wrap gap-2">
-              {[3000, 8080, 443, 300].map((port) => {
-                const selected = Number(portInput) === port;
+                {[3000, 8080, 443, 300].map((port) => {
+                  const selected = Number(portInput) === port;
 
-                return (
-                  <button
-                    key={port}
-                    type="button"
-                    onClick={() => setPortInput(String(port))}
-                    className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition ${
-                      selected
-                        ? "border-primary/40 bg-primary/10 text-primary shadow-[0_0_0_1px_rgba(59,130,246,0.12)]"
-                        : "border-border/70 bg-background/70 text-foreground hover:border-primary/30"
-                    }`}
-                  >
-                    {port}
-                  </button>
-                );
-              })}
+                  return (
+                    <button
+                      key={port}
+                      type="button"
+                      onClick={() => setPortInput(String(port))}
+                      className={`rounded-full border px-3.5 py-2 text-xs font-semibold transition ${
+                        selected
+                          ? "border-primary/40 bg-primary/12 text-primary shadow-[0_0_0_1px_rgba(59,130,246,0.12)]"
+                          : "border-border/70 bg-background/70 text-foreground hover:border-primary/30"
+                      }`}
+                    >
+                      {port}
+                    </button>
+                  );
+                })}
               </div>
             </div>
 
-            <div className="mt-5 grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
+            <div className="mt-5 grid gap-3">
               <label className="block">
                 <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                  Target port
+                  Cổng đích
                 </span>
                 <input
                   type="number"
@@ -412,29 +430,32 @@ function TerminalRoutePanel({
                   value={portInput}
                   onChange={(event) => setPortInput(event.target.value)}
                   disabled={loading || saving}
-                  className="mt-2 h-11 w-full rounded-[1rem] border border-border/70 bg-background/75 px-4 py-3 font-mono text-sm text-foreground outline-none transition focus:border-primary/35 disabled:cursor-not-allowed disabled:opacity-60"
+                  className="mt-2 h-12 w-full rounded-[1rem] border border-border/70 bg-background/75 px-4 py-3 font-mono text-sm text-foreground outline-none transition focus:border-primary/35 disabled:cursor-not-allowed disabled:opacity-60"
                 />
+                <p className="mt-2 text-xs leading-5 text-muted-foreground">
+                  Nhập cổng dịch vụ thật đang chạy trong VM, ví dụ 3000, 8080 hoặc 443.
+                </p>
               </label>
 
               <button
                 type="button"
                 onClick={() => void handleSave()}
                 disabled={loading || saving}
-                className="inline-flex h-11 items-center justify-center gap-2 rounded-[1rem] bg-foreground px-4 text-sm font-semibold text-background transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+                className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-[1rem] bg-foreground px-4 text-sm font-semibold text-background transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {loading || saving ? (
                   <RefreshCw className="h-4 w-4 animate-spin" />
                 ) : (
                   <Save className="h-4 w-4" />
                 )}
-                {route ? "Lưu port" : "Tạo route"}
+                {route ? "Lưu cổng" : "Tạo route"}
               </button>
             </div>
           </div>
-        </>
+        </div>
       ) : (
         <div className="mt-5 rounded-[1rem] border border-dashed border-border/70 bg-background/60 px-4 py-5 text-sm leading-6 text-muted-foreground">
-          Chọn một VM trong Terminal để đổi port public cho đúng máy đó.
+          Chọn một VM trong Terminal để đổi cổng công khai đúng theo từng máy ảo.
         </div>
       )}
     </div>
