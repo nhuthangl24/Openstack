@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerIP, isValidHostnameLabel, normalizeHostnameLabel } from "@/lib/openstack";
 import {
   getConfiguredRouteDomain,
+  getVmRoute,
   syncVmRoute,
 } from "@/lib/nginx-route-sync";
 
@@ -21,9 +22,7 @@ export async function PUT(request: NextRequest) {
   try {
     const body = await request.json();
     const vmName = String(body.vm_name || "").trim();
-    const hostnameLabel = normalizeHostnameLabel(
-      String(body.hostname || body.vm_name || "").trim(),
-    );
+    const requestedHostname = String(body.hostname || "").trim();
     const targetPort = parseTargetPort(body.target_port);
     const hintedIp = String(body.target_ip || "").trim();
 
@@ -33,6 +32,11 @@ export async function PUT(request: NextRequest) {
         { status: 400 },
       );
     }
+
+    const existingRoute = await getVmRoute(vmName);
+    const hostnameLabel = normalizeHostnameLabel(
+      requestedHostname || existingRoute?.hostname || vmName,
+    );
 
     if (!hostnameLabel || !isValidHostnameLabel(hostnameLabel)) {
       return NextResponse.json(
@@ -81,6 +85,7 @@ export async function PUT(request: NextRequest) {
       fqdn: `${hostnameLabel}.${getConfiguredRouteDomain()}`,
       ip: targetIp,
       target_port: targetPort,
+      existed_before: Boolean(existingRoute),
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Cap nhat route that bai.";

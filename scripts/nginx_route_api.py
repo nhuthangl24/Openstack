@@ -159,6 +159,10 @@ def render_server_block(hostname: str, domain: str, target_ip: str, target_port:
 """
 
 
+SERVER_NAME_PATTERN = re.compile(r"server_name\s+([a-z0-9-]+)\.([a-z0-9.-]+);")
+PROXY_PASS_PATTERN = re.compile(r"proxy_pass\s+http://([0-9.]+):(\d+);")
+
+
 class RouteManager:
   def __init__(self, config: Config) -> None:
     self.config = config
@@ -242,6 +246,33 @@ class RouteManager:
       "config_path": str(target_path),
     }
 
+  def get(self, route_key: str) -> dict[str, Any]:
+    safe_route_key = sanitize_route_key(route_key)
+    target_path = self._route_path(safe_route_key)
+
+    if not target_path.exists():
+      raise FileNotFoundError(f"Route {safe_route_key} khong ton tai.")
+
+    raw = target_path.read_text(encoding="utf-8")
+    server_name_match = SERVER_NAME_PATTERN.search(raw)
+    proxy_pass_match = PROXY_PASS_PATTERN.search(raw)
+
+    if not server_name_match or not proxy_pass_match:
+      raise RouteValidationError("Khong doc duoc thong tin route tu file config.")
+
+    hostname, domain = server_name_match.groups()
+    target_ip, target_port = proxy_pass_match.groups()
+
+    return {
+      "route_key": safe_route_key,
+      "hostname": hostname,
+      "domain": domain,
+      "fqdn": f"{hostname}.{domain}",
+      "target_ip": target_ip,
+      "target_port": int(target_port),
+      "config_path": str(target_path),
+    }
+
 
 MANAGER = RouteManager(CONFIG)
 
@@ -311,8 +342,32 @@ class Handler(BaseHTTPRequestHandler):
     return route_key
 
   def do_GET(self) -> None:
-    if urlparse(self.path).path.rstrip("/") == "/health":
+    parsed = urlparse(self.path)
+    path = parsed.path.rstrip("/")
+
+    if path == "/health":
       self._json_response(HTTPStatus.OK, {"ok": True, "service": "nginx-route-api"})
+      return
+
+    if path.startswith("/routes/"):
+      if not self._require_auth():
+        return
+
+      try:
+        route_key = self._resolve_route_key()
+        result = MANAGER.get(route_key)
+      except FileNotFoundError as error:
+        self._json_response(HTTPStatus.NOT_FOUND, {"ok": False, "error": str(error)})
+        return
+      except RouteValidationError as error:
+        self._json_response(HTTPStatus.BAD_REQUEST, {"ok": False, "error": str(error)})
+        return
+      except Exception as error:
+        LOGGER.exception("GET /routes failed")
+        self._json_response(HTTPStatus.INTERNAL_SERVER_ERROR, {"ok": False, "error": str(error)})
+        return
+
+      self._json_response(HTTPStatus.OK, {"ok": True, "route": result})
       return
 
     self._json_response(HTTPStatus.NOT_FOUND, {"ok": False, "error": "Not found"})

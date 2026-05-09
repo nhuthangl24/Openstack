@@ -12,6 +12,16 @@ export interface SyncVmRouteInput {
   targetPort?: number;
 }
 
+export interface VmRouteInfo {
+  route_key: string;
+  hostname: string;
+  domain: string;
+  fqdn: string;
+  target_ip: string;
+  target_port: number;
+  config_path: string;
+}
+
 function readRequiredEnv(name: string) {
   const value = process.env[name]?.trim();
 
@@ -104,4 +114,22 @@ export async function removeVmRoute(routeKey: string) {
   await requestRouteApi(`/routes/${encodeURIComponent(routeKey)}`, {
     method: "DELETE",
   });
+}
+
+export async function getVmRoute(routeKey: string): Promise<VmRouteInfo | null> {
+  try {
+    const response = await requestRouteApi(`/routes/${encodeURIComponent(routeKey)}`, {
+      method: "GET",
+    });
+    const payload = (await response.json()) as {
+      route?: VmRouteInfo;
+    };
+    return payload.route ?? null;
+  } catch (error) {
+    if (error instanceof Error && error.message.includes("(404)")) {
+      return null;
+    }
+
+    throw error;
+  }
 }
