@@ -6,7 +6,11 @@ import {
   normalizeHostnameLabel,
   waitForServerIP,
 } from "@/lib/openstack";
-import { syncVmRoute } from "@/lib/nginx-route-sync";
+import {
+  getConfiguredRouteDomain,
+  getConfiguredRouteTargetPort,
+  syncVmRoute,
+} from "@/lib/nginx-route-sync";
 
 export const dynamic = "force-dynamic";
 
@@ -148,7 +152,8 @@ export async function POST(request: NextRequest) {
       status: result.status,
       ip,
       hostname: hostnameLabel,
-      fqdn: `${hostnameLabel}.${process.env.NGINX_ROUTE_DOMAIN || "orbitstack.app"}`,
+      fqdn: `${hostnameLabel}.${getConfiguredRouteDomain()}`,
+      route_target_port: getConfiguredRouteTargetPort(),
       route_sync_warning: routeSyncWarning || undefined,
     });
   } catch (error) {

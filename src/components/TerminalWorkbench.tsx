@@ -349,15 +349,15 @@ export default function TerminalWorkbench({
   }, [scheduleViewportSync]);
 
   useEffect(() => {
-    if (!connected || !xtermRef.current) {
+    if (!connected) {
       return;
     }
 
-    xtermRef.current.writeln(
+    /* xtermRef.current.writeln(
       `\r\n\x1b[90m# Đã cập nhật đích: ${selectedVm?.name || resolvedHost || "nhập thủ công"}\x1b[0m`,
-    );
+    ); */
     scheduleViewportSync();
-  }, [connected, resolvedHost, scheduleViewportSync, selectedVm]);
+  }, [connected, scheduleViewportSync]);
 
   useEffect(() => {
     scheduleViewportSync();

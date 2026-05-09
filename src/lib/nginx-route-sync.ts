@@ -22,12 +22,26 @@ function readRequiredEnv(name: string) {
   return value;
 }
 
+export function getConfiguredRouteDomain() {
+  return (process.env.NGINX_ROUTE_DOMAIN || "orbitstack.app").trim();
+}
+
+export function getConfiguredRouteTargetPort() {
+  const port = Number(process.env.NGINX_ROUTE_TARGET_PORT || 3000);
+
+  if (Number.isInteger(port) && port >= 1 && port <= 65535) {
+    return port;
+  }
+
+  return 3000;
+}
+
 function getRouteApiConfig(): RouteApiConfig {
   return {
     baseUrl: readRequiredEnv("NGINX_ROUTE_API_BASE_URL").replace(/\/+$/, ""),
     token: readRequiredEnv("NGINX_ROUTE_API_TOKEN"),
-    domain: (process.env.NGINX_ROUTE_DOMAIN || "orbitstack.app").trim(),
-    defaultTargetPort: Number(process.env.NGINX_ROUTE_TARGET_PORT || 80),
+    domain: getConfiguredRouteDomain(),
+    defaultTargetPort: getConfiguredRouteTargetPort(),
   };
 }
 

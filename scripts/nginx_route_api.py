@@ -333,7 +333,7 @@ class Handler(BaseHTTPRequestHandler):
         route_key=str(payload.get("route_key", "")),
         hostname=str(payload.get("hostname", "")),
         target_ip=str(payload.get("target_ip", "")),
-        target_port=payload.get("target_port", 80),
+        target_port=payload.get("target_port", 3000),
         domain=str(payload.get("domain") or CONFIG.domain),
       )
     except RouteValidationError as error:
@@ -361,7 +361,7 @@ class Handler(BaseHTTPRequestHandler):
         route_key=route_key,
         hostname=str(payload.get("hostname", "")),
         target_ip=str(payload.get("target_ip", "")),
-        target_port=payload.get("target_port", 80),
+        target_port=payload.get("target_port", 3000),
         domain=str(payload.get("domain") or CONFIG.domain),
       )
     except RouteValidationError as error:

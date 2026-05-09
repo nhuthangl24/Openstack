@@ -28,6 +28,11 @@ interface CreateServerModalProps {
     os: string;
     password: string;
     environments: string[];
+    ip?: string;
+    hostname?: string;
+    fqdn?: string;
+    route_target_port?: number;
+    route_sync_warning?: string;
   }) => void;
 }
 
@@ -230,6 +235,14 @@ export default function CreateServerModal({
         os: osName,
         password,
         environments: envs,
+        ip: data.ip || "",
+        hostname: data.hostname || name,
+        fqdn: data.fqdn || "",
+        route_target_port:
+          typeof data.route_target_port === "number"
+            ? data.route_target_port
+            : undefined,
+        route_sync_warning: data.route_sync_warning || undefined,
       });
     } catch (submitError) {
       setErrors({

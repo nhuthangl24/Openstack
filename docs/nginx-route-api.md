@@ -55,7 +55,7 @@ curl http://127.0.0.1:9055/health
 NGINX_ROUTE_API_BASE_URL=http://20.41.119.30:9055
 NGINX_ROUTE_API_TOKEN=change-this-token
 NGINX_ROUTE_DOMAIN=orbitstack.app
-NGINX_ROUTE_TARGET_PORT=80
+NGINX_ROUTE_TARGET_PORT=3000
 ```
 
 ## API
@@ -79,7 +79,7 @@ Content-Type: application/json
   "route_key": "demo-vm",
   "hostname": "demo",
   "target_ip": "10.0.0.25",
-  "target_port": 80,
+  "target_port": 3000,
   "domain": "orbitstack.app"
 }
 ```
@@ -96,7 +96,7 @@ Content-Type: application/json
 {
   "hostname": "demo",
   "target_ip": "10.0.0.25",
-  "target_port": 80,
+  "target_port": 3000,
   "domain": "orbitstack.app"
 }
 ```

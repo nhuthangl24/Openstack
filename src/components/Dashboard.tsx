@@ -69,6 +69,11 @@ interface VMResult {
   os: string;
   password: string;
   environments: string[];
+  ip?: string;
+  hostname?: string;
+  fqdn?: string;
+  route_target_port?: number;
+  route_sync_warning?: string;
 }
 
 interface GitHubUser {

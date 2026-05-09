@@ -32,6 +32,11 @@ interface VMResult {
   os: string;
   password: string;
   environments: string[];
+  ip?: string;
+  hostname?: string;
+  fqdn?: string;
+  route_target_port?: number;
+  route_sync_warning?: string;
 }
 
 export default function CreateVMForm() {
@@ -117,6 +122,14 @@ export default function CreateVMForm() {
           os: "Ubuntu 24.04 Noble",
           password,
           environments: selectedEnvs,
+          ip: data.ip || "",
+          hostname: data.hostname || hostname,
+          fqdn: data.fqdn || "",
+          route_target_port:
+            typeof data.route_target_port === "number"
+              ? data.route_target_port
+              : undefined,
+          route_sync_warning: data.route_sync_warning || undefined,
         });
         // Reset form
         setInstanceName("");
