@@ -106,6 +106,32 @@ interface HostedDatabaseRow extends RowDataPacket {
   deleted_at: Date | null;
 }
 
+interface AdminUserOverviewRow extends RowDataPacket {
+  id: number;
+  github_username: string;
+  email: string | null;
+  name: string | null;
+  created_at: Date;
+  updated_at: Date;
+  plan_id: number;
+  plan_code: string;
+  plan_name: string;
+  plan_price: number;
+  plan_max_databases: number;
+  plan_max_total_storage_mb: number;
+  plan_max_connections: number;
+  quota_max_databases: number | null;
+  quota_max_storage_mb: number | null;
+  quota_max_connections: number | null;
+  usage_total_databases: number | null;
+  usage_total_storage_mb: number | null;
+  usage_active_connections: number | null;
+  mysql_username: string | null;
+  host_allow: string | null;
+  hosted_database_count: number | null;
+  hosted_database_names: string | null;
+}
+
 export interface DatabaseListItem {
   id: string;
   displayName: string;
@@ -160,6 +186,56 @@ export interface PasswordResetResult {
   password: string;
 }
 
+export interface AdminDatabasePlanSummary {
+  id: number;
+  code: string;
+  name: string;
+  price: number;
+  maxDatabases: number;
+  maxStorageMb: number;
+  maxConnections: number;
+}
+
+export interface AdminDatabaseUserSummary {
+  id: number;
+  githubUsername: string;
+  email: string | null;
+  name: string | null;
+  createdAt: string;
+  updatedAt: string;
+  plan: {
+    id: number;
+    code: string;
+    name: string;
+    price: number;
+  };
+  quota: {
+    maxDatabases: number;
+    maxStorageMb: number;
+    maxConnections: number;
+    isCustomized: boolean;
+  };
+  usage: {
+    totalDatabases: number;
+    totalStorageMb: number;
+    totalStorageLabel: string;
+    activeConnections: number;
+  };
+  databaseCount: number;
+  databaseNames: string[];
+  mysqlAccount: {
+    username: string;
+    hostAllow: string;
+  } | null;
+}
+
+export interface AdminDatabaseOverview {
+  accessMode: "allowlist" | "development-open";
+  allowedAdmins: string[];
+  plans: AdminDatabasePlanSummary[];
+  users: AdminDatabaseUserSummary[];
+}
+
 interface PlatformContext {
   user: AppUserRow;
   github: CurrentGitHubUser;
@@ -201,6 +277,37 @@ function getAdminConfig() {
       process.env.DATABASE_HOSTING_CREATE_LIMIT_PER_HOUR || 8,
     ),
   };
+}
+
+function getDatabaseHostingAdminAccess() {
+  const raw =
+    process.env.DATABASE_HOSTING_ADMIN_GITHUB_USERS ||
+    process.env.DB_HOSTING_ADMIN_GITHUB_USERS ||
+    "";
+  const allowedAdmins = raw
+    .split(",")
+    .map((value) => value.trim().toLowerCase())
+    .filter(Boolean);
+
+  if (allowedAdmins.length) {
+    return {
+      accessMode: "allowlist" as const,
+      allowedAdmins,
+    };
+  }
+
+  if (process.env.NODE_ENV !== "production") {
+    return {
+      accessMode: "development-open" as const,
+      allowedAdmins: [],
+    };
+  }
+
+  throw new DatabaseHostingError(
+    "Can cau hinh DATABASE_HOSTING_ADMIN_GITHUB_USERS de dung trang quan tri database hosting.",
+    503,
+    true,
+  );
 }
 
 function getAdminPool() {
@@ -439,7 +546,7 @@ async function getPlanByCode(connection: PoolConnection, code: string) {
   );
 
   if (!rows.length) {
-    throw new DatabaseHostingError("Khong tim thay plan mac dinh.", 500, true);
+    throw new DatabaseHostingError("Khong tim thay plan.", 500, true);
   }
 
   return rows[0];
@@ -461,6 +568,164 @@ async function getPlanById(connection: PoolConnection, id: number) {
   }
 
   return rows[0];
+}
+
+async function listPlanRows(connection: PoolConnection) {
+  const [rows] = await connection.execute<PlanRow[]>(
+    `
+      SELECT id, code, name, max_databases, max_total_storage_mb, max_connections, price
+      FROM plans
+      ORDER BY price ASC, id ASC
+    `,
+  );
+
+  return rows;
+}
+
+function toAdminPlanSummary(plan: PlanRow) {
+  return {
+    id: plan.id,
+    code: plan.code,
+    name: plan.name,
+    price: Number(plan.price),
+    maxDatabases: plan.max_databases,
+    maxStorageMb: plan.max_total_storage_mb,
+    maxConnections: plan.max_connections,
+  } satisfies AdminDatabasePlanSummary;
+}
+
+function toAdminUserSummary(row: AdminUserOverviewRow) {
+  const quotaMaxDatabases = row.quota_max_databases ?? row.plan_max_databases;
+  const quotaMaxStorageMb =
+    row.quota_max_storage_mb ?? row.plan_max_total_storage_mb;
+  const quotaMaxConnections =
+    row.quota_max_connections ?? row.plan_max_connections;
+  const totalDatabases =
+    row.usage_total_databases ?? row.hosted_database_count ?? 0;
+  const totalStorageMb = Number(row.usage_total_storage_mb ?? 0);
+  const databaseNames = row.hosted_database_names
+    ? row.hosted_database_names.split("\n").filter(Boolean)
+    : [];
+
+  return {
+    id: row.id,
+    githubUsername: row.github_username,
+    email: row.email,
+    name: row.name,
+    createdAt: new Date(row.created_at).toISOString(),
+    updatedAt: new Date(row.updated_at).toISOString(),
+    plan: {
+      id: row.plan_id,
+      code: row.plan_code,
+      name: row.plan_name,
+      price: Number(row.plan_price),
+    },
+    quota: {
+      maxDatabases: quotaMaxDatabases,
+      maxStorageMb: quotaMaxStorageMb,
+      maxConnections: quotaMaxConnections,
+      isCustomized:
+        quotaMaxDatabases !== row.plan_max_databases ||
+        quotaMaxStorageMb !== row.plan_max_total_storage_mb ||
+        quotaMaxConnections !== row.plan_max_connections,
+    },
+    usage: {
+      totalDatabases: Number(totalDatabases),
+      totalStorageMb,
+      totalStorageLabel: formatStorage(totalStorageMb),
+      activeConnections: Number(row.usage_active_connections ?? 0),
+    },
+    databaseCount: Number(row.hosted_database_count ?? 0),
+    databaseNames,
+    mysqlAccount: row.mysql_username
+      ? {
+          username: row.mysql_username,
+          hostAllow: row.host_allow || "%",
+        }
+      : null,
+  } satisfies AdminDatabaseUserSummary;
+}
+
+async function listAdminUserOverviewRows(connection: PoolConnection) {
+  const [rows] = await connection.execute<AdminUserOverviewRow[]>(
+    `
+      SELECT
+        u.id,
+        u.github_username,
+        u.email,
+        u.name,
+        u.created_at,
+        u.updated_at,
+        p.id AS plan_id,
+        p.code AS plan_code,
+        p.name AS plan_name,
+        p.price AS plan_price,
+        p.max_databases AS plan_max_databases,
+        p.max_total_storage_mb AS plan_max_total_storage_mb,
+        p.max_connections AS plan_max_connections,
+        q.max_databases AS quota_max_databases,
+        q.max_storage_mb AS quota_max_storage_mb,
+        q.max_connections AS quota_max_connections,
+        us.total_databases AS usage_total_databases,
+        us.total_storage_mb AS usage_total_storage_mb,
+        us.active_connections AS usage_active_connections,
+        da.mysql_username,
+        da.host_allow,
+        db.hosted_database_count,
+        db.hosted_database_names
+      FROM users u
+      INNER JOIN plans p ON p.id = u.plan_id
+      LEFT JOIN quotas q ON q.user_id = u.id
+      LEFT JOIN usage_stats us ON us.user_id = u.id
+      LEFT JOIN database_accounts da ON da.user_id = u.id
+      LEFT JOIN (
+        SELECT
+          user_id,
+          COUNT(*) AS hosted_database_count,
+          GROUP_CONCAT(real_db_name ORDER BY created_at DESC SEPARATOR '\n') AS hosted_database_names
+        FROM ${HOSTED_DATABASES_TABLE}
+        WHERE deleted_at IS NULL AND status <> 'deleted'
+        GROUP BY user_id
+      ) db ON db.user_id = u.id
+      ORDER BY u.created_at DESC, u.id DESC
+    `,
+  );
+
+  return rows;
+}
+
+async function getAdminUserOverviewById(
+  connection: PoolConnection,
+  userId: number,
+) {
+  const rows = await listAdminUserOverviewRows(connection);
+  return rows.find((row) => row.id === userId) ?? null;
+}
+
+async function requireDatabaseHostingAdmin(request: NextRequest) {
+  const githubUser = await getCurrentGitHubUser(request);
+
+  if (!githubUser) {
+    throw new DatabaseHostingError("Phien GitHub khong hop le.", 401, true);
+  }
+
+  const access = getDatabaseHostingAdminAccess();
+
+  if (
+    access.accessMode === "allowlist" &&
+    !access.allowedAdmins.includes(githubUser.login.toLowerCase())
+  ) {
+    throw new DatabaseHostingError(
+      "Ban khong co quyen truy cap trang quan tri database hosting.",
+      403,
+      true,
+    );
+  }
+
+  return {
+    githubUser,
+    access,
+  };
 }
 
 async function getEffectiveQuotaForUser(connection: PoolConnection, user: AppUserRow) {
@@ -840,6 +1105,118 @@ export async function getDatabaseUsageForRequest(
         remainingStorageLabel: formatStorage(remaining.remainingStorageMb),
         remainingConnections: remaining.remainingConnections,
       },
+    };
+  });
+}
+
+export async function getDatabaseHostingAdminOverviewForRequest(
+  request: NextRequest,
+): Promise<AdminDatabaseOverview> {
+  const { access } = await requireDatabaseHostingAdmin(request);
+
+  return withControlConnection(async (connection) => {
+    const [plans, users] = await Promise.all([
+      listPlanRows(connection),
+      listAdminUserOverviewRows(connection),
+    ]);
+
+    return {
+      accessMode: access.accessMode,
+      allowedAdmins: access.allowedAdmins,
+      plans: plans.map(toAdminPlanSummary),
+      users: users.map(toAdminUserSummary),
+    } satisfies AdminDatabaseOverview;
+  });
+}
+
+export async function updateDatabaseHostingUserPlanForRequest(
+  request: NextRequest,
+  payload: {
+    userId: number;
+    planCode: string;
+    maxDatabases?: number;
+    maxStorageMb?: number;
+    maxConnections?: number;
+  },
+) {
+  const { githubUser } = await requireDatabaseHostingAdmin(request);
+
+  return withControlConnection(async (connection) => {
+    const [userRows] = await connection.execute<AppUserRow[]>(
+      `
+        SELECT id, github_username, email, name, plan_id, created_at, updated_at
+        FROM users
+        WHERE id = ?
+        LIMIT 1
+      `,
+      [payload.userId],
+    );
+
+    if (!userRows.length) {
+      throw new DatabaseHostingError("Khong tim thay user de cap nhat plan.", 404, true);
+    }
+
+    const plan = await getPlanByCode(connection, payload.planCode);
+    const nextMaxDatabases =
+      payload.maxDatabases ?? plan.max_databases;
+    const nextMaxStorageMb =
+      payload.maxStorageMb ?? plan.max_total_storage_mb;
+    const nextMaxConnections =
+      payload.maxConnections ?? plan.max_connections;
+
+    await connection.execute(
+      `
+        UPDATE users
+        SET plan_id = ?, updated_at = CURRENT_TIMESTAMP
+        WHERE id = ?
+      `,
+      [plan.id, payload.userId],
+    );
+
+    await connection.execute(
+      `
+        INSERT INTO quotas (user_id, max_databases, max_storage_mb, max_connections)
+        VALUES (?, ?, ?, ?)
+        ON DUPLICATE KEY UPDATE
+          max_databases = VALUES(max_databases),
+          max_storage_mb = VALUES(max_storage_mb),
+          max_connections = VALUES(max_connections),
+          updated_at = CURRENT_TIMESTAMP
+      `,
+      [
+        payload.userId,
+        nextMaxDatabases,
+        nextMaxStorageMb,
+        nextMaxConnections,
+      ],
+    );
+
+    await appendAuditLog(
+      connection,
+      payload.userId,
+      "admin_user_plan_updated",
+      "user",
+      String(payload.userId),
+      {
+        githubUsername: userRows[0].github_username,
+        updatedBy: githubUser.login,
+        planCode: plan.code,
+        quota: {
+          maxDatabases: nextMaxDatabases,
+          maxStorageMb: nextMaxStorageMb,
+          maxConnections: nextMaxConnections,
+        },
+      },
+    );
+
+    const updated = await getAdminUserOverviewById(connection, payload.userId);
+
+    if (!updated) {
+      throw new DatabaseHostingError("Khong the doc lai user sau khi cap nhat plan.", 500, true);
+    }
+
+    return {
+      user: toAdminUserSummary(updated),
     };
   });
 }
