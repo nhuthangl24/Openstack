@@ -488,14 +488,7 @@ export default function PublicRouteManager({
         </div>
       ) : null}
 
-      <div
-        className={cn(
-          "mt-5 grid gap-5",
-          editorOpen
-            ? "2xl:grid-cols-[minmax(0,1.35fr)_minmax(22rem,0.95fr)]"
-            : "grid-cols-1",
-        )}
-      >
+      <div className="mt-5 grid grid-cols-1 gap-5">
         <section className="min-w-0 space-y-3">
           <div>
             <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">

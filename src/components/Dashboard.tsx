@@ -1573,7 +1573,6 @@ export default function Dashboard({
             </div>
           </div>
 
-          <RoutePortPanel vm={selectedVm} />
         </>
       ) : (
         <div className="mt-5 rounded-[1.25rem] border border-dashed border-border/70 bg-background/60 p-6 text-sm leading-6 text-muted-foreground">
@@ -1889,6 +1888,7 @@ export default function Dashboard({
       <div className="space-y-4">
         {fleetMatrixPanel}
         {fleetAlert}
+        {selectedVm ? <RoutePortPanel vm={selectedVm} /> : null}
         {fleetCollection}
       </div>
       <aside className="space-y-4">
@@ -1941,6 +1941,7 @@ export default function Dashboard({
       <div className="space-y-4">
         {fleetMatrixPanel}
         {fleetAlert}
+        {selectedVm ? <RoutePortPanel vm={selectedVm} /> : null}
         <div className="surface-panel rounded-[1.5rem] p-5 sm:p-6">
           <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-muted-foreground">
             Chọn máy
@@ -2033,6 +2034,7 @@ export default function Dashboard({
             </div>
           </div>
         </div>
+        {selectedVm ? <RoutePortPanel vm={selectedVm} /> : null}
       </div>
 
       <aside className="space-y-4">

@@ -14,7 +14,6 @@ import {
   X,
 } from "lucide-react";
 import RouteMappingsBuilder, {
-  createRouteMappingDraft,
   parseRouteMappingDrafts,
   type RouteMappingDraft,
 } from "@/components/RouteMappingsBuilder";
@@ -89,9 +88,7 @@ export default function CreateServerModal({
   const [loadingOS, setLoadingOS] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
-  const [routeMappings, setRouteMappings] = useState<RouteMappingDraft[]>([
-    createRouteMappingDraft(),
-  ]);
+  const [routeMappings, setRouteMappings] = useState<RouteMappingDraft[]>([]);
 
   const activePreset = serverPresets.find((item) => item.key === selectedPresetKey);
 
@@ -496,24 +493,21 @@ export default function CreateServerModal({
                 </div>
               </section>
 
-              <section className="mt-8 space-y-4">
-                <SectionHeading
-                  kicker="3. Public routes"
-                  title="Gan nhieu host port ngay luc deploy"
-                  description="Moi dong la mot host port cong khai se forward vao mot target port trong VM. Ban co the tao 0, 1 hoac nhieu mapping."
-                />
-
-                {errors.routeMappings && (
-                  <p className="text-sm text-rose-300">{errors.routeMappings}</p>
-                )}
-
+              <section className="mt-6 space-y-3">
                 <RouteMappingsBuilder
                   value={routeMappings}
                   onChange={(nextValue) => {
                     setRouteMappings(nextValue);
                     setErrors((current) => ({ ...current, routeMappings: "" }));
                   }}
+                  title="Public ports tuy chon"
+                  description="Can public port ngay luc tao may thi mo form nay. Khong can thi de tat."
+                  defaultExpanded={false}
+                  compact
                 />
+                {errors.routeMappings && (
+                  <p className="text-sm text-rose-300">{errors.routeMappings}</p>
+                )}
               </section>
 
               <section className="mt-8 space-y-4">

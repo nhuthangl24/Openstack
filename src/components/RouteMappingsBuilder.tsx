@@ -23,6 +23,7 @@ interface RouteMappingsBuilderProps {
   description?: string;
   className?: string;
   defaultExpanded?: boolean;
+  compact?: boolean;
 }
 
 function createDraftId() {
@@ -90,8 +91,9 @@ export default function RouteMappingsBuilder({
   description = "Chon nhieu host port cong khai de forward vao cac target port ben trong VM.",
   className,
   defaultExpanded = false,
+  compact = false,
 }: RouteMappingsBuilderProps) {
-  const [expanded, setExpanded] = useState(defaultExpanded || value.length === 0);
+  const [expanded, setExpanded] = useState(defaultExpanded);
 
   const parsedSummaries = useMemo(
     () =>
@@ -147,34 +149,54 @@ export default function RouteMappingsBuilder({
   return (
     <div
       className={cn(
-        "rounded-[1.5rem] border border-border/70 bg-background/70 p-4",
+        compact
+          ? "rounded-[1.2rem] border border-border/70 bg-background/70 p-3"
+          : "rounded-[1.5rem] border border-border/70 bg-background/70 p-4",
         className,
       )}
     >
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0">
-          <p className="text-xs font-semibold uppercase tracking-[0.22em] text-muted-foreground">
+          <p
+            className={cn(
+              "font-semibold uppercase text-muted-foreground",
+              compact ? "text-[11px] tracking-[0.18em]" : "text-xs tracking-[0.22em]",
+            )}
+          >
             {title}
           </p>
-          <p className="mt-2 text-sm leading-6 text-muted-foreground">{description}</p>
+          <p
+            className={cn(
+              "text-muted-foreground",
+              compact ? "mt-1 text-xs leading-5" : "mt-2 text-sm leading-6",
+            )}
+          >
+            {description}
+          </p>
         </div>
 
         <div className="flex shrink-0 flex-wrap gap-2">
           <button
             type="button"
             onClick={addDraft}
-            className="inline-flex h-10 items-center justify-center gap-2 rounded-full border border-border/70 bg-background/80 px-4 text-sm font-semibold text-foreground transition hover:border-primary/35 hover:text-primary"
+            className={cn(
+              "inline-flex items-center justify-center gap-2 rounded-full border border-border/70 bg-background/80 font-semibold text-foreground transition hover:border-primary/35 hover:text-primary",
+              compact ? "h-9 px-3 text-xs" : "h-10 px-4 text-sm",
+            )}
           >
             <Plus className="h-4 w-4" />
-            Them port
+            Them
           </button>
           <button
             type="button"
             onClick={() => setExpanded((current) => !current)}
-            className="inline-flex h-10 items-center justify-center gap-2 rounded-full border border-border/70 bg-background/80 px-4 text-sm font-semibold text-foreground transition hover:border-primary/35 hover:text-primary"
+            className={cn(
+              "inline-flex items-center justify-center gap-2 rounded-full border border-border/70 bg-background/80 font-semibold text-foreground transition hover:border-primary/35 hover:text-primary",
+              compact ? "h-9 px-3 text-xs" : "h-10 px-4 text-sm",
+            )}
           >
             {expanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-            {expanded ? "Thu gon" : "Mo form"}
+            {expanded ? "Thu gon" : "Mo"}
           </button>
         </div>
       </div>

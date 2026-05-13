@@ -118,3 +118,11 @@ Authorization: Bearer <token>
 DELETE /routes/demo-vm?listen_port=8080
 Authorization: Bearer <token>
 ```
+
+## Luu y ve file Nginx sinh ra
+
+- Moi `listen_port` se tao ra mot file rieng:
+  - `/etc/nginx/conf.d/orbitstack-vm-demo-vm-3000.conf`
+  - `/etc/nginx/conf.d/orbitstack-vm-demo-vm-8080.conf`
+- Neu ban van thay mot file kieu cu nhu `/etc/nginx/conf.d/orbitstack-vm-demo-vm.conf` thi server Nginx cua ban van dang chay flow cu, chua deploy lai `scripts/nginx_route_api.py` moi.
+- Script legacy `scripts/orbitstack-route.sh` da duoc cap nhat de ghi theo tung `listen_port`, nhung app web hien tai duoc thiet ke de noi voi `nginx_route_api.py`.

@@ -10,7 +10,6 @@ import FlavorSelect from "@/components/FlavorSelect";
 import EnvironmentCheckboxes from "@/components/EnvironmentCheckboxes";
 import PreviewCard from "@/components/PreviewCard";
 import RouteMappingsBuilder, {
-  createRouteMappingDraft,
   parseRouteMappingDrafts,
   type RouteMappingDraft,
 } from "@/components/RouteMappingsBuilder";
@@ -56,9 +55,7 @@ export default function CreateVMForm() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [vmResult, setVmResult] = useState<VMResult | null>(null);
-  const [routeMappings, setRouteMappings] = useState<RouteMappingDraft[]>([
-    createRouteMappingDraft(),
-  ]);
+  const [routeMappings, setRouteMappings] = useState<RouteMappingDraft[]>([]);
 
   const validate = (): boolean => {
     const newErrors: Record<string, string> = {};
@@ -169,7 +166,7 @@ export default function CreateVMForm() {
         setPassword("");
         setFlavor("");
         setSelectedEnvs([]);
-        setRouteMappings([createRouteMappingDraft()]);
+        setRouteMappings([]);
         setErrors({});
       } else {
         toast.error("Không thể tạo máy ảo", {
@@ -303,6 +300,10 @@ export default function CreateVMForm() {
                     }
                   }}
                   className="bg-card/60"
+                  title="Public ports tuy chon"
+                  description="Chi mo ra khi can public port ngay luc tao VM."
+                  defaultExpanded={false}
+                  compact
                 />
                 {errors.routeMappings && (
                   <p className="text-xs text-destructive mt-1 animate-in fade-in-0 slide-in-from-top-1">
