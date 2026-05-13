@@ -26,6 +26,13 @@ export function buildPublicUrl(fqdn: string, listenPort: number) {
   return listenPort === 443 ? `https://${fqdn}` : `https://${fqdn}:${listenPort}`;
 }
 
+function normalizeVmRoute(route: VmRouteSnapshot): VmRouteSnapshot {
+  return {
+    ...route,
+    listen_port: parsePortNumber(route.listen_port) ?? 443,
+  };
+}
+
 function sortWeight(port: number) {
   if (port === 443) {
     return -2;
@@ -39,7 +46,14 @@ function sortWeight(port: number) {
 }
 
 export function sortVmRoutes(routes: VmRouteSnapshot[]) {
-  return [...routes].sort(
+  const uniqueRoutes = new Map<number, VmRouteSnapshot>();
+
+  for (const route of routes) {
+    const normalizedRoute = normalizeVmRoute(route);
+    uniqueRoutes.set(normalizedRoute.listen_port, normalizedRoute);
+  }
+
+  return [...uniqueRoutes.values()].sort(
     (left, right) => sortWeight(left.listen_port) - sortWeight(right.listen_port),
   );
 }

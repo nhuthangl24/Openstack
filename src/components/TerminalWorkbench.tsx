@@ -864,12 +864,12 @@ function TerminalMultiRoutePanel({
               </div>
               {routes.length > 0 ? (
                 <div className="mt-3 flex flex-wrap gap-2">
-                  {routes.map((item) => {
+                  {routes.map((item, index) => {
                     const selected = item.listen_port === selectedRoute?.listen_port;
 
                     return (
                       <button
-                        key={item.listen_port}
+                        key={`${item.listen_port}-${item.fqdn}-${item.target_port}-${index}`}
                         type="button"
                         onClick={() => selectRoute(item)}
                         disabled={isBusy}
@@ -1024,6 +1024,7 @@ export default function TerminalWorkbench({
   const wsRef = useRef<WebSocket | null>(null);
   const fitRef = useRef<FitAddon | null>(null);
   const runAfterConnectRef = useRef("");
+  const didHydrateWorkspaceRef = useRef(false);
 
   const selectedVm = useMemo(
     () => vms.find((vm) => vm.id === selectedVmId) ?? null,
@@ -1098,7 +1099,36 @@ export default function TerminalWorkbench({
       }
 
       if (typeof payload?.initialCommand === "string") {
-        setPendingWorkflow(payload.initialCommand);
+        const initialCommand = payload.initialCommand;
+        setPendingWorkflow(initialCommand);
+
+        if (initialCommand.trim()) {
+          if (wsRef.current?.readyState === WebSocket.OPEN) {
+            runAfterConnectRef.current = "";
+            setWorkflowArmed(false);
+
+            window.setTimeout(() => {
+              if (wsRef.current?.readyState === WebSocket.OPEN) {
+                wsRef.current.send(
+                  initialCommand.endsWith("\n")
+                    ? initialCommand
+                    : `${initialCommand}\n`,
+                );
+                toast.success("Đã nạp workflow deploy vào terminal.");
+              }
+            }, 120);
+          } else {
+            runAfterConnectRef.current = initialCommand;
+            setWorkflowArmed(true);
+          }
+        } else {
+          runAfterConnectRef.current = "";
+          setWorkflowArmed(false);
+        }
+      } else {
+        setPendingWorkflow("");
+        runAfterConnectRef.current = "";
+        setWorkflowArmed(false);
       }
 
       if (payload) {
@@ -1109,6 +1139,10 @@ export default function TerminalWorkbench({
       }
     }
 
+    if (!didHydrateWorkspaceRef.current) {
+      syncWorkspaceState();
+      didHydrateWorkspaceRef.current = true;
+    }
     window.addEventListener(TERMINAL_WORKSPACE_EVENT, syncWorkspaceState);
     return () =>
       window.removeEventListener(TERMINAL_WORKSPACE_EVENT, syncWorkspaceState);
