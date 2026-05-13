@@ -372,7 +372,7 @@ export default function PublicRouteManager({
   return (
     <div
       className={cn(
-        "rounded-[1.25rem] border border-border/70 bg-background/75 p-4 backdrop-blur",
+        "min-w-0 rounded-[1.35rem] border border-border/70 bg-background/75 p-5 backdrop-blur sm:p-6",
         className,
       )}
     >
@@ -387,14 +387,14 @@ export default function PublicRouteManager({
         </div>
 
         <div className="flex shrink-0 flex-wrap items-center gap-2">
-          <div className="rounded-full border border-border/70 bg-background/70 px-3 py-1.5 text-xs font-semibold text-foreground">
+          <div className="rounded-full border border-border/70 bg-background/70 px-3 py-1.5 text-xs font-semibold whitespace-nowrap text-foreground">
             {routes.length} mapping
           </div>
           <button
             type="button"
             onClick={prepareNewRoute}
             disabled={loading || saving || deleting}
-            className="inline-flex h-10 items-center justify-center gap-2 rounded-full border border-border/70 bg-background/80 px-4 text-sm font-semibold text-foreground transition hover:border-primary/35 hover:text-primary disabled:cursor-not-allowed disabled:opacity-60"
+            className="inline-flex h-10 items-center justify-center gap-2 rounded-full border border-border/70 bg-background/80 px-4 text-sm font-semibold whitespace-nowrap text-foreground transition hover:border-primary/35 hover:text-primary disabled:cursor-not-allowed disabled:opacity-60"
           >
             <Plus className="h-4 w-4" />
             Them mapping
@@ -409,8 +409,8 @@ export default function PublicRouteManager({
         </div>
       ) : null}
 
-      <div className="mt-5 grid gap-4 xl:grid-cols-[minmax(0,1.2fr)_minmax(18rem,0.8fr)]">
-        <section className="space-y-3">
+      <div className="mt-5 grid gap-5 2xl:grid-cols-[minmax(0,1.35fr)_minmax(24rem,0.95fr)]">
+        <section className="min-w-0 space-y-3">
           <div className="flex items-center justify-between gap-3">
             <div>
               <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">
@@ -436,7 +436,7 @@ export default function PublicRouteManager({
                   <div
                     key={`${route.route_key}-${route.listen_port}`}
                     className={cn(
-                      "rounded-[1.1rem] border px-4 py-4 transition",
+                      "min-w-0 rounded-[1.1rem] border px-4 py-4 transition",
                       active
                         ? "border-foreground/20 bg-background/85 shadow-[0_0_0_1px_rgba(255,255,255,0.05)]"
                         : "border-border/70 bg-background/60 hover:border-foreground/15",
@@ -445,14 +445,14 @@ export default function PublicRouteManager({
                     <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                       <div className="min-w-0 flex-1">
                         <div className="flex flex-wrap items-center gap-2">
-                          <span className="rounded-full border border-border/70 bg-background/80 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                          <span className="rounded-full border border-border/70 bg-background/80 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] whitespace-nowrap text-muted-foreground">
                             Host :{route.listen_port}
                           </span>
-                          <span className="rounded-full border border-border/70 bg-background/80 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                          <span className="rounded-full border border-border/70 bg-background/80 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] whitespace-nowrap text-muted-foreground">
                             Target :{route.target_port}
                           </span>
                           {active ? (
-                            <span className="rounded-full border border-emerald-500/25 bg-emerald-500/10 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-emerald-300">
+                            <span className="rounded-full border border-emerald-500/25 bg-emerald-500/10 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] whitespace-nowrap text-emerald-300">
                               Dang chinh
                             </span>
                           ) : null}
@@ -471,7 +471,7 @@ export default function PublicRouteManager({
                           type="button"
                           onClick={() => selectRoute(route)}
                           className={cn(
-                            "inline-flex h-9 items-center justify-center rounded-full border px-3 text-xs font-semibold transition",
+                            "inline-flex h-9 items-center justify-center rounded-full border px-3 text-xs font-semibold whitespace-nowrap transition",
                             active
                               ? "border-foreground/20 bg-background/80 text-foreground"
                               : "border-border/70 bg-background/80 text-foreground hover:border-primary/30 hover:text-primary",
@@ -482,7 +482,7 @@ export default function PublicRouteManager({
                         <button
                           type="button"
                           onClick={() => void handleCopy(route)}
-                          className="inline-flex h-9 items-center justify-center gap-2 rounded-full border border-border/70 bg-background/80 px-3 text-xs font-semibold text-foreground transition hover:border-primary/30 hover:text-primary"
+                          className="inline-flex h-9 items-center justify-center gap-2 rounded-full border border-border/70 bg-background/80 px-3 text-xs font-semibold whitespace-nowrap text-foreground transition hover:border-primary/30 hover:text-primary"
                         >
                           {copiedRoutePort === route.listen_port ? (
                             <Check className="h-3.5 w-3.5" />
@@ -510,7 +510,7 @@ export default function PublicRouteManager({
           )}
         </section>
 
-        <section className="rounded-[1.15rem] border border-border/70 bg-background/60 p-4">
+        <section className="min-w-0 rounded-[1.15rem] border border-border/70 bg-background/60 p-4 sm:p-5">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
               <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">
@@ -528,14 +528,14 @@ export default function PublicRouteManager({
                 type="button"
                 onClick={prepareNewRoute}
                 disabled={loading || saving || deleting}
-                className="inline-flex h-9 items-center justify-center rounded-full border border-border/70 bg-background/80 px-3 text-xs font-semibold text-foreground transition hover:border-primary/30 hover:text-primary disabled:cursor-not-allowed disabled:opacity-60"
+                className="inline-flex h-9 items-center justify-center rounded-full border border-border/70 bg-background/80 px-3 text-xs font-semibold whitespace-nowrap text-foreground transition hover:border-primary/30 hover:text-primary disabled:cursor-not-allowed disabled:opacity-60"
               >
                 Tao moi
               </button>
             ) : null}
           </div>
 
-          <div className="mt-4 grid gap-3 sm:grid-cols-2">
+          <div className="mt-4 grid gap-3 lg:grid-cols-2">
             <RouteStat label="Preview host port" value={`:${listenPortInput || "?"}`} />
             <RouteStat label="Preview target" value={`${previewTargetIp}:${targetPortInput || "?"}`} />
           </div>
@@ -601,7 +601,7 @@ export default function PublicRouteManager({
               type="button"
               onClick={() => void handleSave()}
               disabled={loading || saving || deleting}
-              className="inline-flex h-11 items-center justify-center gap-2 rounded-full bg-foreground px-5 text-sm font-semibold text-background transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+              className="inline-flex h-11 items-center justify-center gap-2 rounded-full bg-foreground px-5 text-sm font-semibold whitespace-nowrap text-background transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
             >
               {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
               {isCreating ? "Tao mapping" : "Luu thay doi"}
@@ -612,7 +612,7 @@ export default function PublicRouteManager({
                 type="button"
                 onClick={() => void handleDelete()}
                 disabled={loading || saving || deleting}
-                className="inline-flex h-11 items-center justify-center gap-2 rounded-full border border-rose-500/25 bg-rose-500/10 px-5 text-sm font-semibold text-rose-200 transition hover:border-rose-500/40 hover:text-rose-100 disabled:cursor-not-allowed disabled:opacity-60"
+                className="inline-flex h-11 items-center justify-center gap-2 rounded-full border border-rose-500/25 bg-rose-500/10 px-5 text-sm font-semibold whitespace-nowrap text-rose-200 transition hover:border-rose-500/40 hover:text-rose-100 disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {deleting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
                 Xoa mapping

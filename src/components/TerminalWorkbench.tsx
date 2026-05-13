@@ -190,9 +190,9 @@ function TerminalRoutePanel({
           vmName={vm.name}
           vmId={vm.id}
           vmIp={vm.ip}
-          className="relative mt-5 overflow-hidden rounded-[1.35rem] border border-border/70 bg-[linear-gradient(160deg,rgba(8,12,20,0.96),rgba(12,20,32,0.92))] p-4 shadow-[0_32px_90px_-56px_rgba(15,23,42,1)]"
+          className="relative overflow-hidden rounded-[1.5rem] border border-border/70 bg-[linear-gradient(160deg,rgba(8,12,20,0.96),rgba(12,20,32,0.92))] p-5 shadow-[0_32px_90px_-56px_rgba(15,23,42,1)] sm:p-6"
           title="Public routes"
-          description="Map nhieu host port tren cung domain vao cac service khac nhau cua VM nay."
+          description="Quan ly danh sach host port cong khai va target port cho VM dang chon."
         />
       ) : (
         <div className="mt-5 rounded-[1rem] border border-dashed border-border/70 bg-background/60 px-4 py-5 text-sm leading-6 text-muted-foreground">
@@ -883,7 +883,7 @@ export default function TerminalWorkbench({
         </div>
       </div>
 
-      <div className="grid gap-4 xl:grid-cols-[320px_minmax(0,1fr)] xl:items-start">
+      <div className="grid gap-4 2xl:grid-cols-[340px_minmax(0,1fr)] 2xl:items-start">
         <aside className="space-y-4">
           <div className="surface-panel rounded-[1.5rem] p-5">
             <SectionLabel
@@ -1046,9 +1046,6 @@ export default function TerminalWorkbench({
               Xóa thông tin đã lưu
             </button>
           </div>
-
-          <TerminalRoutePanel vm={selectedVm} />
-
           <div className="surface-panel rounded-[1.5rem] p-5">
             <SectionLabel
               title="Kịch bản"
@@ -1138,6 +1135,8 @@ export default function TerminalWorkbench({
         </aside>
 
         <div className="space-y-4">
+          <TerminalRoutePanel vm={selectedVm} />
+
           <div className="surface-panel overflow-hidden rounded-[1.6rem]">
             <div className="flex flex-col gap-4 border-b border-border/70 px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
               <div>
