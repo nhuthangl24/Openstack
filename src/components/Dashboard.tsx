@@ -31,11 +31,13 @@ import {
   Network,
   Plus,
   RefreshCw,
+  Save,
   Search,
   Server,
   ShieldCheck,
   Sparkles,
   Terminal,
+  TriangleAlert,
   Trash2,
   Workflow,
   type LucideIcon,
@@ -45,10 +47,10 @@ import CreateServerModal from "@/components/CreateServerModal";
 import GitHubDeployModal, {
   type GitHubDeployPlan,
 } from "@/components/GitHubDeployModal";
-import PublicRouteManager from "@/components/PublicRouteManager";
 import TerminalWorkbench from "@/components/TerminalWorkbench";
 import ThemeToggle from "@/components/ThemeToggle";
 import VMSuccessModal from "@/components/VMSuccessModal";
+import { Input } from "@/components/ui/input";
 import { copyToClipboard } from "@/lib/clipboard";
 import { serverPresets } from "@/lib/presets";
 import { writeTerminalWorkspace } from "@/lib/terminal-workspace";
@@ -73,8 +75,6 @@ interface VMResult {
   ip?: string;
   hostname?: string;
   fqdn?: string;
-  route_mappings?: import("@/lib/public-routes").VmRouteSnapshot[];
-  route_listen_port?: number;
   route_target_port?: number;
   route_sync_warning?: string;
 }
@@ -84,6 +84,13 @@ interface GitHubUser {
   name: string | null;
   avatar_url: string;
   html_url: string;
+}
+
+interface VmRouteSnapshot {
+  fqdn: string;
+  hostname: string;
+  target_ip: string;
+  target_port: number;
 }
 
 type FilterKey = "all" | "ready" | "building" | "attention";
@@ -377,15 +384,193 @@ function RoutePortPanel({
 }: {
   vm: VM;
 }) {
+  const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [route, setRoute] = useState<VmRouteSnapshot | null>(null);
+  const [portInput, setPortInput] = useState("3000");
+  const [message, setMessage] = useState("");
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadRoute() {
+      setLoading(true);
+      setMessage("");
+
+      try {
+        const response = await fetch(
+          `/api/vm-route?vm_name=${encodeURIComponent(vm.name)}`,
+          { cache: "no-store" },
+        );
+        const data = await response.json();
+
+        if (cancelled) {
+          return;
+        }
+
+        if (!response.ok || !data.success) {
+          setRoute(null);
+          setPortInput("3000");
+          setMessage(data.error_message || "Chua co public route cho VM nay.");
+          return;
+        }
+
+        const nextRoute = data.route as VmRouteSnapshot;
+        setRoute(nextRoute);
+        setPortInput(String(nextRoute.target_port || 3000));
+      } catch {
+        if (!cancelled) {
+          setRoute(null);
+          setMessage("Khong tai duoc thong tin public route.");
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      }
+    }
+
+    void loadRoute();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [vm.id, vm.name]);
+
+  async function handleSave() {
+    const targetPort = Number(portInput);
+
+    if (!Number.isInteger(targetPort) || targetPort < 1 || targetPort > 65535) {
+      const detail = "Port khong hop le. Hay nhap so tu 1 den 65535.";
+      setMessage(detail);
+      toast.error("Khong cap nhat duoc route", { description: detail });
+      return;
+    }
+
+    setSaving(true);
+
+    try {
+      const response = await fetch("/api/update-vm-route", {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          vm_name: vm.name,
+          target_ip: vm.ip || route?.target_ip || undefined,
+          target_port: targetPort,
+        }),
+      });
+      const data = await response.json();
+
+      if (!response.ok || !data.success) {
+        throw new Error(data.error_message || data.error || "Khong cap nhat duoc route.");
+      }
+
+      const nextRoute: VmRouteSnapshot = {
+        fqdn: data.fqdn,
+        hostname: data.hostname,
+        target_ip: data.ip,
+        target_port: data.target_port,
+      };
+
+      setRoute(nextRoute);
+      setPortInput(String(nextRoute.target_port));
+      setMessage("");
+      toast.success("Da cap nhat port public", {
+        description: `${nextRoute.fqdn} -> ${nextRoute.target_port}`,
+      });
+    } catch (error) {
+      const detail =
+        error instanceof Error ? error.message : "Khong cap nhat duoc route public.";
+      setMessage(detail);
+      toast.error("Cap nhat route that bai", { description: detail });
+    } finally {
+      setSaving(false);
+    }
+  }
+
   return (
-    <PublicRouteManager
-      vmName={vm.name}
-      vmId={vm.id}
-      vmIp={vm.ip}
-      title="Public routes"
-      description="Cho phep mot domain host nhieu public port khac nhau cho cung VM."
-      className="mt-5"
-    />
+    <div className="mt-5 rounded-[1.2rem] border border-border/70 bg-background/75 p-4">
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">
+            Public route
+          </p>
+          <p className="mt-2 text-sm text-foreground">
+            {route?.fqdn || "Chua co route public"}
+          </p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Dang route den {(vm.ip || route?.target_ip || "IP cua VM")}:
+            {route?.target_port || portInput}
+          </p>
+        </div>
+        {route?.fqdn ? <CopyChip text={`https://${route.fqdn}`} label="Copy URL" /> : null}
+      </div>
+
+      {message ? (
+        <div className="mt-4 flex items-start gap-3 rounded-[1rem] border border-amber-500/25 bg-amber-500/10 px-3 py-3 text-sm text-amber-100">
+          <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0" />
+          <p>{message}</p>
+        </div>
+      ) : null}
+
+      <div className="mt-4 flex flex-wrap gap-2">
+        {[3000, 8080, 443, 300].map((port) => {
+          const selected = Number(portInput) === port;
+
+          return (
+            <button
+              key={port}
+              type="button"
+              onClick={() => setPortInput(String(port))}
+              className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition ${
+                selected
+                  ? "border-primary/40 bg-primary/10 text-primary"
+                  : "border-border/70 bg-background/70 text-foreground hover:border-primary/30"
+              }`}
+            >
+              {port}
+            </button>
+          );
+        })}
+      </div>
+
+      <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-end">
+        <div className="flex-1">
+          <label
+            htmlFor={`route-port-${vm.id}`}
+            className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground"
+          >
+            Target port
+          </label>
+          <Input
+            id={`route-port-${vm.id}`}
+            type="number"
+            min={1}
+            max={65535}
+            inputMode="numeric"
+            value={portInput}
+            onChange={(event) => setPortInput(event.target.value)}
+            disabled={loading || saving}
+            className="mt-2 h-10 bg-background/70 font-mono"
+          />
+        </div>
+        <button
+          type="button"
+          onClick={() => void handleSave()}
+          disabled={loading || saving}
+          className="inline-flex h-10 items-center justify-center gap-2 rounded-[0.85rem] bg-foreground px-4 text-sm font-semibold text-background transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          {loading || saving ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            <Save className="h-4 w-4" />
+          )}
+          {route ? "Luu port" : "Tao route"}
+        </button>
+      </div>
+    </div>
   );
 }
 
@@ -1573,6 +1758,7 @@ export default function Dashboard({
             </div>
           </div>
 
+          <RoutePortPanel vm={selectedVm} />
         </>
       ) : (
         <div className="mt-5 rounded-[1.25rem] border border-dashed border-border/70 bg-background/60 p-6 text-sm leading-6 text-muted-foreground">
@@ -1888,7 +2074,6 @@ export default function Dashboard({
       <div className="space-y-4">
         {fleetMatrixPanel}
         {fleetAlert}
-        {selectedVm ? <RoutePortPanel vm={selectedVm} /> : null}
         {fleetCollection}
       </div>
       <aside className="space-y-4">
@@ -1941,7 +2126,6 @@ export default function Dashboard({
       <div className="space-y-4">
         {fleetMatrixPanel}
         {fleetAlert}
-        {selectedVm ? <RoutePortPanel vm={selectedVm} /> : null}
         <div className="surface-panel rounded-[1.5rem] p-5 sm:p-6">
           <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-muted-foreground">
             Chọn máy
@@ -2034,7 +2218,6 @@ export default function Dashboard({
             </div>
           </div>
         </div>
-        {selectedVm ? <RoutePortPanel vm={selectedVm} /> : null}
       </div>
 
       <aside className="space-y-4">

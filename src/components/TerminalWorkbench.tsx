@@ -5,12 +5,15 @@ import {
   Clipboard,
   Eraser,
   GitBranch,
+  Globe,
   Play,
   Plug,
   PlugZap,
   RefreshCw,
+  Save,
   ShieldCheck,
   TerminalSquare,
+  TriangleAlert,
   Trash2,
   Upload,
   Waypoints,
@@ -22,7 +25,6 @@ import { WebLinksAddon } from "@xterm/addon-web-links";
 import { Terminal as XTerm } from "@xterm/xterm";
 import { toast } from "sonner";
 import "@xterm/xterm/css/xterm.css";
-import PublicRouteManager from "@/components/PublicRouteManager";
 import { copyToClipboard } from "@/lib/clipboard";
 import {
   TERMINAL_WORKSPACE_EVENT,
@@ -50,6 +52,13 @@ interface QuickCommand {
   key: string;
   label: string;
   command: string;
+}
+
+interface VmRouteSnapshot {
+  fqdn: string;
+  hostname: string;
+  target_ip: string;
+  target_port: number;
 }
 
 interface TerminalWorkbenchProps {
@@ -175,34 +184,6 @@ function TerminalRoutePanel({
 }: {
   vm: VMOption | null;
 }) {
-  return (
-    <div className="surface-panel relative overflow-hidden rounded-[1.6rem] border border-border/60 bg-background/75 p-5 shadow-[0_24px_80px_-48px_rgba(15,23,42,0.95)] backdrop-blur">
-      <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-primary/45 to-transparent" />
-      <div className="pointer-events-none absolute -left-16 top-0 h-32 w-32 rounded-full bg-primary/10 blur-3xl" />
-      <div className="pointer-events-none absolute -bottom-20 right-0 h-36 w-36 rounded-full bg-emerald-500/10 blur-3xl" />
-      <SectionLabel
-        title="Truy cap cong khai"
-        description="Gan nhieu host port cong khai khac nhau vao tung VM ngay trong trang terminal."
-      />
-
-      {vm ? (
-        <PublicRouteManager
-          vmName={vm.name}
-          vmId={vm.id}
-          vmIp={vm.ip}
-          className="relative overflow-hidden rounded-[1.5rem] border border-border/70 bg-[linear-gradient(160deg,rgba(8,12,20,0.96),rgba(12,20,32,0.92))] p-5 shadow-[0_32px_90px_-56px_rgba(15,23,42,1)] sm:p-6"
-          title="Public routes"
-          description="Quan ly danh sach host port cong khai va target port cho VM dang chon."
-        />
-      ) : (
-        <div className="mt-5 rounded-[1rem] border border-dashed border-border/70 bg-background/60 px-4 py-5 text-sm leading-6 text-muted-foreground">
-          Chon mot VM trong Terminal de doi cong cong khai dung theo tung may ao.
-        </div>
-      )}
-    </div>
-  );
-
-  /*
   const vmId = vm?.id || "";
   const vmName = vm?.name || "";
   const [loading, setLoading] = useState(false);
@@ -479,7 +460,6 @@ function TerminalRoutePanel({
       )}
     </div>
   );
-  */
 }
 
 export default function TerminalWorkbench({
@@ -883,7 +863,7 @@ export default function TerminalWorkbench({
         </div>
       </div>
 
-      <div className="grid gap-4 2xl:grid-cols-[340px_minmax(0,1fr)] 2xl:items-start">
+      <div className="grid gap-4 xl:grid-cols-[320px_minmax(0,1fr)] xl:items-start">
         <aside className="space-y-4">
           <div className="surface-panel rounded-[1.5rem] p-5">
             <SectionLabel
@@ -1046,6 +1026,9 @@ export default function TerminalWorkbench({
               Xóa thông tin đã lưu
             </button>
           </div>
+
+          <TerminalRoutePanel vm={selectedVm} />
+
           <div className="surface-panel rounded-[1.5rem] p-5">
             <SectionLabel
               title="Kịch bản"
@@ -1135,8 +1118,6 @@ export default function TerminalWorkbench({
         </aside>
 
         <div className="space-y-4">
-          <TerminalRoutePanel vm={selectedVm} />
-
           <div className="surface-panel overflow-hidden rounded-[1.6rem]">
             <div className="flex flex-col gap-4 border-b border-border/70 px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
               <div>

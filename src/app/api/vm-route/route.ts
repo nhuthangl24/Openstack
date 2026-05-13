@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getConfiguredRouteListenPort, getVmRoutes } from "@/lib/nginx-route-sync";
-import { pickPrimaryVmRoute } from "@/lib/public-routes";
+import { getVmRoute } from "@/lib/nginx-route-sync";
 
 export const dynamic = "force-dynamic";
 
@@ -15,21 +14,18 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const routes = await getVmRoutes(vmName);
+    const route = await getVmRoute(vmName);
 
-    if (routes.length === 0) {
+    if (!route) {
       return NextResponse.json(
         { success: false, error_message: "Khong tim thay route cho VM nay." },
         { status: 404 },
       );
     }
 
-    const route = pickPrimaryVmRoute(routes, getConfiguredRouteListenPort()) || routes[0];
-
     return NextResponse.json({
       success: true,
       route,
-      routes,
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Khong lay duoc route.";

@@ -7,20 +7,15 @@ HOSTNAME_LABEL="${3:-}"
 TARGET_IP="${4:-}"
 TARGET_PORT="${5:-80}"
 DOMAIN="${6:-orbitstack.app}"
-LISTEN_PORT="${7:-443}"
 CONFIG_DIR="${ORBITSTACK_NGINX_CONFIG_DIR:-/etc/nginx/conf.d}"
 SAFE_ROUTE_KEY="$(printf '%s' "$ROUTE_KEY" | tr '[:upper:]' '[:lower:]' | tr -cs 'a-z0-9-' '-')"
-LEGACY_CONFIG_PATH="${CONFIG_DIR}/orbitstack-vm-${SAFE_ROUTE_KEY}.conf"
+CONFIG_PATH="${CONFIG_DIR}/orbitstack-vm-${SAFE_ROUTE_KEY}.conf"
 FULL_HOST=""
-
-entry_path() {
-  printf '%s/orbitstack-vm-%s-%s.conf' "$CONFIG_DIR" "$SAFE_ROUTE_KEY" "$1"
-}
 
 if [[ -z "$ACTION" || -z "$ROUTE_KEY" ]]; then
   echo "Usage:"
-  echo "  orbitstack-route.sh upsert <route-key> <hostname-label> <target-ip> [target-port] [domain] [listen-port]"
-  echo "  orbitstack-route.sh remove <route-key> [hostname-label] [target-ip] [target-port] [domain] [listen-port]"
+  echo "  orbitstack-route.sh upsert <route-key> <hostname-label> <target-ip> [target-port] [domain]"
+  echo "  orbitstack-route.sh remove <route-key>"
   exit 1
 fi
 
@@ -54,19 +49,12 @@ case "$ACTION" in
       exit 1
     fi
 
-    if [[ ! "$LISTEN_PORT" =~ ^[0-9]+$ ]]; then
-      echo "Invalid listen port"
-      exit 1
-    fi
-
     mkdir -p "$CONFIG_DIR"
-    CONFIG_PATH="$(entry_path "$LISTEN_PORT")"
-    rm -f "$LEGACY_CONFIG_PATH"
 
     cat > "$CONFIG_PATH" <<EOF
 server {
-    listen ${LISTEN_PORT} ssl http2;
-    listen [::]:${LISTEN_PORT} ssl http2;
+    listen 443 ssl http2;
+    listen [::]:443 ssl http2;
     server_name ${FULL_HOST};
 
     ssl_certificate     /etc/letsencrypt/live/orbitstack.app/fullchain.pem;
@@ -95,12 +83,7 @@ EOF
     ;;
 
   remove)
-    if [[ -n "${7:-}" ]]; then
-      rm -f "$(entry_path "$LISTEN_PORT")"
-    else
-      rm -f "${CONFIG_DIR}/orbitstack-vm-${SAFE_ROUTE_KEY}-"*.conf
-      rm -f "$LEGACY_CONFIG_PATH"
-    fi
+    rm -f "$CONFIG_PATH"
     ;;
 
   *)

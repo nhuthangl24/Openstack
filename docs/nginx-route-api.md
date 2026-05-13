@@ -55,7 +55,6 @@ curl http://127.0.0.1:9055/health
 NGINX_ROUTE_API_BASE_URL=http://20.41.119.30:9055
 NGINX_ROUTE_API_TOKEN=change-this-token
 NGINX_ROUTE_DOMAIN=orbitstack.app
-NGINX_ROUTE_LISTEN_PORT=443
 NGINX_ROUTE_TARGET_PORT=3000
 ```
 
@@ -80,7 +79,6 @@ Content-Type: application/json
   "route_key": "demo-vm",
   "hostname": "demo",
   "target_ip": "10.0.0.25",
-  "listen_port": 3000,
   "target_port": 3000,
   "domain": "orbitstack.app"
 }
@@ -98,8 +96,6 @@ Content-Type: application/json
 {
   "hostname": "demo",
   "target_ip": "10.0.0.25",
-  "listen_port": 8080,
-  "previous_listen_port": 3000,
   "target_port": 3000,
   "domain": "orbitstack.app"
 }
@@ -111,18 +107,3 @@ Content-Type: application/json
 DELETE /routes/demo-vm
 Authorization: Bearer <token>
 ```
-
-### Xoa mot host port cu the
-
-```http
-DELETE /routes/demo-vm?listen_port=8080
-Authorization: Bearer <token>
-```
-
-## Luu y ve file Nginx sinh ra
-
-- Moi `listen_port` se tao ra mot file rieng:
-  - `/etc/nginx/conf.d/orbitstack-vm-demo-vm-3000.conf`
-  - `/etc/nginx/conf.d/orbitstack-vm-demo-vm-8080.conf`
-- Neu ban van thay mot file kieu cu nhu `/etc/nginx/conf.d/orbitstack-vm-demo-vm.conf` thi server Nginx cua ban van dang chay flow cu, chua deploy lai `scripts/nginx_route_api.py` moi.
-- Script legacy `scripts/orbitstack-route.sh` da duoc cap nhat de ghi theo tung `listen_port`, nhung app web hien tai duoc thiet ke de noi voi `nginx_route_api.py`.

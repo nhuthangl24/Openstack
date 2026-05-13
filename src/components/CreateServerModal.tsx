@@ -13,14 +13,9 @@ import {
   Sparkles,
   X,
 } from "lucide-react";
-import RouteMappingsBuilder, {
-  parseRouteMappingDrafts,
-  type RouteMappingDraft,
-} from "@/components/RouteMappingsBuilder";
 import { environments, type Environment } from "@/lib/environments";
 import { flavors } from "@/lib/flavors";
 import { serverPresets } from "@/lib/presets";
-import { type VmRouteSnapshot } from "@/lib/public-routes";
 
 interface CreateServerModalProps {
   initialPresetKey?: string | null;
@@ -36,8 +31,6 @@ interface CreateServerModalProps {
     ip?: string;
     hostname?: string;
     fqdn?: string;
-    route_mappings?: VmRouteSnapshot[];
-    route_listen_port?: number;
     route_target_port?: number;
     route_sync_warning?: string;
   }) => void;
@@ -88,7 +81,6 @@ export default function CreateServerModal({
   const [loadingOS, setLoadingOS] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
-  const [routeMappings, setRouteMappings] = useState<RouteMappingDraft[]>([]);
 
   const activePreset = serverPresets.find((item) => item.key === selectedPresetKey);
 
@@ -201,12 +193,6 @@ export default function CreateServerModal({
       nextErrors.os = "Hãy chọn một image hệ điều hành.";
     }
 
-    const parsedMappings = parseRouteMappingDrafts(routeMappings);
-
-    if (parsedMappings.error) {
-      nextErrors.routeMappings = parsedMappings.error;
-    }
-
     setErrors(nextErrors);
     return Object.keys(nextErrors).length === 0;
   }
@@ -219,16 +205,6 @@ export default function CreateServerModal({
     setSubmitting(true);
 
     try {
-      const parsedMappings = parseRouteMappingDrafts(routeMappings);
-
-      if (parsedMappings.error) {
-        setErrors((current) => ({
-          ...current,
-          routeMappings: parsedMappings.error,
-        }));
-        return;
-      }
-
       const response = await fetch("/api/create-vm", {
         method: "POST",
         headers: {
@@ -242,7 +218,6 @@ export default function CreateServerModal({
           os: osName,
           network: "public",
           environments: envs,
-          route_mappings: parsedMappings.mappings,
         }),
       });
 
@@ -263,13 +238,6 @@ export default function CreateServerModal({
         ip: data.ip || "",
         hostname: data.hostname || name,
         fqdn: data.fqdn || "",
-        route_mappings: Array.isArray(data.route_mappings)
-          ? (data.route_mappings as VmRouteSnapshot[])
-          : undefined,
-        route_listen_port:
-          typeof data.route_listen_port === "number"
-            ? data.route_listen_port
-            : undefined,
         route_target_port:
           typeof data.route_target_port === "number"
             ? data.route_target_port
@@ -493,26 +461,9 @@ export default function CreateServerModal({
                 </div>
               </section>
 
-              <section className="mt-6 space-y-3">
-                <RouteMappingsBuilder
-                  value={routeMappings}
-                  onChange={(nextValue) => {
-                    setRouteMappings(nextValue);
-                    setErrors((current) => ({ ...current, routeMappings: "" }));
-                  }}
-                  title="Public ports tuy chon"
-                  description="Can public port ngay luc tao may thi mo form nay. Khong can thi de tat."
-                  defaultExpanded={false}
-                  compact
-                />
-                {errors.routeMappings && (
-                  <p className="text-sm text-rose-300">{errors.routeMappings}</p>
-                )}
-              </section>
-
               <section className="mt-8 space-y-4">
                 <SectionHeading
-                  kicker="4. Hardware"
+                  kicker="3. Hardware"
                   title="Chọn flavor cho workload"
                   description="Cân bằng CPU, RAM và dung lượng phù hợp để đỡ phải resize lại sau này."
                 />
@@ -562,7 +513,7 @@ export default function CreateServerModal({
 
               <section className="mt-8 space-y-4">
                 <SectionHeading
-                  kicker="5. Image"
+                  kicker="4. Image"
                   title="Chọn hệ điều hành"
                   description="Danh sách image được lấy trực tiếp từ OpenStack nên sẽ bám đúng môi trường hiện tại."
                 />
@@ -619,7 +570,7 @@ export default function CreateServerModal({
 
               <section className="mt-8 space-y-4">
                 <SectionHeading
-                  kicker="6. Software"
+                  kicker="5. Software"
                   title="Chọn stack cài sẵn"
                   description="Các package này sẽ được cài qua cloud-init sau khi VM khởi động."
                 />
@@ -656,14 +607,6 @@ export default function CreateServerModal({
                     <SummaryRow label="Network" value="public" />
                     <SummaryRow label="Flavor" value={flavor || "Chưa chọn"} />
                     <SummaryRow label="Image" value={osName || "Chưa chọn"} />
-                    <SummaryRow
-                      label="Public ports"
-                      value={
-                        routeMappings.length > 0
-                          ? `${routeMappings.length} mapping`
-                          : "Khong tao route luc deploy"
-                      }
-                    />
                     <SummaryRow
                       label="Package"
                       value={envs.length ? `${envs.length} lựa chọn` : "Không cài sẵn"}

@@ -9,10 +9,6 @@ import { Separator } from "@/components/ui/separator";
 import FlavorSelect from "@/components/FlavorSelect";
 import EnvironmentCheckboxes from "@/components/EnvironmentCheckboxes";
 import PreviewCard from "@/components/PreviewCard";
-import RouteMappingsBuilder, {
-  parseRouteMappingDrafts,
-  type RouteMappingDraft,
-} from "@/components/RouteMappingsBuilder";
 import VMSuccessModal from "@/components/VMSuccessModal";
 import { toast } from "sonner";
 import {
@@ -39,8 +35,6 @@ interface VMResult {
   ip?: string;
   hostname?: string;
   fqdn?: string;
-  route_mappings?: import("@/lib/public-routes").VmRouteSnapshot[];
-  route_listen_port?: number;
   route_target_port?: number;
   route_sync_warning?: string;
 }
@@ -55,7 +49,6 @@ export default function CreateVMForm() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [vmResult, setVmResult] = useState<VMResult | null>(null);
-  const [routeMappings, setRouteMappings] = useState<RouteMappingDraft[]>([]);
 
   const validate = (): boolean => {
     const newErrors: Record<string, string> = {};
@@ -89,12 +82,6 @@ export default function CreateVMForm() {
       newErrors.flavor = "Vui lòng chọn cấu hình máy";
     }
 
-    const parsedMappings = parseRouteMappingDrafts(routeMappings);
-
-    if (parsedMappings.error) {
-      newErrors.routeMappings = parsedMappings.error;
-    }
-
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -107,16 +94,6 @@ export default function CreateVMForm() {
     setIsSubmitting(true);
 
     try {
-      const parsedMappings = parseRouteMappingDrafts(routeMappings);
-
-      if (parsedMappings.error) {
-        setErrors((current) => ({
-          ...current,
-          routeMappings: parsedMappings.error,
-        }));
-        return;
-      }
-
       const response = await fetch("/api/create-vm", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -128,7 +105,6 @@ export default function CreateVMForm() {
           os: "Ubuntu 24.04 Noble",
           network: "public",
           environments: selectedEnvs,
-          route_mappings: parsedMappings.mappings,
           username: "dung",
           project: "Dung_Prj"
         }),
@@ -149,11 +125,6 @@ export default function CreateVMForm() {
           ip: data.ip || "",
           hostname: data.hostname || hostname,
           fqdn: data.fqdn || "",
-          route_mappings: Array.isArray(data.route_mappings) ? data.route_mappings : undefined,
-          route_listen_port:
-            typeof data.route_listen_port === "number"
-              ? data.route_listen_port
-              : undefined,
           route_target_port:
             typeof data.route_target_port === "number"
               ? data.route_target_port
@@ -166,7 +137,6 @@ export default function CreateVMForm() {
         setPassword("");
         setFlavor("");
         setSelectedEnvs([]);
-        setRouteMappings([]);
         setErrors({});
       } else {
         toast.error("Không thể tạo máy ảo", {
@@ -284,33 +254,6 @@ export default function CreateVMForm() {
                 </div>
               </div>
 
-              <div className="space-y-3">
-                <Label className="text-sm font-medium text-foreground/90">
-                  Public route mappings
-                </Label>
-                <RouteMappingsBuilder
-                  value={routeMappings}
-                  onChange={(nextValue) => {
-                    setRouteMappings(nextValue);
-                    if (errors.routeMappings) {
-                      setErrors((prev) => ({
-                        ...prev,
-                        routeMappings: "",
-                      }));
-                    }
-                  }}
-                  className="bg-card/60"
-                  title="Public ports tuy chon"
-                  description="Chi mo ra khi can public port ngay luc tao VM."
-                  defaultExpanded={false}
-                  compact
-                />
-                {errors.routeMappings && (
-                  <p className="text-xs text-destructive mt-1 animate-in fade-in-0 slide-in-from-top-1">
-                    {errors.routeMappings}
-                  </p>
-                )}
-              </div>
 
               {/* SSH Password */}
               <div className="space-y-2">
