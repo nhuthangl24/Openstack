@@ -12,8 +12,76 @@ import {
   getConfiguredRouteTargetPort,
   syncVmRoute,
 } from "@/lib/nginx-route-sync";
+import { pickPrimaryVmRoute, type VmRouteSnapshot } from "@/lib/public-routes";
 
 export const dynamic = "force-dynamic";
+
+interface RouteMappingPayload {
+  listen_port: number;
+  target_port: number;
+}
+
+function parsePort(value: unknown) {
+  const port = Number(value);
+
+  if (!Number.isInteger(port) || port < 1 || port > 65535) {
+    return null;
+  }
+
+  return port;
+}
+
+function parseRouteMappings(
+  value: unknown,
+  defaultListenPort: number,
+  defaultTargetPort: number,
+) {
+  if (value === undefined) {
+    return [
+      {
+        listen_port: defaultListenPort,
+        target_port: defaultTargetPort,
+      },
+    ] satisfies RouteMappingPayload[];
+  }
+
+  if (!Array.isArray(value)) {
+    throw new Error("route_mappings phai la mot mang.");
+  }
+
+  const usedListenPorts = new Set<number>();
+  const mappings: RouteMappingPayload[] = [];
+
+  for (const [index, item] of value.entries()) {
+    if (!item || typeof item !== "object") {
+      throw new Error(`route_mappings[${index}] khong hop le.`);
+    }
+
+    const mapping = item as Record<string, unknown>;
+    const listenPort = parsePort(mapping.listen_port);
+    const targetPort = parsePort(mapping.target_port);
+
+    if (!listenPort) {
+      throw new Error(`route_mappings[${index}].listen_port khong hop le.`);
+    }
+
+    if (!targetPort) {
+      throw new Error(`route_mappings[${index}].target_port khong hop le.`);
+    }
+
+    if (usedListenPorts.has(listenPort)) {
+      throw new Error(`Host port :${listenPort} bi trung trong route_mappings.`);
+    }
+
+    usedListenPorts.add(listenPort);
+    mappings.push({
+      listen_port: listenPort,
+      target_port: targetPort,
+    });
+  }
+
+  return mappings;
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -26,6 +94,7 @@ export async function POST(request: NextRequest) {
       os,
       network,
       environments,
+      route_mappings,
     } = body;
 
     if (!instance_name || !password || !flavor || !os || !network) {
@@ -69,6 +138,29 @@ export async function POST(request: NextRequest) {
           success: false,
           error_message:
             "Hostname public khong hop le. Chi dung chu thuong, so va dau gach ngang.",
+        },
+        { status: 400 },
+      );
+    }
+
+    let requestedRouteMappings: RouteMappingPayload[];
+
+    try {
+      requestedRouteMappings = parseRouteMappings(
+        route_mappings,
+        getConfiguredRouteListenPort(),
+        getConfiguredRouteTargetPort(),
+      );
+    } catch (routeMappingError) {
+      const message =
+        routeMappingError instanceof Error
+          ? routeMappingError.message
+          : "route_mappings khong hop le.";
+
+      return NextResponse.json(
+        {
+          success: false,
+          error_message: message,
         },
         { status: 400 },
       );
@@ -130,22 +222,43 @@ export async function POST(request: NextRequest) {
     }
 
     const ip = await waitForServerIP(result.vm_id || result.vm_name);
-    let routeSyncWarning = "";
+    const syncedRouteMappings: VmRouteSnapshot[] = [];
+    const routeSyncWarnings: string[] = [];
 
-    try {
-      await syncVmRoute({
-        routeKey: instance_name,
-        hostname: hostnameLabel,
-        targetIp: ip,
-        listenPort: getConfiguredRouteListenPort(),
-      });
-    } catch (routeError) {
-      routeSyncWarning =
-        routeError instanceof Error
-          ? routeError.message
-          : "Khong dong bo duoc route Nginx.";
-      console.error("[create-vm] nginx route sync error:", routeSyncWarning);
+    for (const mapping of requestedRouteMappings) {
+      try {
+        await syncVmRoute({
+          routeKey: instance_name,
+          hostname: hostnameLabel,
+          targetIp: ip,
+          listenPort: mapping.listen_port,
+          targetPort: mapping.target_port,
+        });
+
+        syncedRouteMappings.push({
+          route_key: instance_name,
+          hostname: hostnameLabel,
+          domain: getConfiguredRouteDomain(),
+          fqdn: `${hostnameLabel}.${getConfiguredRouteDomain()}`,
+          target_ip: ip,
+          target_port: mapping.target_port,
+          listen_port: mapping.listen_port,
+          config_path: "",
+        });
+      } catch (routeError) {
+        const detail =
+          routeError instanceof Error
+            ? routeError.message
+            : "Khong dong bo duoc route Nginx.";
+        routeSyncWarnings.push(`:${mapping.listen_port} -> :${mapping.target_port}: ${detail}`);
+        console.error("[create-vm] nginx route sync error:", detail);
+      }
     }
+
+    const primaryRoute =
+      pickPrimaryVmRoute(syncedRouteMappings, getConfiguredRouteListenPort()) ??
+      syncedRouteMappings[0] ??
+      null;
 
     return NextResponse.json({
       success: true,
@@ -155,9 +268,10 @@ export async function POST(request: NextRequest) {
       ip,
       hostname: hostnameLabel,
       fqdn: `${hostnameLabel}.${getConfiguredRouteDomain()}`,
-      route_listen_port: getConfiguredRouteListenPort(),
-      route_target_port: getConfiguredRouteTargetPort(),
-      route_sync_warning: routeSyncWarning || undefined,
+      route_mappings: syncedRouteMappings,
+      route_listen_port: primaryRoute?.listen_port,
+      route_target_port: primaryRoute?.target_port,
+      route_sync_warning: routeSyncWarnings.join(" | ") || undefined,
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);

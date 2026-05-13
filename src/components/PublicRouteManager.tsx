@@ -24,6 +24,7 @@ import {
   parsePortNumber,
   pickPrimaryVmRoute,
   sortVmRoutes,
+  suggestListenPort,
   type VmRouteSnapshot,
 } from "@/lib/public-routes";
 import { cn } from "@/lib/utils";
@@ -46,25 +47,6 @@ type PartialRoute = Partial<VmRouteSnapshot>;
 
 function buildRouteSummary(route: VmRouteSnapshot, vmIp?: string) {
   return `${buildPublicUrl(route.fqdn, route.listen_port)} -> ${vmIp || route.target_ip}:${route.target_port}`;
-}
-
-function getSuggestedListenPort(routes: VmRouteSnapshot[], fallbackTargetPort: number) {
-  const usedPorts = new Set(routes.map((route) => route.listen_port));
-  const suggestions = [443, 3000, 8080, 80, 8443, fallbackTargetPort, 5000, 5173, 8000];
-
-  for (const candidate of suggestions) {
-    if (candidate >= 1 && candidate <= 65535 && !usedPorts.has(candidate)) {
-      return candidate;
-    }
-  }
-
-  let candidate = Math.max(3000, ...routes.map((route) => route.listen_port)) + 1;
-
-  while (candidate <= 65535 && usedPorts.has(candidate)) {
-    candidate += 1;
-  }
-
-  return candidate <= 65535 ? candidate : 443;
 }
 
 function RouteStat({
@@ -238,7 +220,7 @@ export default function PublicRouteManager({
       selectedRoute?.target_port ?? pickPrimaryVmRoute(routes)?.target_port ?? 3000;
 
     setSelectedListenPort(null);
-    setListenPortInput(String(getSuggestedListenPort(routes, baseTargetPort)));
+    setListenPortInput(String(suggestListenPort(routes, baseTargetPort)));
     setTargetPortInput(String(baseTargetPort));
     setEditorOpen(true);
     setMessage("");
@@ -381,9 +363,15 @@ export default function PublicRouteManager({
         throw new Error("Khong dong bo duoc du lieu route vua luu.");
       }
 
+      const replacedPorts = new Set<number>([nextRoute.listen_port]);
+
+      if (selectedRoute?.listen_port) {
+        replacedPorts.add(selectedRoute.listen_port);
+      }
+
       applyRoutes(
         [
-          ...routes.filter((route) => route.listen_port !== nextRoute.listen_port),
+          ...routes.filter((route) => !replacedPorts.has(route.listen_port)),
           nextRoute,
         ],
         nextRoute.listen_port,

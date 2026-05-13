@@ -9,6 +9,11 @@ export interface VmRouteSnapshot {
   config_path: string;
 }
 
+export interface VmRoutePortMapping {
+  listen_port: number;
+  target_port: number;
+}
+
 export const COMMON_PUBLIC_PORTS = [443, 3000, 8080, 80] as const;
 export const COMMON_TARGET_PORTS = [3000, 8080, 443, 80] as const;
 
@@ -67,4 +72,36 @@ export function pickPrimaryVmRoute(
     sorted[0] ??
     null
   );
+}
+
+export function suggestListenPort(
+  routes: Array<{ listen_port: number }>,
+  fallbackTargetPort = 3000,
+) {
+  const usedPorts = new Set(routes.map((route) => route.listen_port));
+  const suggestions = [
+    443,
+    3000,
+    8080,
+    80,
+    8443,
+    fallbackTargetPort,
+    5000,
+    5173,
+    8000,
+  ];
+
+  for (const candidate of suggestions) {
+    if (candidate >= 1 && candidate <= 65535 && !usedPorts.has(candidate)) {
+      return candidate;
+    }
+  }
+
+  let candidate = Math.max(3000, ...routes.map((route) => route.listen_port)) + 1;
+
+  while (candidate <= 65535 && usedPorts.has(candidate)) {
+    candidate += 1;
+  }
+
+  return candidate <= 65535 ? candidate : 443;
 }

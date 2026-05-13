@@ -31,6 +31,7 @@ interface VMInfo {
   ip?: string;
   hostname?: string;
   fqdn?: string;
+  route_mappings?: VmRouteSnapshot[];
   route_listen_port?: number;
   route_target_port?: number;
   route_sync_warning?: string;
@@ -103,6 +104,10 @@ export default function VMSuccessModal({
   );
   const maxAttempts = 30;
   const initialRoutes = useMemo<VmRouteSnapshot[]>(() => {
+    if (Array.isArray(info.route_mappings) && info.route_mappings.length > 0) {
+      return info.route_mappings;
+    }
+
     if (
       !info.fqdn ||
       typeof info.route_listen_port !== "number" ||
@@ -125,7 +130,15 @@ export default function VMSuccessModal({
         config_path: "",
       },
     ];
-  }, [hostnameLabel, info.fqdn, info.route_listen_port, info.route_target_port, info.vm_name, initialIp]);
+  }, [
+    hostnameLabel,
+    info.fqdn,
+    info.route_listen_port,
+    info.route_mappings,
+    info.route_target_port,
+    info.vm_name,
+    initialIp,
+  ]);
 
   useEffect(() => {
     async function pollIp() {

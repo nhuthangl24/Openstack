@@ -73,6 +73,7 @@ interface VMResult {
   ip?: string;
   hostname?: string;
   fqdn?: string;
+  route_mappings?: import("@/lib/public-routes").VmRouteSnapshot[];
   route_listen_port?: number;
   route_target_port?: number;
   route_sync_warning?: string;
