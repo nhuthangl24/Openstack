@@ -27,6 +27,14 @@ import { toast } from "sonner";
 import "@xterm/xterm/css/xterm.css";
 import { copyToClipboard } from "@/lib/clipboard";
 import {
+  buildPublicUrl,
+  parsePortNumber,
+  pickPrimaryVmRoute,
+  sortVmRoutes,
+  suggestListenPort,
+  type VmRouteSnapshot as PublicVmRouteSnapshot,
+} from "@/lib/public-routes";
+import {
   TERMINAL_WORKSPACE_EVENT,
   clearStoredSshSession,
   clearTerminalWorkspace,
@@ -450,6 +458,545 @@ function TerminalRoutePanel({
                 )}
                 {route ? "Lưu cổng" : "Tạo route"}
               </button>
+            </div>
+          </div>
+        </div>
+      ) : (
+        <div className="mt-5 rounded-[1rem] border border-dashed border-border/70 bg-background/60 px-4 py-5 text-sm leading-6 text-muted-foreground">
+          Chọn một VM trong Terminal để đổi cổng công khai đúng theo từng máy ảo.
+        </div>
+      )}
+    </div>
+  );
+}
+
+void TerminalRoutePanel;
+
+function TerminalMultiRoutePanel({
+  vm,
+}: {
+  vm: VMOption | null;
+}) {
+  const vmName = vm?.name || "";
+  const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [routes, setRoutes] = useState<PublicVmRouteSnapshot[]>([]);
+  const [selectedListenPort, setSelectedListenPort] = useState<number | null>(null);
+  const [hostPortInput, setHostPortInput] = useState("443");
+  const [targetPortInput, setTargetPortInput] = useState("3000");
+  const [message, setMessage] = useState("");
+
+  const selectedRoute = useMemo(
+    () => routes.find((item) => item.listen_port === selectedListenPort) ?? null,
+    [routes, selectedListenPort],
+  );
+  const selectedPublicUrl = selectedRoute
+    ? buildPublicUrl(selectedRoute.fqdn, selectedRoute.listen_port)
+    : "";
+  const previewPublicUrl = useMemo(() => {
+    const baseFqdn = selectedRoute?.fqdn || routes[0]?.fqdn || "";
+    const listenPort = parsePortNumber(hostPortInput);
+
+    if (!baseFqdn || !listenPort) {
+      return "";
+    }
+
+    return buildPublicUrl(baseFqdn, listenPort);
+  }, [hostPortInput, routes, selectedRoute]);
+  const previewTargetPort = parsePortNumber(targetPortInput);
+  const currentTargetIp = vm?.ip || selectedRoute?.target_ip || routes[0]?.target_ip || "";
+  const isBusy = loading || saving || deleting;
+
+  const applyRouteDraft = useCallback(
+    (
+      nextRoutes: PublicVmRouteSnapshot[],
+      preferredListenPort?: number | null,
+      fallbackTargetPort = 3000,
+    ) => {
+      const orderedRoutes = sortVmRoutes(nextRoutes);
+      const primaryRoute =
+        preferredListenPort != null
+          ? orderedRoutes.find((item) => item.listen_port === preferredListenPort) ?? null
+          : pickPrimaryVmRoute(orderedRoutes);
+
+      setRoutes(orderedRoutes);
+
+      if (primaryRoute) {
+        setSelectedListenPort(primaryRoute.listen_port);
+        setHostPortInput(String(primaryRoute.listen_port));
+        setTargetPortInput(String(primaryRoute.target_port));
+        return;
+      }
+
+      setSelectedListenPort(null);
+      setTargetPortInput(String(fallbackTargetPort));
+      setHostPortInput(String(suggestListenPort(orderedRoutes, fallbackTargetPort)));
+    },
+    [],
+  );
+
+  const selectRoute = useCallback((nextRoute: PublicVmRouteSnapshot) => {
+    setSelectedListenPort(nextRoute.listen_port);
+    setHostPortInput(String(nextRoute.listen_port));
+    setTargetPortInput(String(nextRoute.target_port));
+    setMessage("");
+  }, []);
+
+  const startNewRoute = useCallback(() => {
+    const fallbackTargetPort =
+      selectedRoute?.target_port ||
+      parsePortNumber(targetPortInput) ||
+      routes[0]?.target_port ||
+      3000;
+
+    setSelectedListenPort(null);
+    setHostPortInput(String(suggestListenPort(routes, fallbackTargetPort)));
+    setTargetPortInput(String(fallbackTargetPort));
+    setMessage("");
+  }, [routes, selectedRoute, targetPortInput]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    if (!vm || !vmName) {
+      setRoutes([]);
+      setSelectedListenPort(null);
+      setHostPortInput("443");
+      setTargetPortInput("3000");
+      setMessage("");
+      return;
+    }
+
+    async function loadRoutes() {
+      setLoading(true);
+      setMessage("");
+
+      try {
+        const response = await fetch(`/api/vm-route?vm_name=${encodeURIComponent(vmName)}`, {
+          cache: "no-store",
+        });
+        const data = await response.json();
+
+        if (cancelled) {
+          return;
+        }
+
+        if (!response.ok || !data.success) {
+          if (response.status === 404) {
+            applyRouteDraft([], null, 3000);
+            return;
+          }
+
+          throw new Error(data.error_message || "Không tải được route công khai.");
+        }
+
+        const nextRoutes = Array.isArray(data.routes)
+          ? (data.routes as PublicVmRouteSnapshot[])
+          : data.route
+            ? [data.route as PublicVmRouteSnapshot]
+            : [];
+        const primaryRoute =
+          (data.route as PublicVmRouteSnapshot | undefined) || pickPrimaryVmRoute(nextRoutes);
+
+        applyRouteDraft(nextRoutes, primaryRoute?.listen_port, primaryRoute?.target_port || 3000);
+      } catch (error) {
+        if (!cancelled) {
+          applyRouteDraft([], null, 3000);
+          setMessage(
+            error instanceof Error
+              ? error.message
+              : "Không tải được thông tin route công khai.",
+          );
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      }
+    }
+
+    void loadRoutes();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [applyRouteDraft, vm, vmName]);
+
+  async function handleSave() {
+    if (!vm) {
+      toast.error("Hãy chọn VM trước khi đổi cổng.");
+      return;
+    }
+
+    const listenPort = parsePortNumber(hostPortInput);
+    const targetPort = parsePortNumber(targetPortInput);
+
+    if (!listenPort) {
+      const detail = "Cổng host không hợp lệ. Hãy nhập số từ 1 đến 65535.";
+      setMessage(detail);
+      toast.error("Không cập nhật được route", { description: detail });
+      return;
+    }
+
+    if (!targetPort) {
+      const detail = "Cổng đích không hợp lệ. Hãy nhập số từ 1 đến 65535.";
+      setMessage(detail);
+      toast.error("Không cập nhật được route", { description: detail });
+      return;
+    }
+
+    const duplicatedRoute = routes.find(
+      (item) => item.listen_port === listenPort && item.listen_port !== selectedRoute?.listen_port,
+    );
+
+    if (duplicatedRoute) {
+      const detail = `Cổng host ${listenPort} đã tồn tại trên VM này.`;
+      setMessage(detail);
+      toast.error("Không cập nhật được route", { description: detail });
+      return;
+    }
+
+    setSaving(true);
+
+    try {
+      const response = await fetch("/api/update-vm-route", {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          vm_name: vm.name,
+          hostname: selectedRoute?.hostname || vm.name,
+          target_ip: currentTargetIp || undefined,
+          listen_port: listenPort,
+          previous_listen_port: selectedRoute?.listen_port || undefined,
+          target_port: targetPort,
+        }),
+      });
+      const data = await response.json();
+
+      if (!response.ok || !data.success) {
+        throw new Error(data.error_message || data.error || "Không cập nhật được route.");
+      }
+
+      const nextRoute: PublicVmRouteSnapshot = {
+        route_key: vm.name,
+        fqdn: data.fqdn,
+        hostname: data.hostname,
+        domain: data.domain || selectedRoute?.domain || routes[0]?.domain || "",
+        target_ip: data.ip,
+        listen_port: data.listen_port,
+        target_port: data.target_port,
+        config_path: selectedRoute?.config_path || "",
+      };
+      const replacedPort = selectedRoute?.listen_port;
+      const nextRoutes = routes.filter(
+        (item) => item.listen_port !== data.listen_port && item.listen_port !== replacedPort,
+      );
+
+      applyRouteDraft([...nextRoutes, nextRoute], data.listen_port, data.target_port);
+      setMessage("");
+      toast.success("Đã cập nhật cổng công khai", {
+        description: `${buildPublicUrl(nextRoute.fqdn, nextRoute.listen_port)} -> ${nextRoute.target_port}`,
+      });
+    } catch (error) {
+      const detail =
+        error instanceof Error ? error.message : "Không cập nhật được route công khai.";
+      setMessage(detail);
+      toast.error("Cập nhật route thất bại", { description: detail });
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleDelete() {
+    if (!vm || !selectedRoute) {
+      return;
+    }
+
+    setDeleting(true);
+
+    try {
+      const response = await fetch("/api/update-vm-route", {
+        method: "DELETE",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          vm_name: vm.name,
+          listen_port: selectedRoute.listen_port,
+        }),
+      });
+      const data = await response.json();
+
+      if (!response.ok || !data.success) {
+        throw new Error(data.error_message || data.error || "Không xóa được cổng host.");
+      }
+
+      const nextRoutes = routes.filter((item) => item.listen_port !== selectedRoute.listen_port);
+      applyRouteDraft(nextRoutes, null, selectedRoute.target_port);
+      setMessage("");
+      toast.success("Đã xóa cổng host công khai", {
+        description: buildPublicUrl(selectedRoute.fqdn, selectedRoute.listen_port),
+      });
+    } catch (error) {
+      const detail =
+        error instanceof Error ? error.message : "Không xóa được cổng host công khai.";
+      setMessage(detail);
+      toast.error("Xóa route thất bại", { description: detail });
+    } finally {
+      setDeleting(false);
+    }
+  }
+
+  async function handleCopyUrl() {
+    const copyUrl = selectedPublicUrl || previewPublicUrl;
+
+    if (!copyUrl) {
+      toast.error("VM này chưa có URL công khai để sao chép.");
+      return;
+    }
+
+    const copied = await copyToClipboard(copyUrl);
+
+    if (!copied) {
+      toast.error("Không thể sao chép URL công khai.");
+      return;
+    }
+
+    toast.success("Đã sao chép URL công khai.");
+  }
+
+  return (
+    <div className="surface-panel relative overflow-hidden rounded-[1.6rem] border border-border/60 bg-background/75 p-5 shadow-[0_24px_80px_-48px_rgba(15,23,42,0.95)] backdrop-blur">
+      <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-primary/45 to-transparent" />
+      <div className="pointer-events-none absolute -left-16 top-0 h-32 w-32 rounded-full bg-primary/10 blur-3xl" />
+      <div className="pointer-events-none absolute -bottom-20 right-0 h-36 w-36 rounded-full bg-emerald-500/10 blur-3xl" />
+      <SectionLabel
+        title="Truy cập công khai"
+        description="Giữ nguyên thẻ route trong Terminal, nhưng cho phép một VM host nhiều cổng công khai khác nhau."
+      />
+
+      {vm ? (
+        <div className="relative mt-5 overflow-hidden rounded-[1.35rem] border border-border/70 bg-[linear-gradient(160deg,rgba(8,12,20,0.96),rgba(12,20,32,0.92))] p-4 shadow-[0_32px_90px_-56px_rgba(15,23,42,1)]">
+          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(250,204,21,0.12),transparent_36%),radial-gradient(circle_at_bottom_right,rgba(16,185,129,0.14),transparent_40%)]" />
+
+          <div className="relative">
+            <div className="flex flex-col gap-3">
+              <div className="inline-flex w-fit items-center gap-2 rounded-full border border-primary/20 bg-primary/10 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.18em] text-primary">
+                <Globe className="h-3.5 w-3.5" />
+                URL công khai
+              </div>
+
+              <div className="space-y-3">
+                <div>
+                  <p className="break-all text-lg font-semibold leading-7 text-foreground">
+                    {selectedPublicUrl || previewPublicUrl || "Chưa có URL công khai"}
+                  </p>
+                  <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                    Dùng route này để trỏ truy cập ngoài vào đúng dịch vụ đang chạy bên trong VM.
+                  </p>
+                  {previewPublicUrl && selectedPublicUrl && previewPublicUrl !== selectedPublicUrl ? (
+                    <p className="mt-2 text-xs leading-5 text-primary">
+                      Xem trước sau khi lưu: {previewPublicUrl}
+                    </p>
+                  ) : null}
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => void handleCopyUrl()}
+                  disabled={!selectedPublicUrl && !previewPublicUrl}
+                  className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-full border border-border/70 bg-background/72 px-4 text-sm font-semibold text-foreground transition hover:border-primary/35 hover:text-primary disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <Clipboard className="h-4 w-4" />
+                  Sao chép URL
+                </button>
+              </div>
+            </div>
+
+            <div className="mt-4 grid gap-3 sm:grid-cols-2">
+              <div className="rounded-[1rem] border border-border/70 bg-background/72 px-4 py-3">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                  Đích hiện tại
+                </p>
+                <p className="mt-2 break-all font-mono text-sm font-semibold text-foreground">
+                  {currentTargetIp || "IP của VM"}:{previewTargetPort || selectedRoute?.target_port || 3000}
+                </p>
+              </div>
+              <div className="rounded-[1rem] border border-border/70 bg-background/72 px-4 py-3">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                  VM đang chọn
+                </p>
+                <p className="mt-2 text-sm font-semibold text-foreground">{vm.name}</p>
+              </div>
+            </div>
+
+            {message ? (
+              <div className="mt-4 flex items-start gap-3 rounded-[1rem] border border-amber-500/25 bg-amber-500/10 px-4 py-3 text-sm leading-6 text-amber-100">
+                <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0" />
+                <p>{message}</p>
+              </div>
+            ) : routes.length === 0 ? (
+              <div className="mt-4 rounded-[1rem] border border-primary/20 bg-primary/10 px-4 py-3 text-sm leading-6 text-primary/90">
+                VM này chưa có cổng host nào. Chọn cổng host và cổng đích bên dưới để tạo route đầu tiên.
+              </div>
+            ) : (
+              <div className="mt-4 rounded-[1rem] border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-sm leading-6 text-emerald-100">
+                Route đã sẵn sàng cho VM này. Bạn có thể chọn từng cổng đang host, sửa cổng và lưu lại bất cứ lúc nào.
+              </div>
+            )}
+
+            <div className="mt-5">
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                  Cổng đang host
+                </p>
+                <button
+                  type="button"
+                  onClick={startNewRoute}
+                  disabled={isBusy}
+                  className="rounded-full border border-border/70 bg-background/70 px-3 py-1.5 text-xs font-semibold text-foreground transition hover:border-primary/30 hover:text-primary disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  + Thêm cổng
+                </button>
+              </div>
+              {routes.length > 0 ? (
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {routes.map((item) => {
+                    const selected = item.listen_port === selectedRoute?.listen_port;
+
+                    return (
+                      <button
+                        key={item.listen_port}
+                        type="button"
+                        onClick={() => selectRoute(item)}
+                        disabled={isBusy}
+                        className={`rounded-full border px-3.5 py-2 text-xs font-semibold transition ${
+                          selected
+                            ? "border-primary/40 bg-primary/12 text-primary shadow-[0_0_0_1px_rgba(59,130,246,0.12)]"
+                            : "border-border/70 bg-background/70 text-foreground hover:border-primary/30"
+                        }`}
+                      >
+                        {item.listen_port}
+                      </button>
+                    );
+                  })}
+                </div>
+              ) : (
+                <p className="mt-3 text-xs leading-5 text-muted-foreground">
+                  Chưa có cổng host nào. Bạn có thể tạo cổng đầu tiên ngay bên dưới.
+                </p>
+              )}
+            </div>
+
+            <div className="mt-5">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                Cổng phổ biến
+              </p>
+              <div className="mt-3 flex flex-wrap gap-2">
+                {[3000, 8080, 443, 300].map((port) => {
+                  const selected = Number(hostPortInput) === port;
+
+                  return (
+                    <button
+                      key={port}
+                      type="button"
+                      onClick={() => {
+                        const existingRoute = routes.find((item) => item.listen_port === port);
+
+                        if (existingRoute) {
+                          selectRoute(existingRoute);
+                          return;
+                        }
+
+                        setHostPortInput(String(port));
+                      }}
+                      disabled={isBusy}
+                      className={`rounded-full border px-3.5 py-2 text-xs font-semibold transition ${
+                        selected
+                          ? "border-primary/40 bg-primary/12 text-primary shadow-[0_0_0_1px_rgba(59,130,246,0.12)]"
+                          : "border-border/70 bg-background/70 text-foreground hover:border-primary/30"
+                      }`}
+                    >
+                      {port}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className="mt-5 grid gap-3">
+              <label className="block">
+                <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                  Cổng host
+                </span>
+                <input
+                  type="number"
+                  min={1}
+                  max={65535}
+                  inputMode="numeric"
+                  value={hostPortInput}
+                  onChange={(event) => setHostPortInput(event.target.value)}
+                  disabled={isBusy}
+                  className="mt-2 h-12 w-full rounded-[1rem] border border-border/70 bg-background/75 px-4 py-3 font-mono text-sm text-foreground outline-none transition focus:border-primary/35 disabled:cursor-not-allowed disabled:opacity-60"
+                />
+                <p className="mt-2 text-xs leading-5 text-muted-foreground">
+                  Port public mà Nginx sẽ lắng nghe trên {vm.name}.orbitstack.app:&lt;port&gt;.
+                </p>
+              </label>
+
+              <label className="block">
+                <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                  Cổng đích
+                </span>
+                <input
+                  type="number"
+                  min={1}
+                  max={65535}
+                  inputMode="numeric"
+                  value={targetPortInput}
+                  onChange={(event) => setTargetPortInput(event.target.value)}
+                  disabled={isBusy}
+                  className="mt-2 h-12 w-full rounded-[1rem] border border-border/70 bg-background/75 px-4 py-3 font-mono text-sm text-foreground outline-none transition focus:border-primary/35 disabled:cursor-not-allowed disabled:opacity-60"
+                />
+                <p className="mt-2 text-xs leading-5 text-muted-foreground">
+                  Nhập cổng dịch vụ thật đang chạy trong VM, ví dụ 3000, 8080 hoặc 443.
+                </p>
+              </label>
+
+              <div className={`grid gap-3 ${selectedRoute ? "sm:grid-cols-[minmax(0,1fr)_auto]" : ""}`}>
+                <button
+                  type="button"
+                  onClick={() => void handleSave()}
+                  disabled={isBusy}
+                  className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-[1rem] bg-foreground px-4 text-sm font-semibold text-background transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {loading || saving ? (
+                    <RefreshCw className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Save className="h-4 w-4" />
+                  )}
+                  {selectedRoute ? "Lưu cổng" : "Tạo cổng host"}
+                </button>
+
+                {selectedRoute ? (
+                  <button
+                    type="button"
+                    onClick={() => void handleDelete()}
+                    disabled={isBusy}
+                    className="inline-flex h-12 items-center justify-center gap-2 rounded-[1rem] border border-rose-500/25 bg-rose-500/10 px-4 text-sm font-semibold text-rose-200 transition hover:border-rose-500/40 hover:bg-rose-500/15 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {deleting ? (
+                      <RefreshCw className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Trash2 className="h-4 w-4" />
+                    )}
+                    Xóa cổng
+                  </button>
+                ) : null}
+              </div>
             </div>
           </div>
         </div>
@@ -1027,7 +1574,7 @@ export default function TerminalWorkbench({
             </button>
           </div>
 
-          <TerminalRoutePanel vm={selectedVm} />
+          <TerminalMultiRoutePanel vm={selectedVm} />
 
           <div className="surface-panel rounded-[1.5rem] p-5">
             <SectionLabel
