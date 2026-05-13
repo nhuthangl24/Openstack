@@ -7,21 +7,18 @@ import {
   Copy,
   Cpu,
   ExternalLink,
-  Globe,
   KeyRound,
   Loader2,
   Monitor,
   Package,
-  Save,
   Server,
   Terminal,
-  TriangleAlert,
   Wifi,
   X,
 } from "lucide-react";
-import { toast } from "sonner";
-import { Input } from "@/components/ui/input";
+import PublicRouteManager from "@/components/PublicRouteManager";
 import { copyToClipboard } from "@/lib/clipboard";
+import { type VmRouteSnapshot } from "@/lib/public-routes";
 
 interface VMInfo {
   vm_name: string;
@@ -34,6 +31,7 @@ interface VMInfo {
   ip?: string;
   hostname?: string;
   fqdn?: string;
+  route_listen_port?: number;
   route_target_port?: number;
   route_sync_warning?: string;
 }
@@ -42,16 +40,6 @@ interface VMSuccessModalProps {
   info: VMInfo;
   onOpenTerminal?: (host: string) => void;
   onClose: () => void;
-}
-
-const COMMON_ROUTE_PORTS = [3000, 8080, 443, 300];
-
-function getInitialRoutePort(value?: number) {
-  if (typeof value === "number" && Number.isInteger(value) && value >= 1 && value <= 65535) {
-    return value;
-  }
-
-  return 3000;
 }
 
 function buildFallbackHostname(vmName: string, hostname?: string) {
@@ -65,7 +53,7 @@ function buildFallbackHostname(vmName: string, hostname?: string) {
     .replace(/^-|-$/g, "");
 }
 
-function CopyButton({
+function SummaryCopyButton({
   text,
   label,
 }: {
@@ -108,20 +96,36 @@ export default function VMSuccessModal({
     () => buildFallbackHostname(info.vm_name, info.hostname),
     [info.hostname, info.vm_name],
   );
-  const initialPort = getInitialRoutePort(info.route_target_port);
   const [ip, setIp] = useState(initialIp);
   const [attempts, setAttempts] = useState(0);
   const [ipStatus, setIpStatus] = useState<"polling" | "found" | "timeout">(
     initialIp ? "found" : "polling",
   );
-  const [fqdn, setFqdn] = useState(
-    info.fqdn?.trim() || (hostnameLabel ? `${hostnameLabel}.orbitstack.app` : ""),
-  );
-  const [routePortInput, setRoutePortInput] = useState(String(initialPort));
-  const [currentRoutePort, setCurrentRoutePort] = useState(initialPort);
-  const [routeNotice, setRouteNotice] = useState(info.route_sync_warning || "");
-  const [isSavingRoute, setIsSavingRoute] = useState(false);
   const maxAttempts = 30;
+  const initialRoutes = useMemo<VmRouteSnapshot[]>(() => {
+    if (
+      !info.fqdn ||
+      typeof info.route_listen_port !== "number" ||
+      typeof info.route_target_port !== "number"
+    ) {
+      return [];
+    }
+
+    return [
+      {
+        route_key: info.vm_name,
+        hostname: hostnameLabel,
+        domain: info.fqdn.startsWith(`${hostnameLabel}.`)
+          ? info.fqdn.slice(hostnameLabel.length + 1)
+          : "",
+        fqdn: info.fqdn,
+        target_ip: initialIp,
+        target_port: info.route_target_port,
+        listen_port: info.route_listen_port,
+        config_path: "",
+      },
+    ];
+  }, [hostnameLabel, info.fqdn, info.route_listen_port, info.route_target_port, info.vm_name, initialIp]);
 
   useEffect(() => {
     async function pollIp() {
@@ -176,67 +180,6 @@ export default function VMSuccessModal({
   }, [onClose]);
 
   const sshCommand = `ssh ubuntu@${ip || "<IP>"}`;
-  const publicUrl = fqdn ? `https://${fqdn}` : "";
-
-  async function handleRouteSave() {
-    const targetPort = Number(routePortInput);
-
-    if (!Number.isInteger(targetPort) || targetPort < 1 || targetPort > 65535) {
-      const message = "Port khong hop le. Hay nhap so tu 1 den 65535.";
-      setRouteNotice(message);
-      toast.error("Khong cap nhat duoc route", { description: message });
-      return;
-    }
-
-    setIsSavingRoute(true);
-
-    try {
-      const response = await fetch("/api/update-vm-route", {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          vm_name: info.vm_name,
-          hostname: hostnameLabel,
-          target_port: targetPort,
-          target_ip: ip || undefined,
-        }),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok || !data.success) {
-        throw new Error(
-          data.error_message || data.error || "Khong cap nhat duoc route Nginx.",
-        );
-      }
-
-      if (data.ip) {
-        setIp(data.ip);
-        setIpStatus("found");
-      }
-
-      if (data.fqdn) {
-        setFqdn(data.fqdn);
-      }
-
-      setCurrentRoutePort(data.target_port || targetPort);
-      setRoutePortInput(String(data.target_port || targetPort));
-      setRouteNotice("");
-
-      toast.success("Da cap nhat port public", {
-        description: `${data.fqdn || fqdn || hostnameLabel} -> ${data.target_port || targetPort}`,
-      });
-    } catch (error) {
-      const message =
-        error instanceof Error ? error.message : "Khong cap nhat duoc route Nginx.";
-      setRouteNotice(message);
-      toast.error("Cap nhat route that bai", { description: message });
-    } finally {
-      setIsSavingRoute(false);
-    }
-  }
 
   return (
     <div
@@ -306,7 +249,7 @@ export default function VMSuccessModal({
                   </div>
                 </div>
 
-                {ip && <CopyButton text={ip} label="IP" />}
+                {ip && <SummaryCopyButton text={ip} label="IP" />}
               </div>
             </div>
 
@@ -318,7 +261,7 @@ export default function VMSuccessModal({
                   </p>
                   <p className="mt-2 font-mono text-sm text-foreground">{sshCommand}</p>
                 </div>
-                <CopyButton text={sshCommand} label="SSH" />
+                <SummaryCopyButton text={sshCommand} label="SSH" />
               </div>
 
               {ip && onOpenTerminal && (
@@ -333,101 +276,17 @@ export default function VMSuccessModal({
               )}
             </div>
 
-            <div className="rounded-[1.6rem] border border-border/70 bg-background/70 p-5">
-              <div className="flex items-center justify-between gap-4">
-                <div className="flex items-center gap-3">
-                  <Globe className="h-4 w-4 text-primary" />
-                  <div>
-                    <p className="text-xs font-semibold uppercase tracking-[0.22em] text-muted-foreground">
-                      Public route
-                    </p>
-                    <p className="mt-2 font-mono text-sm text-foreground">
-                      {publicUrl || "Dang cho tao hostname public"}
-                    </p>
-                    <p className="mt-1 text-xs text-muted-foreground">
-                      Dang route den {ip || "IP cua VM"}:{currentRoutePort}
-                    </p>
-                  </div>
-                </div>
-
-                {publicUrl && <CopyButton text={publicUrl} label="URL" />}
-              </div>
-
-              {routeNotice && (
-                <div className="mt-4 rounded-[1.2rem] border border-amber-500/25 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">
-                  <div className="flex items-start gap-3">
-                    <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0" />
-                    <p>{routeNotice}</p>
-                  </div>
-                </div>
-              )}
-
-              <div className="mt-4">
-                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                  Doi target port
-                </p>
-                <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                  Neu app ben trong VM chay o cong khac, hay doi port tai day. Vi du:
-                  3000, 8080, 443 hoac 300.
-                </p>
-
-                <div className="mt-4 flex flex-wrap gap-2">
-                  {COMMON_ROUTE_PORTS.map((port) => {
-                    const selected = Number(routePortInput) === port;
-
-                    return (
-                      <button
-                        key={port}
-                        type="button"
-                        onClick={() => setRoutePortInput(String(port))}
-                        className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition ${
-                          selected
-                            ? "border-primary/40 bg-primary/10 text-primary"
-                            : "border-border/70 bg-background/70 text-foreground hover:border-primary/30"
-                        }`}
-                      >
-                        {port}
-                      </button>
-                    );
-                  })}
-                </div>
-
-                <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-end">
-                  <div className="flex-1">
-                    <label
-                      htmlFor="route-target-port"
-                      className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground"
-                    >
-                      Target port
-                    </label>
-                    <Input
-                      id="route-target-port"
-                      type="number"
-                      min={1}
-                      max={65535}
-                      inputMode="numeric"
-                      value={routePortInput}
-                      onChange={(event) => setRoutePortInput(event.target.value)}
-                      className="mt-2 h-11 bg-card/70 font-mono"
-                    />
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={() => void handleRouteSave()}
-                    disabled={isSavingRoute}
-                    className="inline-flex h-11 items-center justify-center gap-2 rounded-full bg-foreground px-5 text-sm font-semibold text-background transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
-                  >
-                    {isSavingRoute ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <Save className="h-4 w-4" />
-                    )}
-                    Luu port public
-                  </button>
-                </div>
-              </div>
-            </div>
+            <PublicRouteManager
+              vmName={info.vm_name}
+              vmId={info.vm_id}
+              vmIp={ip || undefined}
+              hostname={hostnameLabel}
+              initialRoutes={initialRoutes}
+              initialNotice={info.route_sync_warning || ""}
+              className="rounded-[1.6rem] p-5"
+              title="Public routes"
+              description="Mot VM co the host nhieu cong cong khai khac nhau tren cung domain nay."
+            />
 
             <div className="grid gap-4 sm:grid-cols-2">
               <SummaryCard
@@ -532,7 +391,7 @@ function SummaryCard({
             {label}
           </p>
         </div>
-        {copyValue && <CopyButton text={copyValue} label={label} />}
+        {copyValue && <SummaryCopyButton text={copyValue} label={label} />}
       </div>
       <p className="mt-3 break-all text-sm font-medium text-foreground">{value}</p>
     </div>

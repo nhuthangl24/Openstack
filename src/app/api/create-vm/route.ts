@@ -8,6 +8,7 @@ import {
 } from "@/lib/openstack";
 import {
   getConfiguredRouteDomain,
+  getConfiguredRouteListenPort,
   getConfiguredRouteTargetPort,
   syncVmRoute,
 } from "@/lib/nginx-route-sync";
@@ -136,6 +137,7 @@ export async function POST(request: NextRequest) {
         routeKey: instance_name,
         hostname: hostnameLabel,
         targetIp: ip,
+        listenPort: getConfiguredRouteListenPort(),
       });
     } catch (routeError) {
       routeSyncWarning =
@@ -153,6 +155,7 @@ export async function POST(request: NextRequest) {
       ip,
       hostname: hostnameLabel,
       fqdn: `${hostnameLabel}.${getConfiguredRouteDomain()}`,
+      route_listen_port: getConfiguredRouteListenPort(),
       route_target_port: getConfiguredRouteTargetPort(),
       route_sync_warning: routeSyncWarning || undefined,
     });

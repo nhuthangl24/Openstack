@@ -55,6 +55,7 @@ curl http://127.0.0.1:9055/health
 NGINX_ROUTE_API_BASE_URL=http://20.41.119.30:9055
 NGINX_ROUTE_API_TOKEN=change-this-token
 NGINX_ROUTE_DOMAIN=orbitstack.app
+NGINX_ROUTE_LISTEN_PORT=443
 NGINX_ROUTE_TARGET_PORT=3000
 ```
 
@@ -79,6 +80,7 @@ Content-Type: application/json
   "route_key": "demo-vm",
   "hostname": "demo",
   "target_ip": "10.0.0.25",
+  "listen_port": 3000,
   "target_port": 3000,
   "domain": "orbitstack.app"
 }
@@ -96,6 +98,8 @@ Content-Type: application/json
 {
   "hostname": "demo",
   "target_ip": "10.0.0.25",
+  "listen_port": 8080,
+  "previous_listen_port": 3000,
   "target_port": 3000,
   "domain": "orbitstack.app"
 }
@@ -105,5 +109,12 @@ Content-Type: application/json
 
 ```http
 DELETE /routes/demo-vm
+Authorization: Bearer <token>
+```
+
+### Xoa mot host port cu the
+
+```http
+DELETE /routes/demo-vm?listen_port=8080
 Authorization: Bearer <token>
 ```

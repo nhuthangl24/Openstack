@@ -31,6 +31,7 @@ interface CreateServerModalProps {
     ip?: string;
     hostname?: string;
     fqdn?: string;
+    route_listen_port?: number;
     route_target_port?: number;
     route_sync_warning?: string;
   }) => void;
@@ -238,6 +239,10 @@ export default function CreateServerModal({
         ip: data.ip || "",
         hostname: data.hostname || name,
         fqdn: data.fqdn || "",
+        route_listen_port:
+          typeof data.route_listen_port === "number"
+            ? data.route_listen_port
+            : undefined,
         route_target_port:
           typeof data.route_target_port === "number"
             ? data.route_target_port
